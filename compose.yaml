@@ -1,0 +1,13 @@
+services:
+  compiler:
+    build: .
+    volumes:
+      - ./source.genpay:/compiler/source.genpay
+      - cargo_cache:/usr/local/cargo/registry
+      - llvm_build:/llvm
+    working_dir: /compiler
+    command: bash -c 'genpay source.genpay output && sync && echo -e "\n-- LAUNCHING COMPILED BINARY --\n" && ./output && rm output'
+
+volumes:
+  cargo_cache:
+  llvm_build:

@@ -1,0 +1,371 @@
+_link_c "@string.c"
+
+extern "C" fn __string_replace(*char, *char, *char);
+extern "C" fn memcpy(*void, *void, usize) *void;
+extern "C" fn malloc(usize) *void;
+extern "C" fn realloc(*void, usize) *void;
+extern "C" fn free(*void);
+
+extern "C" fn strlen(*char) usize;
+extern "C" fn strcat(*char, *char);
+extern "C" fn strcpy(*char, *char);
+
+extern "C" fn strchr(*char, char) *char;
+extern "C" fn strstr(*char, *char) *char;
+
+extern "C" fn toupper(char) char;
+extern "C" fn tolower(char) char;
+
+include "@bytes"
+
+pub struct String {
+  ptr: *char,
+  size: usize,
+  len: usize,
+
+  iterator_ptr: usize,
+
+  fn new() String {
+    let ptr: *char = malloc(sizeof!(char));
+
+    if ptr == NULL {
+      panic!("Null pointer appeared on heap allocation: `String.new`");
+    }
+    
+    return String { .ptr = ptr, .size = sizeof!(char), .len = 0, .iterator_ptr = 0 };
+  }
+
+  fn from(value: *char) String {
+    let len = strlen(value);
+    let size = sizeof!(char) * len;
+    let ptr: *char = malloc(size);
+
+    if ptr == NULL {
+      panic!("Null pointer appeared on heap allocation: `String.from`");
+    }
+
+    strcpy(ptr, value);
+    return String { .ptr = ptr, .size = size, .len = len, .iterator_ptr = 0 };
+  }
+
+  fn with_capacity(capacity: usize) String {
+    let size = sizeof!(char) * capacity;
+    let ptr: *char = malloc(size);
+
+    if ptr == NULL {
+      panic!("Null pointer appeared on heap allocation: `String.from`");
+    }
+
+    return String { .ptr = ptr, .size = size, .len = 0, .iterator_ptr = 0 };
+  }
+
+  fn clone(&self) String {
+    return String.from(self.ptr);
+  }
+
+  fn len(&self) usize {
+    return self.len;
+  }
+
+  fn capacity(&self) usize {
+    return self.size;
+  }
+
+  fn is_empty(&self) bool {
+    return self.len == 0;
+  }
+
+  fn push(&self, value: char) {
+    if self.size < 1 {
+      panic!("Unable to push into dropped string: `String.push`");
+    }
+
+    self.len += 1;
+
+    if self.size < self.len {
+      let temp: *char = realloc(self.ptr, self.len);
+
+      if temp == NULL {
+        free(self.ptr);
+        panic!("Reallocation returned NULL pointer: `String.push`");
+      }
+
+      self.ptr = temp;
+      self.size = self.len;
+    }
+
+    let ptr = self.ptr;
+    ptr[self.len - 1] = value;
+  }
+
+  fn push_str(&self, value: *char) {
+    if self.size < 1 {
+      panic!("Unable to push into dropped string: `String.push_str`");
+    }
+
+    self.len += strlen(value);
+
+    if self.size < self.len {
+      let temp: *char = realloc(self.ptr, self.len);
+
+      if temp == NULL {
+        free(self.ptr);
+        panic!("Reallocation returned NULL pointer: `String.push_str`");
+      }
+
+      self.ptr = temp;
+      self.size = self.len;
+    }
+
+    strcat(self.ptr, value);
+  }
+
+  fn push_string(&self, value: String) {
+    self.push_str(value.ptr);
+  }
+
+  fn pop(&self) char {
+    if self.size < 1 {
+      panic!("Unable to pop dropped string: `String.pop`");
+    }
+    
+    if self.len < 1 {
+      return '\0';
+    }
+
+    self.len -= 1;
+
+    let ptr = self.ptr;
+    let output = ptr[self.len];
+
+    ptr[self.len] = '\0';
+
+    if self.size > self.len {
+      let temp: *char = realloc(self.ptr, self.len);
+
+      if temp == NULL {
+        free(self.ptr);
+        panic!("Reallocation returned NULL pointer: `String.pop`");
+      }
+
+      self.ptr = temp;
+      self.size = self.len;
+    }
+
+    return output;
+  }
+
+  fn peek(&self, position: usize) char {
+    if self.size < 1 {
+      panic!("Unable to peek dropped string: `String.peek`");
+    }
+    
+    if self.len < 1 {
+      return '\0'
+    }
+
+    if position >= self.len {
+      panic!("Peek position is {}, but String len is {}: `String.peek`", position, self.len);
+    }
+
+    let ptr = self.ptr;
+    return ptr[position];
+  }
+
+  fn set(&self, position: usize, value: char) {
+    if self.size < 1 {
+      panic!("Unable to set dropped string: `String.set`");
+    }
+    
+    if self.len < 1 {
+      return;
+    }
+
+    if position >= self.len {
+      panic!("Set position is {}, but String len is {}: `String.set`", position, self.len);
+    }
+
+    let ptr = self.ptr;
+    ptr[position] = value;
+  }
+
+  fn find(&self, value: char) usize {
+    let ptr = strchr(self.ptr, value);
+    let offset: usize = 0;
+
+    while *ptr != '\0' {
+      ptr++;
+      offset++;
+    }
+
+    let len = self.len;
+    let position = len - offset;
+
+    return position;
+  }
+
+  fn find_str(&self, value: *char) usize {
+    let ptr = strstr(self.ptr, value);
+    let offset: usize = 0;
+
+    while *ptr != '\0' {
+      ptr++;
+      offset++;
+    }
+
+    let len = self.len;
+    let position = len - offset;
+
+    return position;
+  }
+
+  fn contains(&self, value: char) bool {
+    if self.size < 1 {
+      panic!("Unable to operate dropped string: `String.contains`");
+    }
+    return strchr(self.ptr, value) != NULL;
+  }
+
+  fn contains_str(&self, value: *char) bool {
+    if self.size < 1 {
+      panic!("Unable to operate dropped string: `String.contains_str`");
+    }
+    return strstr(self.ptr, value) != NULL;
+  }
+
+  fn to_uppercase(&self) {
+    let ptr = self.ptr;
+
+    while *ptr != '\0' {
+      *ptr = toupper(*ptr);
+      ptr++;
+    }
+  }
+
+  fn to_lowercase(&self) {
+    let ptr = self.ptr;
+
+    while *ptr != '\0' {
+      *ptr = tolower(*ptr);
+      ptr++;
+    }
+  }
+
+  fn replace(&self, from: *char, to: *char) {
+    __string_replace(self.ptr, from, to);
+
+    let new_size = strlen(self.ptr);
+    let new_ptr: *char = realloc(self.ptr, new_size);
+
+    if new_ptr == NULL {
+      panic!("Null pointer appeared on heap allocation: `String.replace`");
+    }
+
+    self.ptr = new_ptr;
+    self.size = new_size;
+    self.len = new_size;
+  }
+
+  fn reverse(&self) {
+    if self.ptr == NULL || self.len < 1 {
+      return;
+    }
+
+    let ptr = self.ptr;
+    let len = strlen(ptr);
+    let start = 0;
+    let end = len - 1;
+    
+    while (start < end) {
+      let temp: char = ptr[start];
+      ptr[start] = ptr[end];
+      ptr[end] = temp;
+
+      start++;
+      end--;
+    }
+  }
+
+  fn clone_reversed(&self) String {
+    let instance = self.clone();
+    instance.reverse();
+
+    return instance;
+  }
+
+  fn clear(&self) {
+    let ptr = self.ptr;
+    ptr[0] = '\0';
+
+    self.len = 0;
+  }
+
+  fn to_bytes(&self) Bytes {
+    let buffer = Bytes.with_size(self.len);
+    let ptr = self.ptr;
+
+    while *ptr != '\0' {
+      buffer.push(cast!(*ptr, u8));
+      ptr++;
+    }
+
+    return buffer;
+  }
+
+  fn as_ptr(&self) *char {
+    return self.ptr;
+  }
+
+  // tech
+
+  fn display(&self) *char {
+    if self.size < 1 {
+      return "<dropped>";
+    }
+
+    return self.ptr;
+  }
+
+  fn drop(&self) {
+    if self.size != 0 {
+      self.len = 0;
+      self.size = 0;
+
+      free(self.ptr);
+    }
+  }
+
+  fn iterate(&self) (char, bool) {
+    if self.iterator_ptr >= self.len {
+      self.iterator_ptr = 0;
+      return (' ', false);
+    }
+
+    let ptr = self.ptr;
+    let ch = ptr[self.iterator_ptr];
+
+    self.iterator_ptr += 1;
+    return (ch, true);
+  }
+
+  fn compare(&self, other: *String) i32 {
+    if self.ptr == other.ptr {
+      return 0;
+    }
+
+    if self.len > other.len { return -1 }
+    return 1;
+  }
+
+  fn slice(&self, index: usize) char {
+    return self.peek(index);
+  }
+
+  fn slice_assign(&self, index: usize, value: char) {
+    self.set(index, value);
+  }
+
+  fn deref(&self) *char {
+    return self.as_ptr();
+  }
+}
