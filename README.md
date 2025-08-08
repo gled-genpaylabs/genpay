@@ -32,7 +32,6 @@ See official documentation here: [Genpay Documentation](https://genpay-docs.verc
 *  **Open Source**. You can always participate in the project's development.
 
 ## Technical Details
-#### 🔧 Main
 - **Language:** Rust
 - **Build Systems:** Cargo, Make
 - **Backend:** inkwell (LLVM 1.18.6^)
