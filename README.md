@@ -18,22 +18,20 @@
   </div>
 </div>
 
-## 👀 Description
+## Description
 **Genpay** - a statically-typed compiling programming language inspired by languages like C, C++, Zig, and Rust. <br><br>
 It provides tools for system programming, including: structures, C-like enums with supported functions, type definitions, backward compatibility with C, pointers, recursion, and more. <br/>
 See official documentation here: [Genpay Documentation](https://genpay-docs.vercel.app/)
 
-**⚠️ The project is currently under active development and may be unstable.**
+##  Features
+*  **Simplicity**. The language syntax is easy to read and write.
+*  **Fast**. The compiler uses LLVM as a backend for the best performance.
+*  **Clean**. Nothing superfluous - just basic tools for everything.
+*  **Modern**. Syntax and mechanics are inspired by Rust and Zig.
+*  **Strict**. Analyzers and checkers will prevent most compile-time errors.
+*  **Open Source**. You can always participate in the project's development.
 
-## 🎯 Features
-* ⚡ **Simplicity**. The language syntax is easy to read and write.
-* 🚀 **Fast**. The compiler uses LLVM as a backend for the best performance.
-* ✨ **Clean**. Nothing superfluous - just basic tools for everything.
-* 🌐 **Modern**. Syntax and mechanics are inspired by Rust and Zig.
-* 📑 **Strict**. Analyzers and checkers will prevent most compile-time errors.
-* 🌎 **Open Source**. You can always participate in the project's development.
-
-## ⚙️ Technical Details
+## Technical Details
 #### 🔧 Main
 - **Language:** Rust
 - **Build Systems:** Cargo, Make
@@ -42,7 +40,7 @@ See official documentation here: [Genpay Documentation](https://genpay-docs.verc
 - **Error Reporting:** miette, colored
 - **Command Line Interface:** clap
 
-#### 🌀 Structure
+#### Structure
 The project is divided into submodules using a virtual workspace environment:
 - `genpay` - main executable module. Combines all submodules into the main process.
 - `genpay-lexer` - lexical analyzer. Converts source code into abstract data types (Tokens).
@@ -51,20 +49,20 @@ The project is divided into submodules using a virtual workspace environment:
 - `genpay-codegen` - code generator. Recursively compiles the AST to an LLVM IR module.
 - `genpay-linker` - module linker. Compiles the LLVM IR module to an object file and links it.
 
-## 💫 Installation
+## Installation
 1. Install [clang](https://clang.llvm.org/)
 2. Download the latest release from GitHub: [Latest Release]
 3. Unpack it anywhere and add to your `PATH` variable. Instructions for: [Windows](https://stackoverflow.com/questions/44272416/how-to-add-a-folder-to-path-environment-variable-in-windows-10-with-screensho), [Linux](https://phoenixnap.com/kb/linux-add-to-path), and [macOS](https://stackoverflow.com/questions/22465332/setting-path-environment-variable-in-macos-permanently)
 4. Restart your system or environment.
 
-## 🛠️ Building
+## Building
 1. Install the [Rust Programming Language](https://www.rust-lang.org/) from the official site.
 2. Install [LLVM](https://www.llvm.org/docs/GettingStarted.html) following the official tutorial.
 3. Clone this repository: `git clone https://github.com/mealet/genpay`
 4. Go to its directory and run: `cargo build --release`
 5. The executable file will be in the `target/release` folder.
 
-## 👮 Repository
+## Repository
 The project is licensed under the BSD-3 Clause License. <br>
 For more information see [License File](https://github.com/gled-genpaylabs/genpay/blob/master/LICENSE) <br/>
 You can check the contribution guide by: [CONTRIBUTING.md](https://github.com/gled-genpaylabs/genpay/blob/master/CONTRIBUTING.md).
