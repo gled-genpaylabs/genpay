@@ -57,7 +57,7 @@ The project is divided into submodules using a virtual workspace environment:
 ## Building
 1. Install the [Rust Programming Language](https://www.rust-lang.org/) from the official site.
 2. Install [LLVM](https://www.llvm.org/docs/GettingStarted.html) following the official tutorial.
-3. Clone this repository: `git clone https://github.com/mealet/genpay`
+3. Clone this repository: `git clone https://github.com/gled-genpaylabs/genpay`
 4. Go to its directory and run: `cargo build --release`
 5. The executable file will be in the `target/release` folder.
 
