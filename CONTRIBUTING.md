@@ -1,15 +1,15 @@
-Hello! Thank you for your interest in project's life 🍀 <br/>
+Hello! Thank you for your interest in project's life  <br/>
 Here's contribution guide for you:
 
-### 🍏 Repository Issues
+### Repository Issues
 Found a bug? Wanna suggest an improvement? You can always open issue in this repository:
-1. Open repo's [issues](https://github.com/mealet/genpay/issues)
+1. Open repo's [issues](https://github.com/gled-genpaylabs/genpay/issues)
 2. Please ensure that your problem/improvement wasn't already reported
 3. Push the button `Create issue`
 4. Choose any template, or create blank issue
 5. Follow the instructions in template
 
-### 🚀 Pull Requests
+### Pull Requests
 > [!NOTE]
 > ### Ensure that
 > - your code matches the project's code style
