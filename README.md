@@ -11,7 +11,7 @@
   </div>
   <br/>
   <div>
-    <a href="https://github.com/gled-genpaylabs/genpay/releases/latest"><img src="https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmealet%2Fgenpay%2Frefs%2Fheads%2Fmaster%2FCargo.toml%3Fraw%3Dtrue&query=workspace.package.version&logo=hackthebox&logoColor=fff&label=version&color=%2319a63e" /></a>
+    <a href="https://github.com/gled-genpaylabs/genpay/releases/latest"><img src="https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%gled-genpaylabs%2Fgenpay%2Frefs%2Fheads%2Fmaster%2FCargo.toml%3Fraw%3Dtrue&query=workspace.package.version&logo=hackthebox&logoColor=fff&label=version&color=%2319a63e" /></a>
     <a href="https://github.com/gled-genpaylabs/genpay" /><img src="https://img.shields.io/github/actions/workflow/status/gled-genpaylabs/genpay/test.yml?logo=speedtest&logoColor=fff&label=tests&color=19a63e" /></a>
     <a href="https://github.com/gled-genpaylabs/genpay/blob/master/LICENSE"><img src="https://img.shields.io/github/license/gled-genpaylabs/genpay?style=flat&color=%2319a63e&logo=opensourcehardware&logoColor=fff" /></a>
   </div>
