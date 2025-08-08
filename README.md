@@ -2,7 +2,8 @@
 
 <div align="center">
   <picture>
-    <img src="https://github.com/gled-genpaylabs/genpay/blob/master/assets/GenPayLogo.png" width="35%" />
+    <img src="https://github.com/mealet/deen/blob/master/assets/Deen%20Logo.png" width="35%" />
+    
   </picture>
 
   <div>
