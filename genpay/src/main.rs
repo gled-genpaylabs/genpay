@@ -318,16 +318,12 @@ fn main() {
     } else {
         genpay_linker::compiler::ObjectCompiler::compile_module(module_ref, &module_name);
         let compiler = genpay_linker::linker::ObjectLinker::link(
-            &module_name,
+            &format!("{module_name}.o"),
             args.output.to_str().unwrap(),
             external_linkages,
         )
         .unwrap_or_else(|err| {
-            let object_linker = genpay_linker::linker::ObjectLinker::detect_compiler()
-                .unwrap_or(String::from("none"));
-            cli::error(&format!(
-                "Linker catched an error! (object linker: `{object_linker}`)"
-            ));
+            cli::error("Linker catched an error! (object linker: `clang`)");
             println!("\n{err}\n");
 
             cli::error(
@@ -336,16 +332,12 @@ fn main() {
             std::process::exit(1);
         });
 
-        let formatted_output =
-            if cfg!(windows) && !args.output.display().to_string().contains(".exe") {
-                format!("{}.exe", args.output.display())
-            } else {
-                args.output.display().to_string()
-            };
-
         cli::info(
             "Successfully",
-            &format!("compiled to binary (with `{compiler}`): `{formatted_output}`"),
+            &format!(
+                "compiled to binary (with `{compiler}`): `{}`",
+                args.output.display()
+            ),
         )
     };
 }
