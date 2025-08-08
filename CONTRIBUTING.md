@@ -1,5 +1,3 @@
-Hello! Thank you for your interest in project's life  <br/>
-Here's contribution guide for you:
 
 ### Repository Issues
 Found a bug? Wanna suggest an improvement? You can always open issue in this repository:
