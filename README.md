@@ -52,7 +52,7 @@ The project is divided into submodules using a virtual workspace environment:
 1. Install [clang](https://clang.llvm.org/)
 2. Download the latest release from GitHub: [Latest Release]
 3. Unpack it anywhere and add to your `PATH` variable. Instructions for: [Linux](https://phoenixnap.com/kb/linux-add-to-path), and [macOS](https://stackoverflow.com/questions/22465332/setting-path-environment-variable-in-macos-permanently)
-4. Restart your system or environment.
+4. Restart the SHELL  on the  environment.
 
 ## Building
 1. Install the [Rust Programming Language](https://www.rust-lang.org/) from the official site.
