@@ -20,7 +20,7 @@
 //!
 //! # License
 //! Project is licensed under the MIT License. <br/>
-//! See LICENSE file on Github: <https://github.com/mealet/genpay/blob/master/LICENSE>
+//! See LICENSE file on Github: <https://github.com/gled-genpaylabs/genpay/blob/master/LICENSE>
 
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
