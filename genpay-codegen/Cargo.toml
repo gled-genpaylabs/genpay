@@ -13,3 +13,8 @@ genpay-semantic = { path = "../genpay-semantic" }
 inkwell = { version = "0.5.0", features = ["llvm18-0"] }
 miette = { version = "7.5.0", features = ["fancy"] }
 thiserror = "2.0.12"
+cranelift = "0.105.1"
+cranelift-module = "0.105.1"
+cranelift-object = "0.105.1"
+cranelift-native = "0.105.1"
+target-lexicon = "0.12.14"

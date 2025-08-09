@@ -27,6 +27,8 @@ mod scope;
 mod structure;
 mod variable;
 
+pub mod cranelift_backend;
+
 pub struct CodeGen<'ctx> {
     source: String,
 

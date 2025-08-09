@@ -1,6 +1,13 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use colored::Colorize;
 use std::path::PathBuf;
+
+/// The compiler backend to use.
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+pub enum Backend {
+    Llvm,
+    Cranelift,
+}
 
 /// Command Line Interface with [`clap`]
 #[derive(Parser, Debug)]
@@ -21,13 +28,13 @@ pub struct Args {
     #[arg(short, long, action, help = "Disable compiler's warnings")]
     pub no_warns: bool,
 
-    /// `-l --llvm` flag to enable compilation into LLVM IR
-    #[arg(short, long, action, help = "Enable compilation into LLVM IR")]
-    pub llvm: bool,
-
     /// `-i --include` flag to link C library to linker
     #[arg(short, long, action, help = "Include C library to linker")]
     pub include: Vec<PathBuf>,
+
+    /// Choose the compiler backend
+    #[arg(long, value_enum, default_value_t = Backend::Llvm, help = "Choose the compiler backend")]
+    pub backend: Backend,
 }
 
 /// Prints formatted red error message to _stderr_
