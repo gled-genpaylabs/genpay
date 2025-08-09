@@ -7,14 +7,11 @@ use crate::{
     variable::Variable,
 };
 use genpay_parser::{expressions::Expressions, statements::Statements, types::Type, value::Value};
-use inkwell::{
-    AddressSpace,
-    basic_block::BasicBlock,
-    builder::Builder,
-    context::Context,
-    module::{Linkage, Module},
-    types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType},
-    values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue},
+use llvm_sys::{
+    core::*,
+    prelude::*,
+    target::{LLVM_InitializeAllTargetInfos, LLVM_InitializeAllTargets, LLVM_InitializeAllTargetMCs, LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllAsmParsers},
+    target_machine::*,
 };
 
 use genpay_semantic::symtable::SymbolTable;
@@ -27,76 +24,82 @@ mod scope;
 mod structure;
 mod variable;
 
-pub struct CodeGen<'ctx> {
+pub struct CodeGen {
     source: String,
 
-    context: &'ctx Context,
-    builder: Builder<'ctx>,
-    module: Module<'ctx>,
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    module: LLVMModuleRef,
 
-    scope: Box<Scope<'ctx>>,
-    function: Option<FunctionValue<'ctx>>,
-    breaks: Vec<BasicBlock<'ctx>>,
-    booleans_strings: Option<(PointerValue<'ctx>, PointerValue<'ctx>)>,
+    scope: Box<Scope>,
+    function: Option<LLVMValueRef>,
+    breaks: Vec<LLVMBasicBlockRef>,
+    booleans_strings: Option<(LLVMValueRef, LLVMValueRef)>,
 
     symtable: SymbolTable,
-    imports: HashMap<String, ModuleContent<'ctx>>,
+    imports: HashMap<String, ModuleContent>,
     includes: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
-pub struct ModuleContent<'ctx> {
-    pub functions: HashMap<String, Function<'ctx>>,
-    pub structures: HashMap<String, Structure<'ctx>>,
-    pub enumerations: HashMap<String, Enumeration<'ctx>>,
+pub struct ModuleContent {
+    pub functions: HashMap<String, Function>,
+    pub structures: HashMap<String, Structure>,
+    pub enumerations: HashMap<String, Enumeration>,
 }
 
-impl<'ctx> CodeGen<'ctx> {
-    pub fn create_context() -> Context {
-        inkwell::targets::Target::initialize_all(&inkwell::targets::InitializationConfig::default());
-        inkwell::context::Context::create()
+impl CodeGen {
+    pub fn create_context() -> LLVMContextRef {
+        unsafe {
+            LLVM_InitializeAllTargetInfos();
+            LLVM_InitializeAllTargets();
+            LLVM_InitializeAllTargetMCs();
+            LLVM_InitializeAllAsmPrinters();
+            LLVM_InitializeAllAsmParsers();
+            LLVMContextCreate()
+        }
     }
 
     pub fn new(
-        context: &'ctx Context,
+        context: LLVMContextRef,
         module_name: &str,
         module_source: &str,
         symtable: SymbolTable,
     ) -> Self {
-        let module = context.create_module(module_name);
-        let builder = context.create_builder();
+        unsafe {
+            let module_name = std::ffi::CString::new(module_name).unwrap();
+            let module = LLVMModuleCreateWithNameInContext(module_name.as_ptr(), context);
+            let builder = LLVMCreateBuilderInContext(context);
 
-        module.set_source_file_name(&format!("{module_name}.genpay"));
-        module.set_triple(&inkwell::targets::TargetMachine::get_default_triple());
+            let source_file_name = std::ffi::CString::new(format!("{}.genpay", module_name.to_str().unwrap())).unwrap();
+            LLVMSetSourceFileName(module, source_file_name.as_ptr(), source_file_name.to_bytes().len());
 
-        module
-            .add_global_metadata(
-                "ident",
-                &context.metadata_node(&[context
-                    .metadata_string(&format!(
-                        "genpay compiler v{} {}",
-                        env!("CARGO_PKG_VERSION"),
-                        env!("GIT_HASH").chars().take(8).collect::<String>()
-                    ))
-                    .into()]),
-            )
-            .unwrap();
+            let target_triple = LLVMGetDefaultTargetTriple();
+            LLVMSetTarget(module, target_triple);
 
-        Self {
-            source: module_source.to_owned(),
+            let ident_key = std::ffi::CString::new("ident").unwrap();
+            let ident_value = std::ffi::CString::new(format!(
+                "genpay compiler v{} {}",
+                env!("CARGO_PKG_VERSION"),
+                env!("GIT_HASH").chars().take(8).collect::<String>()
+            )).unwrap();
+            let metadata_node = LLVMMDStringInContext(context, ident_value.as_ptr(), ident_value.to_bytes().len());
+            let metadata = LLVMMDNodeInContext(context, &mut [metadata_node].as_mut_ptr(), 1);
+            LLVMAddNamedMetadataOperand(module, ident_key.as_ptr(), metadata);
 
-            context,
-            builder,
-            module,
-
-            scope: Box::new(Scope::new()),
-            function: None,
-            breaks: vec![],
-            booleans_strings: None,
-
-            symtable,
-            imports: HashMap::new(),
-            includes: Vec::new(),
+            Self {
+                source: module_source.to_owned(),
+                context,
+                builder,
+                module,
+                scope: Box::new(Scope::new()),
+                function: None,
+                breaks: vec![],
+                booleans_strings: None,
+                symtable,
+                imports: HashMap::new(),
+                includes: Vec::new(),
+            }
         }
     }
 
@@ -104,7 +107,7 @@ impl<'ctx> CodeGen<'ctx> {
         &mut self,
         statements: Vec<Statements>,
         prefix: Option<String>,
-    ) -> (&Module<'ctx>, ModuleContent<'ctx>) {
+    ) -> (LLVMModuleRef, ModuleContent) {
         // let pre_statements = statements
         //     .iter()
         //     .filter(|stmt| match stmt {
@@ -169,11 +172,11 @@ impl<'ctx> CodeGen<'ctx> {
             }
         };
 
-        (&self.module, module_content)
+        (self.module, module_content)
     }
 }
 
-impl<'ctx> CodeGen<'ctx> {
+impl CodeGen {
     fn compile_statement(&mut self, statement: Statements, prefix: Option<String>) {
         match statement {
             Statements::AssignStatement {
@@ -185,15 +188,13 @@ impl<'ctx> CodeGen<'ctx> {
                     let var = self.scope.get_variable(&identifier).unwrap();
                     let compiled_value = self.compile_expression(value, Some(var.datatype));
 
-                    self.builder.build_store(var.ptr, compiled_value.1).unwrap();
+                    unsafe { LLVMBuildStore(self.builder, compiled_value.1, var.ptr) };
                 } else {
                     let ptr = self
                         .compile_expression(object, Some(Type::Pointer(Box::new(Type::Undefined))));
                     let value = self.compile_expression(value, None);
 
-                    let _ = self
-                        .builder
-                        .build_store(ptr.1.into_pointer_value(), value.1);
+                    unsafe { LLVMBuildStore(self.builder, value.1, ptr.1) };
                 }
             }
             Statements::BinaryAssignStatement {
@@ -226,9 +227,7 @@ impl<'ctx> CodeGen<'ctx> {
                     Type::Pointer(ptr_type) => {
                         let compiled_value = self.compile_expression(value, Some(*ptr_type));
 
-                        self.builder
-                            .build_store(instance_ptr.into_pointer_value(), compiled_value.1)
-                            .unwrap();
+                        unsafe { LLVMBuildStore(self.builder, compiled_value.1, instance_ptr) };
                     }
 
                     Type::Alias(alias) => {
@@ -244,13 +243,18 @@ impl<'ctx> CodeGen<'ctx> {
 
                         let compiled_value = self
                             .compile_expression(value, Some(deref_assign_fn.arguments[1].clone()));
-                        self.builder
-                            .build_call(
+
+                        let call_name = std::ffi::CString::new("@genpay_deref_assign_call").unwrap();
+                        unsafe {
+                            LLVMBuildCall2(
+                                self.builder,
+                                deref_assign_fn.fn_type,
                                 deref_assign_fn.value,
-                                &[instance_ptr.into(), compiled_value.1.into()],
-                                "@genpay_deref_assign_call",
+                                [instance_ptr, compiled_value.1].as_mut_ptr(),
+                                2,
+                                call_name.as_ptr(),
                             )
-                            .unwrap();
+                        };
                     }
 
                     _ => {
@@ -269,95 +273,78 @@ impl<'ctx> CodeGen<'ctx> {
 
                 match obj.0 {
                     Type::Array(item_type, len) => {
-                        let obj_ptr = if obj.1.is_pointer_value() {
-                            obj.1.into_pointer_value()
+                        let obj_ptr = if unsafe { LLVMIsAPointerValue(obj.1) } != std::ptr::null_mut() {
+                            obj.1
                         } else {
-                            let recompiled = self
-                                .compile_expression(
-                                    object,
-                                    Some(Type::Pointer(Box::new(Type::Undefined))),
-                                )
-                                .1;
-                            recompiled.into_pointer_value()
+                            self.compile_expression(
+                                object,
+                                Some(Type::Pointer(Box::new(Type::Undefined))),
+                            ).1
                         };
 
                         let value = self.compile_expression(value, Some(*item_type.clone()));
 
                         // checking for the right index
-                        let checker_block = self
-                            .context
-                            .append_basic_block(self.function.unwrap(), "__idxcb"); // idxcb - index checker block
-                        let error_block = self
-                            .context
-                            .append_basic_block(self.function.unwrap(), "__idxcb_err");
-                        let ok_block = self
-                            .context
-                            .append_basic_block(self.function.unwrap(), "__idxcb_ok");
+                        let checker_block_name = std::ffi::CString::new("__idxcb").unwrap();
+                        let checker_block = unsafe { LLVMAppendBasicBlockInContext(self.context, self.function.unwrap(), checker_block_name.as_ptr()) };
+                        let error_block_name = std::ffi::CString::new("__idxcb_err").unwrap();
+                        let error_block = unsafe { LLVMAppendBasicBlockInContext(self.context, self.function.unwrap(), error_block_name.as_ptr()) };
+                        let ok_block_name = std::ffi::CString::new("__idxcb_ok").unwrap();
+                        let ok_block = unsafe { LLVMAppendBasicBlockInContext(self.context, self.function.unwrap(), ok_block_name.as_ptr()) };
 
-                        self.builder
-                            .build_unconditional_branch(checker_block)
-                            .unwrap();
-                        self.builder.position_at_end(checker_block);
+                        unsafe { LLVMBuildBr(self.builder, checker_block) };
+                        unsafe { LLVMPositionBuilderAtEnd(self.builder, checker_block) };
 
-                        let expected_basic_value =
-                            self.context.i64_type().const_int(len as u64, false);
-                        let provided_basic_value = idx.1.into_int_value();
+                        let expected_basic_value = unsafe { LLVMConstInt(LLVMInt64TypeInContext(self.context), len as u64, 0) };
+                        let provided_basic_value = idx.1;
 
-                        let cmp_value = self
-                            .builder
-                            .build_int_compare(
-                                inkwell::IntPredicate::SLT,
-                                provided_basic_value,
-                                expected_basic_value,
-                                "",
-                            )
-                            .unwrap();
-                        self.builder
-                            .build_conditional_branch(cmp_value, ok_block, error_block)
-                            .unwrap();
+                        let cmp_name = std::ffi::CString::new("").unwrap();
+                        let cmp_value = unsafe { LLVMBuildICmp(self.builder, llvm_sys::LLVMIntPredicate::LLVMIntSLT, provided_basic_value, expected_basic_value, cmp_name.as_ptr()) };
+                        unsafe { LLVMBuildCondBr(self.builder, cmp_value, ok_block, error_block) };
 
-                        self.builder.position_at_end(error_block);
+                        unsafe { LLVMPositionBuilderAtEnd(self.builder, error_block) };
 
                         self.build_panic(
                             "Array has len %ld, but index is %ld",
-                            vec![expected_basic_value.into(), provided_basic_value.into()],
+                            vec![expected_basic_value, provided_basic_value],
                             self.get_source_line(span.0),
                         );
                         self.build_branch(ok_block);
-                        self.builder.position_at_end(ok_block);
+                        unsafe { LLVMPositionBuilderAtEnd(self.builder, ok_block) };
 
                         // getting ptr
-
+                        let gep_name = std::ffi::CString::new("").unwrap();
                         let ptr = unsafe {
-                            self.builder
-                                .build_in_bounds_gep(
-                                    self.get_basic_type(*item_type),
-                                    obj_ptr,
-                                    &[idx.1.into_int_value()],
-                                    "",
-                                )
-                                .unwrap()
+                            LLVMBuildInBoundsGEP2(
+                                self.builder,
+                                self.get_basic_type(*item_type),
+                                obj_ptr,
+                                &mut [idx.1],
+                                1,
+                                gep_name.as_ptr(),
+                            )
                         };
 
                         // storing value
-                        self.builder.build_store(ptr, value.1).unwrap();
+                        unsafe { LLVMBuildStore(self.builder, value.1, ptr) };
                     }
                     Type::Pointer(ptr_type) => {
                         // compiling value and ptr
                         let value = self.compile_expression(value, Some(*ptr_type.clone()));
+                        let gep_name = std::ffi::CString::new("").unwrap();
                         let ptr = unsafe {
-                            self.builder
-                                .build_in_bounds_gep(
-                                    self.get_basic_type(*ptr_type),
-                                    obj.1.into_pointer_value(),
-                                    &[idx.1.into_int_value()],
-                                    "",
-                                )
-                                .unwrap()
+                            LLVMBuildInBoundsGEP2(
+                                self.builder,
+                                self.get_basic_type(*ptr_type),
+                                obj.1,
+                                &mut [idx.1],
+                                1,
+                                gep_name.as_ptr(),
+                            )
                         };
 
                         // storing value
-                        self.builder.build_store(ptr, value.1).unwrap();
+                        unsafe { LLVMBuildStore(self.builder, value.1, ptr) };
                     }
 
                     Type::Alias(alias) => {
@@ -373,13 +360,17 @@ impl<'ctx> CodeGen<'ctx> {
                         let compiled_value = self
                             .compile_expression(value, Some(slice_assign_fn.arguments[2].clone()));
 
-                        self.builder
-                            .build_call(
+                        let call_name = std::ffi::CString::new("@genpay_slice_assign_call").unwrap();
+                        unsafe {
+                            LLVMBuildCall2(
+                                self.builder,
+                                slice_assign_fn.fn_type,
                                 slice_assign_fn.value,
-                                &[instance_ptr.into(), idx.1.into(), compiled_value.1.into()],
-                                "@genpay_slice_assign_call",
+                                [instance_ptr, idx.1, compiled_value.1].as_mut_ptr(),
+                                3,
+                                call_name.as_ptr(),
                             )
-                            .unwrap();
+                        };
                     }
 
                     _ => unreachable!(),
@@ -394,9 +385,7 @@ impl<'ctx> CodeGen<'ctx> {
                     self.compile_expression(object, Some(Type::Pointer(Box::new(Type::Undefined))));
                 let compiled_value = self.compile_expression(value, Some(compiled_object.0));
 
-                self.builder
-                    .build_store(compiled_object.1.into_pointer_value(), compiled_value.1)
-                    .unwrap();
+                unsafe { LLVMBuildStore(self.builder, compiled_value.1, compiled_object.1) };
             }
 
             Statements::AnnotationStatement {
@@ -412,30 +401,28 @@ impl<'ctx> CodeGen<'ctx> {
                         let value = self.compile_expression(value, Some(datatype.clone()));
 
                         if !empty_binding {
-                            let alloca = self
-                                .builder
-                                .build_alloca(value.1.get_type(), &identifier)
-                                .unwrap();
+                            let id_c_string = std::ffi::CString::new(identifier.clone()).unwrap();
+                            let alloca = unsafe { LLVMBuildAlloca(self.builder, LLVMTypeOf(value.1), id_c_string.as_ptr()) };
 
                             self.scope.set_variable(
                                 identifier,
                                 Variable {
                                     datatype,
-                                    llvm_type: value.1.get_type(),
+                                    llvm_type: unsafe { LLVMTypeOf(value.1) },
                                     ptr: alloca,
                                     no_drop: false,
                                     global: false,
                                 },
                             );
-                            let _ = self.builder.build_store(alloca, value.1).unwrap();
+                            unsafe { LLVMBuildStore(self.builder, value.1, alloca) };
                         }
                     }
                     (Some(datatype), _) => {
                         let basic_type = self.get_basic_type(datatype.clone());
 
                         if !empty_binding {
-                            let alloca =
-                                self.builder.build_alloca(basic_type, &identifier).unwrap();
+                            let id_c_string = std::ffi::CString::new(identifier.clone()).unwrap();
+                            let alloca = unsafe { LLVMBuildAlloca(self.builder, basic_type, id_c_string.as_ptr()) };
 
                             self.scope.set_variable(
                                 identifier,
@@ -453,22 +440,20 @@ impl<'ctx> CodeGen<'ctx> {
                         let compiled_value = self.compile_expression(value, None);
 
                         if !empty_binding {
-                            let alloca = self
-                                .builder
-                                .build_alloca(compiled_value.1.get_type(), &identifier)
-                                .unwrap();
+                            let id_c_string = std::ffi::CString::new(identifier.clone()).unwrap();
+                            let alloca = unsafe { LLVMBuildAlloca(self.builder, LLVMTypeOf(compiled_value.1), id_c_string.as_ptr()) };
 
                             self.scope.set_variable(
                                 identifier,
                                 Variable {
                                     datatype: compiled_value.0,
-                                    llvm_type: compiled_value.1.get_type(),
+                                    llvm_type: unsafe { LLVMTypeOf(compiled_value.1) },
                                     ptr: alloca,
                                     no_drop: false,
                                     global: false,
                                 },
                             );
-                            let _ = self.builder.build_store(alloca, compiled_value.1).unwrap();
+                            unsafe { LLVMBuildStore(self.builder, compiled_value.1, alloca) };
                         }
                     }
                     _ => unreachable!(),
@@ -484,7 +469,7 @@ impl<'ctx> CodeGen<'ctx> {
                 span: _,
                 header_span: _,
             } => {
-                let module_name = self.module.get_name().to_str().unwrap();
+                let module_name = unsafe { std::ffi::CStr::from_ptr(LLVMGetModuleIdentifier(self.module, &mut 0)).to_str().unwrap() };
                 let name = format!("{}{}", prefix.clone().unwrap_or_default(), raw_name,);
 
                 let llvm_ir_name = format!(
@@ -503,38 +488,37 @@ impl<'ctx> CodeGen<'ctx> {
                         .join(", ")
                 );
 
-                let mut args: Vec<BasicMetadataTypeEnum<'ctx>> = Vec::new();
+                let mut args: Vec<LLVMTypeRef> = Vec::new();
                 arguments.iter().for_each(|arg| {
-                    args.push(self.get_basic_type(arg.1.clone()).into());
+                    args.push(self.get_basic_type(arg.1.clone()));
                 });
 
                 let fn_type = self.get_fn_type(datatype.clone(), &args, false);
-                let function = self.module.add_function(
-                    if name == "main" {
-                        "main"
-                    } else {
-                        &llvm_ir_name
-                    },
-                    fn_type,
-                    None,
-                );
-                let entry = self.context.append_basic_block(function, "entry");
+                let function_name = if name == "main" {
+                    std::ffi::CString::new("main").unwrap()
+                } else {
+                    std::ffi::CString::new(llvm_ir_name).unwrap()
+                };
+                let function = unsafe { LLVMAddFunction(self.module, function_name.as_ptr(), fn_type) };
+                let entry_name = std::ffi::CString::new("entry").unwrap();
+                let entry = unsafe { LLVMAppendBasicBlockInContext(self.context, function, entry_name.as_ptr()) };
 
-                let old_position = self.builder.get_insert_block();
+                let old_position = unsafe { LLVMGetInsertBlock(self.builder) };
                 let old_function = self.function;
-                self.builder.position_at_end(entry);
+                unsafe { LLVMPositionBuilderAtEnd(self.builder, entry) };
                 self.function = Some(function);
 
                 self.enter_new_scope();
 
                 arguments.iter().enumerate().for_each(|(index, arg)| {
                     let arg_name = arg.0.clone();
-                    let arg_value = function.get_nth_param(index as u32).unwrap();
+                    let arg_value = unsafe { LLVMGetParam(function, index as u32) };
 
                     let param_type = self.get_basic_type(arg.1.clone());
-                    let param_alloca = self.builder.build_alloca(param_type, "").unwrap();
+                    let param_alloca_name = std::ffi::CString::new("").unwrap();
+                    let param_alloca = unsafe { LLVMBuildAlloca(self.builder, param_type, param_alloca_name.as_ptr()) };
 
-                    let _ = self.builder.build_store(param_alloca, arg_value);
+                    unsafe { LLVMBuildStore(self.builder, arg_value, param_alloca) };
 
                     let arg_datatype = match arg.1 {
                         Type::SelfRef => {
@@ -564,6 +548,7 @@ impl<'ctx> CodeGen<'ctx> {
                     name.clone(),
                     Function {
                         datatype: datatype.clone(),
+                        fn_type,
                         value: function,
                         arguments: typed_args.clone(),
                         called: false,
@@ -574,29 +559,25 @@ impl<'ctx> CodeGen<'ctx> {
                     .for_each(|stmt| self.compile_statement(stmt.clone(), None));
 
                 if datatype == Type::Void {
-                    self.builder.build_return(None).unwrap();
+                    unsafe { LLVMBuildRetVoid(self.builder) };
                 }
 
-                if !function.verify(false) {
-                    let latest_block = function.get_last_basic_block().unwrap();
-                    let prev_pos = self.builder.get_insert_block().unwrap();
+                if unsafe { LLVMVerifyFunction(function, llvm_sys::LLVMVerifierFailureAction::LLVMPrintMessageAction) } != 0 {
+                    let latest_block = unsafe { LLVMGetLastBasicBlock(function) };
+                    let prev_pos = unsafe { LLVMGetInsertBlock(self.builder) };
 
-                    self.builder.position_at_end(latest_block);
+                    unsafe { LLVMPositionBuilderAtEnd(self.builder, latest_block) };
 
-                    if let Some(instruction) = latest_block.get_last_instruction() {
-                        if !instruction.is_terminator() {
-                            self.builder.build_return(None).unwrap();
-                        }
-                    } else {
-                        self.builder.build_return(None).unwrap();
+                    if unsafe { LLVMGetLastInstruction(latest_block) } == std::ptr::null_mut() {
+                        unsafe { LLVMBuildRetVoid(self.builder) };
                     }
 
-                    self.builder.position_at_end(prev_pos);
+                    unsafe { LLVMPositionBuilderAtEnd(self.builder, prev_pos) };
                 }
 
                 self.exit_scope();
-                if let Some(basic_block) = old_position {
-                    self.builder.position_at_end(basic_block);
+                if old_position != std::ptr::null_mut() {
+                    unsafe { LLVMPositionBuilderAtEnd(self.builder, old_position) };
                 }
 
                 self.function = old_function;
@@ -605,6 +586,7 @@ impl<'ctx> CodeGen<'ctx> {
                     name.clone(),
                     Function {
                         datatype: datatype.clone(),
+                        fn_type,
                         value: function,
                         arguments: typed_args,
                         called: false,
@@ -622,7 +604,7 @@ impl<'ctx> CodeGen<'ctx> {
                 }
 
                 let function = self.scope.get_function(&name).unwrap();
-                let mut basic_args: Vec<BasicMetadataValueEnum> = Vec::new();
+                let mut basic_args: Vec<LLVMValueRef> = Vec::new();
 
                 let mut function_args = function.arguments.clone();
 
@@ -637,12 +619,20 @@ impl<'ctx> CodeGen<'ctx> {
                     .into_iter()
                     .zip(function_args)
                     .for_each(|(expr, expected)| {
-                        basic_args.push(self.compile_expression(expr, Some(expected)).1.into());
+                        basic_args.push(self.compile_expression(expr, Some(expected)).1);
                     });
 
-                self.builder
-                    .build_call(function.value, &basic_args, "")
-                    .unwrap();
+                let call_name = std::ffi::CString::new("").unwrap();
+                unsafe {
+                    LLVMBuildCall2(
+                        self.builder,
+                        function.fn_type,
+                        function.value,
+                        basic_args.as_mut_ptr(),
+                        basic_args.len() as u32,
+                        call_name.as_ptr(),
+                    )
+                };
             }
 
             Statements::MacroCallStatement {
@@ -663,12 +653,13 @@ impl<'ctx> CodeGen<'ctx> {
                 let name = format!("{}{}", prefix.clone().unwrap_or_default(), raw_name);
                 let llvm_name = format!(
                     "{}.{}{}",
-                    self.module.get_name().to_str().unwrap(),
+                    unsafe { std::ffi::CStr::from_ptr(LLVMGetModuleIdentifier(self.module, &mut 0)).to_str().unwrap() },
                     prefix.unwrap_or_default(),
                     raw_name
                 );
 
-                let struct_type = self.context.opaque_struct_type(&llvm_name);
+                let llvm_name_c_string = std::ffi::CString::new(llvm_name).unwrap();
+                let struct_type = unsafe { LLVMStructCreateNamed(self.context, llvm_name_c_string.as_ptr()) };
                 let mut compiled_fields = Vec::new();
 
                 fields.iter().for_each(|field| {
@@ -680,11 +671,11 @@ impl<'ctx> CodeGen<'ctx> {
                     });
                 });
 
-                let basic_fields_types = compiled_fields
+                let mut basic_fields_types = compiled_fields
                     .iter()
                     .map(|field| field.llvm_type)
-                    .collect::<Vec<BasicTypeEnum>>();
-                struct_type.set_body(&basic_fields_types, false);
+                    .collect::<Vec<LLVMTypeRef>>();
+                unsafe { LLVMStructSetBody(struct_type, basic_fields_types.as_mut_ptr(), basic_fields_types.len() as u32, 0) };
 
                 let mut fields_hashmap = HashMap::new();
                 compiled_fields.into_iter().for_each(|field| {
@@ -696,7 +687,7 @@ impl<'ctx> CodeGen<'ctx> {
                     Structure {
                         fields: fields_hashmap,
                         functions: HashMap::new(),
-                        llvm_type: struct_type.into(),
+                        llvm_type: struct_type,
                     },
                 );
 

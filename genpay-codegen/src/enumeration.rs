@@ -1,10 +1,10 @@
 use crate::function::Function;
-use inkwell::types::BasicTypeEnum;
+use llvm_sys::prelude::LLVMTypeRef;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
-pub struct Enumeration<'ctx> {
+pub struct Enumeration {
     pub fields: Vec<String>,
-    pub functions: HashMap<String, Function<'ctx>>,
-    pub llvm_type: BasicTypeEnum<'ctx>,
+    pub functions: HashMap<String, crate::function::Function>,
+    pub llvm_type: LLVMTypeRef,
 }
