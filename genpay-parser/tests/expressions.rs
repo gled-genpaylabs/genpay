@@ -611,14 +611,6 @@ fn subelement_advanced_expression() {
                 subelements,
                 span: _,
             } => {
-                // Okay, here's the problem that caused by moving `SubElement` expr to term
-                // function: parsing multiple embedded subelements creates some kind of tree of
-                // included subeleemnts.
-                // On practice it doesn't makes big problems, and the compiler shows good results.
-                // Even LLVM IR didn't changed and works well, but we're getting tests failure.
-                //
-                // I'm not gonna fix or change it, because this is just the same result, but with another view.
-                // I'll rewrite this test for the new implementation as soon as possible 👀
 
                 if let Expressions::Value(Value::Identifier(id), _) = *head {
                     assert_eq!(id, "some_struct");

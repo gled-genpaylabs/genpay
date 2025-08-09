@@ -45,8 +45,8 @@ The project is divided into submodules using a virtual workspace environment:
 - `genpay-lexer` - lexical analyzer. Converts source code into abstract data types (Tokens).
 - `genpay-parser` - syntax analyzer. Analyzes and converts tokens into an Abstract Syntax Tree.
 - `genpay-semantic` - semantic analyzer. Recursively checks the AST for type and principle matching.
-- `genpay-codegen` - code generator. Recursively compiles the AST to an LLVM IR module.
-- `genpay-linker` - module linker. Compiles the LLVM IR module to an object file and links it.
+- `genpay-codegen` - code generator. Recursively compiles the AST.
+- `genpay-linker` - module linker. Compiles the module to an object file and links it.
 
 ## Installation
 1. Install [clang](https://clang.llvm.org/)
