@@ -1,4 +1,3 @@
-use crate::function::Function;
 use llvm_sys::prelude::LLVMTypeRef;
 use std::collections::HashMap;
 

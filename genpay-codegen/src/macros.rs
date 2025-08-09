@@ -1,27 +1,23 @@
 use genpay_parser::{expressions::Expressions, types::Type, value::Value};
-use inkwell::{
-    AddressSpace,
-    module::Linkage,
-    types::BasicType,
-    values::{BasicMetadataValueEnum, BasicValueEnum},
-};
+use llvm_sys::core::*;
+use llvm_sys::prelude::*;
 
 use crate::CodeGen;
 
-pub trait StandartMacros<'ctx> {
+pub trait StandartMacros {
     fn build_macro_call(
         &mut self,
         id: &str,
         arguments: Vec<Expressions>,
-    ) -> (Type, BasicValueEnum<'ctx>);
+    ) -> (Type, LLVMValueRef);
 }
 
-impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
+impl StandartMacros for CodeGen {
     fn build_macro_call(
         &mut self,
         id: &str,
         arguments: Vec<Expressions>,
-    ) -> (Type, BasicValueEnum<'ctx>) {
+    ) -> (Type, LLVMValueRef) {
         match id {
             "print" | "println" => {
                 let mut literal =
@@ -34,14 +30,14 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     .iter()
                     .skip(1)
                     .map(|expr| self.compile_expression(expr.clone(), None))
-                    .collect::<Vec<(Type, BasicValueEnum)>>();
+                    .collect::<Vec<(Type, LLVMValueRef)>>();
 
                 let format_specifiers = compiled_args
                     .iter()
                     .map(|(typ, _)| self.type_specifier(typ))
                     .collect::<Vec<String>>();
 
-                format_specifiers.into_iter().for_each(|spec| {
+                format_specifiers.iter().for_each(|spec| {
                     if let Some(position) = literal.find("{}") {
                         literal.replace_range(position..position + 2, &spec);
                     }
@@ -50,32 +46,29 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                 if id.contains("ln") {
                     literal.push('\n')
                 }
-                let printf_fn = self.module.get_function("printf").unwrap_or_else(|| {
-                    self.module.add_function(
-                        "printf",
-                        self.context.i32_type().fn_type(
-                            &[self.context.ptr_type(AddressSpace::default()).into()],
-                            true,
-                        ),
-                        Some(Linkage::External),
-                    )
-                });
+                let printf_name = std::ffi::CString::new("printf").unwrap();
+                let printf_fn = unsafe {
+                    let function = LLVMGetNamedFunction(self.module, printf_name.as_ptr());
+                    if function == std::ptr::null_mut() {
+                        let fn_type = LLVMFunctionType(LLVMInt32TypeInContext(self.context), [LLVMPointerType(LLVMInt8TypeInContext(self.context), 0)].as_mut_ptr(), 1, 1);
+                        LLVMAddFunction(self.module, printf_name.as_ptr(), fn_type)
+                    } else {
+                        function
+                    }
+                };
 
                 let format_values = compiled_args
                     .into_iter()
                     .map(|arg| match arg.0.clone() {
                         Type::Bool => {
                             let (_true, _false) = self.booleans_strings();
-                            self.builder
-                                .build_select(arg.1.into_int_value(), _true, _false, "")
-                                .unwrap()
-                                .into()
+                            let name = std::ffi::CString::new("").unwrap();
+                            unsafe { LLVMBuildSelect(self.builder, arg.1, _true, _false, name.as_ptr()) }
                         }
-                        Type::F32 => self
-                            .builder
-                            .build_float_ext(arg.1.into_float_value(), self.context.f64_type(), "")
-                            .unwrap()
-                            .into(),
+                        Type::F32 => {
+                            let name = std::ffi::CString::new("").unwrap();
+                            unsafe { LLVMBuildFPExt(self.builder, arg.1, LLVMDoubleTypeInContext(self.context), name.as_ptr()) }
+                        }
                         Type::Alias(alias) => {
                             let alias_type = self.get_alias_type(arg.0.clone(), None).unwrap();
 
@@ -92,48 +85,37 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                                     // NOTE: Method `display(&self) *char` won`t give mutability of
                                     // structure, it will only provide tool to use struct in basic
                                     // output.
-                                    let self_val: BasicMetadataValueEnum =
-                                        if arg.1.is_pointer_value() {
-                                            arg.1.into()
+                                    let self_val: LLVMValueRef =
+                                        if self.is_a_pointer_value(arg.1) {
+                                            arg.1
                                         } else {
-                                            let alloca = self
-                                                .builder
-                                                .build_alloca(arg.1.get_type(), "")
-                                                .unwrap();
-                                            let _ =
-                                                self.builder.build_store(alloca, arg.1).unwrap();
-                                            alloca.into()
+                                            let alloca_name = std::ffi::CString::new("").unwrap();
+                                            let alloca = unsafe { LLVMBuildAlloca(self.builder, LLVMTypeOf(arg.1), alloca_name.as_ptr()) };
+                                            unsafe { LLVMBuildStore(self.builder, arg.1, alloca) };
+                                            alloca
                                         };
 
-                                    let output: BasicMetadataValueEnum = self
-                                        .builder
-                                        .build_call(display_function.value, &[self_val], "")
-                                        .unwrap()
-                                        .try_as_basic_value()
-                                        .left()
-                                        .unwrap()
-                                        .into();
+                                    let call_name = std::ffi::CString::new("").unwrap();
+                                    let output: LLVMValueRef = unsafe { LLVMBuildCall2(self.builder, display_function.fn_type, display_function.value, [self_val].as_mut_ptr(), 1, call_name.as_ptr()) };
                                     output
                                 }
-                                "enum" => arg.1.into(),
+                                "enum" => arg.1,
                                 _ => unreachable!(),
                             }
                         }
-                        _ => arg.1.into(),
+                        _ => arg.1,
                     })
-                    .collect::<Vec<BasicMetadataValueEnum<'ctx>>>();
+                    .collect::<Vec<LLVMValueRef>>();
 
-                let global_literal: BasicMetadataValueEnum<'ctx> = self
-                    .builder
-                    .build_global_string_ptr(&literal, "")
-                    .unwrap()
-                    .as_pointer_value()
-                    .into();
-                let call_arguments = [vec![global_literal], format_values].concat();
+                let literal_c_string = std::ffi::CString::new(literal).unwrap();
+                let global_name = std::ffi::CString::new("").unwrap();
+                let global_literal: LLVMValueRef = unsafe { LLVMBuildGlobalStringPtr(self.builder, literal_c_string.as_ptr(), global_name.as_ptr()) };
+                let mut call_arguments = [vec![global_literal], format_values].concat();
 
-                let _ = self.builder.build_call(printf_fn, &call_arguments, "");
+                let call_name = std::ffi::CString::new("").unwrap();
+                unsafe { LLVMBuildCall2(self.builder, LLVMGetCalledFunctionType(printf_fn), printf_fn, call_arguments.as_mut_ptr(), call_arguments.len() as u32, call_name.as_ptr()) };
 
-                (Type::Void, self.context.bool_type().const_zero().into())
+                (Type::Void, unsafe { LLVMConstInt(LLVMInt1TypeInContext(self.context), 0, 0) })
             }
             "format" => {
                 let mut literal =
@@ -146,7 +128,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     .iter()
                     .skip(1)
                     .map(|expr| self.compile_expression(expr.clone(), None))
-                    .collect::<Vec<(Type, BasicValueEnum)>>();
+                    .collect::<Vec<(Type, LLVMValueRef)>>();
 
                 let format_specifiers = compiled_args
                     .iter()
@@ -162,36 +144,29 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                 if id.contains("ln") {
                     literal.push('\n')
                 }
-                let snprintf_fn = self.module.get_function("snprintf").unwrap_or_else(|| {
-                    self.module.add_function(
-                        "snprintf",
-                        self.context.i32_type().fn_type(
-                            &[
-                                self.context.ptr_type(AddressSpace::default()).into(),
-                                self.context.i64_type().into(),
-                                self.context.ptr_type(AddressSpace::default()).into(),
-                            ],
-                            true,
-                        ),
-                        Some(Linkage::External),
-                    )
-                });
+                let snprintf_name = std::ffi::CString::new("snprintf").unwrap();
+                let snprintf_fn = unsafe {
+                    let function = LLVMGetNamedFunction(self.module, snprintf_name.as_ptr());
+                    if function == std::ptr::null_mut() {
+                        let fn_type = LLVMFunctionType(LLVMInt32TypeInContext(self.context), [LLVMPointerType(LLVMInt8TypeInContext(self.context), 0), LLVMInt64TypeInContext(self.context), LLVMPointerType(LLVMInt8TypeInContext(self.context), 0)].as_mut_ptr(), 3, 1);
+                        LLVMAddFunction(self.module, snprintf_name.as_ptr(), fn_type)
+                    } else {
+                        function
+                    }
+                };
 
                 let format_values = compiled_args
                     .into_iter()
                     .map(|arg| match arg.0.clone() {
                         Type::Bool => {
                             let (_true, _false) = self.booleans_strings();
-                            self.builder
-                                .build_select(arg.1.into_int_value(), _true, _false, "")
-                                .unwrap()
-                                .into()
+                            let name = std::ffi::CString::new("").unwrap();
+                            unsafe { LLVMBuildSelect(self.builder, arg.1, _true, _false, name.as_ptr()) }
                         }
-                        Type::F32 => self
-                            .builder
-                            .build_float_ext(arg.1.into_float_value(), self.context.f64_type(), "")
-                            .unwrap()
-                            .into(),
+                        Type::F32 => {
+                            let name = std::ffi::CString::new("").unwrap();
+                            unsafe { LLVMBuildFPExt(self.builder, arg.1, LLVMDoubleTypeInContext(self.context), name.as_ptr()) }
+                        }
                         Type::Alias(alias) => {
                             let alias_type = self.get_alias_type(arg.0.clone(), None).unwrap();
 
@@ -205,92 +180,64 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                                         ))
                                         .unwrap();
 
-                                    let self_val: BasicMetadataValueEnum = arg.1.into();
+                                    let self_val: LLVMValueRef = arg.1;
 
-                                    let output: BasicMetadataValueEnum = self
-                                        .builder
-                                        .build_call(display_function.value, &[self_val], "")
-                                        .unwrap()
-                                        .try_as_basic_value()
-                                        .left()
-                                        .unwrap()
-                                        .into();
+                                    let call_name = std::ffi::CString::new("").unwrap();
+                                    let output: LLVMValueRef = unsafe { LLVMBuildCall2(self.builder, display_function.fn_type, display_function.value, [self_val].as_mut_ptr(), 1, call_name.as_ptr()) };
                                     output
                                 }
-                                "enum" => arg.1.into(),
+                                "enum" => arg.1,
                                 _ => unreachable!(),
                             }
                         }
-                        _ => arg.1.into(),
+                        _ => arg.1,
                     })
-                    .collect::<Vec<BasicMetadataValueEnum<'ctx>>>();
+                    .collect::<Vec<LLVMValueRef>>();
 
-                let global_literal: BasicMetadataValueEnum<'ctx> = self
-                    .builder
-                    .build_global_string_ptr(&literal, "")
-                    .unwrap()
-                    .as_pointer_value()
-                    .into();
+                let literal_c_string = std::ffi::CString::new(literal).unwrap();
+                let global_name = std::ffi::CString::new("").unwrap();
+                let global_literal: LLVMValueRef = unsafe { LLVMBuildGlobalStringPtr(self.builder, literal_c_string.as_ptr(), global_name.as_ptr()) };
 
                 // first call for output size
-
-                let first_call_args = [
+                let mut first_call_args = [
                     vec![
-                        self.context
-                            .ptr_type(AddressSpace::default())
-                            .const_null()
-                            .into(),
-                        self.context.i64_type().const_zero().into(),
+                        unsafe { LLVMConstNull(LLVMPointerType(LLVMInt8TypeInContext(self.context), 0)) },
+                        unsafe { LLVMConstInt(LLVMInt64TypeInContext(self.context), 0, 0) },
                         global_literal,
                     ],
                     format_values.clone(),
                 ]
                 .concat();
 
-                let length = self
-                    .builder
-                    .build_call(snprintf_fn, &first_call_args, "")
-                    .unwrap()
-                    .try_as_basic_value()
-                    .left()
-                    .unwrap();
+                let call_name = std::ffi::CString::new("").unwrap();
+                let length = unsafe { LLVMBuildCall2(self.builder, LLVMGetCalledFunctionType(snprintf_fn), snprintf_fn, first_call_args.as_mut_ptr(), first_call_args.len() as u32, call_name.as_ptr()) };
 
                 let buffer = {
-                    let buffer_size = self
-                        .builder
-                        .build_int_add(
-                            length.into_int_value(),
-                            self.context.i32_type().const_int(1, false),
-                            "",
-                        )
-                        .unwrap();
+                    let add_name = std::ffi::CString::new("").unwrap();
+                    let buffer_size = unsafe { LLVMBuildAdd(self.builder, length, LLVMConstInt(LLVMInt32TypeInContext(self.context), 1, 0), add_name.as_ptr()) };
 
-                    self.builder
-                        .build_array_alloca(self.context.i8_type(), buffer_size, "")
-                        .unwrap()
+                    let alloca_name = std::ffi::CString::new("").unwrap();
+                    unsafe { LLVMBuildArrayAlloca(self.builder, LLVMInt8TypeInContext(self.context), buffer_size, alloca_name.as_ptr()) }
                 };
 
                 // second call for the final format
+                let sprintf_name = std::ffi::CString::new("sprintf").unwrap();
+                let sprintf_fn = unsafe {
+                    let function = LLVMGetNamedFunction(self.module, sprintf_name.as_ptr());
+                    if function == std::ptr::null_mut() {
+                        let fn_type = LLVMFunctionType(LLVMInt32TypeInContext(self.context), [LLVMPointerType(LLVMInt8TypeInContext(self.context), 0), LLVMPointerType(LLVMInt8TypeInContext(self.context), 0)].as_mut_ptr(), 2, 1);
+                        LLVMAddFunction(self.module, sprintf_name.as_ptr(), fn_type)
+                    } else {
+                        function
+                    }
+                };
 
-                let sprintf_fn = self.module.get_function("sprintf").unwrap_or_else(|| {
-                    self.module.add_function(
-                        "sprintf",
-                        self.context.i32_type().fn_type(
-                            &[
-                                self.context.ptr_type(AddressSpace::default()).into(),
-                                self.context.ptr_type(AddressSpace::default()).into(),
-                            ],
-                            true,
-                        ),
-                        Some(Linkage::External),
-                    )
-                });
+                let mut call_arguments = [vec![buffer, global_literal], format_values].concat();
 
-                let call_arguments = [vec![buffer.into(), global_literal], format_values].concat();
+                let call_name = std::ffi::CString::new("").unwrap();
+                unsafe { LLVMBuildCall2(self.builder, LLVMGetCalledFunctionType(sprintf_fn), sprintf_fn, call_arguments.as_mut_ptr(), call_arguments.len() as u32, call_name.as_ptr()) };
 
-                let _ = self.builder.build_call(sprintf_fn, &call_arguments, "");
-
-                (Type::Pointer(Box::new(Type::Char)), buffer.into())
+                (Type::Pointer(Box::new(Type::Char)), buffer)
             }
             "panic" => {
                 let (mut literal, call_line) =
@@ -304,7 +251,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     .iter()
                     .skip(1)
                     .map(|expr| self.compile_expression(expr.clone(), None))
-                    .collect::<Vec<(Type, BasicValueEnum)>>();
+                    .collect::<Vec<(Type, LLVMValueRef)>>();
 
                 let format_specifiers = compiled_args
                     .iter()
@@ -326,10 +273,8 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     .map(|arg| match arg.0.clone() {
                         Type::Bool => {
                             let (_true, _false) = self.booleans_strings();
-                            self.builder
-                                .build_select(arg.1.into_int_value(), _true, _false, "")
-                                .unwrap()
-                                .into()
+                            let name = std::ffi::CString::new("").unwrap();
+                            unsafe { LLVMBuildSelect(self.builder, arg.1, _true, _false, name.as_ptr()) }
                         }
                         Type::Alias(alias) => {
                             let alias_type = self.get_alias_type(arg.0.clone(), None).unwrap();
@@ -344,28 +289,22 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                                         ))
                                         .unwrap();
 
-                                    let self_val: BasicMetadataValueEnum = arg.1.into();
+                                    let self_val: LLVMValueRef = arg.1;
 
-                                    let output: BasicMetadataValueEnum = self
-                                        .builder
-                                        .build_call(display_function.value, &[self_val], "")
-                                        .unwrap()
-                                        .try_as_basic_value()
-                                        .left()
-                                        .unwrap()
-                                        .into();
+                                    let call_name = std::ffi::CString::new("").unwrap();
+                                    let output: LLVMValueRef = unsafe { LLVMBuildCall2(self.builder, display_function.fn_type, display_function.value, [self_val].as_mut_ptr(), 1, call_name.as_ptr()) };
                                     output
                                 }
-                                "enum" => arg.1.into(),
+                                "enum" => arg.1,
                                 _ => unreachable!(),
                             }
                         }
-                        _ => arg.1.into(),
+                        _ => arg.1,
                     })
-                    .collect::<Vec<BasicMetadataValueEnum<'ctx>>>();
+                    .collect::<Vec<LLVMValueRef>>();
 
                 self.build_panic(literal, format_values, call_line);
-                (Type::Void, self.context.bool_type().const_zero().into())
+                (Type::Void, unsafe { LLVMConstInt(LLVMInt1TypeInContext(self.context), 0, 0) })
             }
             "sizeof" => {
                 let instance = arguments.first().unwrap();
@@ -378,11 +317,11 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     {
                         self.get_basic_type(r#type.clone())
                     } else {
-                        self.compile_expression(instance.clone(), None).1.get_type()
+                        unsafe { LLVMTypeOf(self.compile_expression(instance.clone(), None).1) }
                     }
                 };
 
-                (Type::USIZE, basic_type.size_of().unwrap().into())
+                (Type::USIZE, unsafe { LLVMSizeOf(basic_type) })
             }
             "cast" => {
                 let from = arguments.first().unwrap().clone();
@@ -408,42 +347,20 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                         let from_order = genpay_semantic::Analyzer::integer_order(from);
                         let to_order = genpay_semantic::Analyzer::integer_order(to);
 
+                        let name = std::ffi::CString::new("").unwrap();
                         let value = if from_order > to_order {
                             // truncating
-                            self.builder
-                                .build_int_truncate(
-                                    from_value.1.into_int_value(),
-                                    target_basic_type.into_int_type(),
-                                    "",
-                                )
-                                .unwrap()
-                                .into()
+                            unsafe { LLVMBuildTrunc(self.builder, from_value.1, target_basic_type, name.as_ptr()) }
                         } else if from_order < to_order {
                             // extending
                             if unsigned {
-                                self.builder
-                                    .build_int_z_extend(
-                                        from_value.1.into_int_value(),
-                                        target_basic_type.into_int_type(),
-                                        "",
-                                    )
-                                    .unwrap()
-                                    .into()
+                                unsafe { LLVMBuildZExt(self.builder, from_value.1, target_basic_type, name.as_ptr()) }
                             } else {
-                                self.builder
-                                    .build_int_s_extend(
-                                        from_value.1.into_int_value(),
-                                        target_basic_type.into_int_type(),
-                                        "",
-                                    )
-                                    .unwrap()
-                                    .into()
+                                unsafe { LLVMBuildSExt(self.builder, from_value.1, target_basic_type, name.as_ptr()) }
                             }
                         } else {
                             // casting
-                            self.builder
-                                .build_bit_cast(from_value.1, target_basic_type.into_int_type(), "")
-                                .unwrap()
+                            unsafe { LLVMBuildBitCast(self.builder, from_value.1, target_basic_type, name.as_ptr()) }
                         };
 
                         (to_type.0, value)
@@ -456,26 +373,13 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                         let from_order = genpay_semantic::Analyzer::float_order(from);
                         let to_order = genpay_semantic::Analyzer::float_order(to);
 
+                        let name = std::ffi::CString::new("").unwrap();
                         let value = if from_order > to_order {
                             // truncating
-                            self.builder
-                                .build_float_trunc(
-                                    from_value.1.into_float_value(),
-                                    target_basic_type.into_float_type(),
-                                    "",
-                                )
-                                .unwrap()
-                                .into()
+                            unsafe { LLVMBuildFPTrunc(self.builder, from_value.1, target_basic_type, name.as_ptr()) }
                         } else {
                             // extending
-                            self.builder
-                                .build_float_ext(
-                                    from_value.1.into_float_value(),
-                                    target_basic_type.into_float_type(),
-                                    "",
-                                )
-                                .unwrap()
-                                .into()
+                            unsafe { LLVMBuildFPExt(self.builder, from_value.1, target_basic_type, name.as_ptr()) }
                         };
 
                         (to_type.0, value)
@@ -487,24 +391,11 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     {
                         let unsigned = genpay_semantic::Analyzer::is_unsigned_integer(to);
 
+                        let name = std::ffi::CString::new("").unwrap();
                         let value = if unsigned {
-                            self.builder
-                                .build_float_to_unsigned_int(
-                                    from_value.1.into_float_value(),
-                                    target_basic_type.into_int_type(),
-                                    "",
-                                )
-                                .unwrap()
-                                .into()
+                            unsafe { LLVMBuildFPToUI(self.builder, from_value.1, target_basic_type, name.as_ptr()) }
                         } else {
-                            self.builder
-                                .build_float_to_signed_int(
-                                    from_value.1.into_float_value(),
-                                    target_basic_type.into_int_type(),
-                                    "",
-                                )
-                                .unwrap()
-                                .into()
+                            unsafe { LLVMBuildFPToSI(self.builder, from_value.1, target_basic_type, name.as_ptr()) }
                         };
 
                         (to_type.0, value)
@@ -516,24 +407,11 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     {
                         let unsigned = genpay_semantic::Analyzer::is_unsigned_integer(from);
 
+                        let name = std::ffi::CString::new("").unwrap();
                         let value = if unsigned {
-                            self.builder
-                                .build_unsigned_int_to_float(
-                                    from_value.1.into_int_value(),
-                                    target_basic_type.into_float_type(),
-                                    "",
-                                )
-                                .unwrap()
-                                .into()
+                            unsafe { LLVMBuildUIToFP(self.builder, from_value.1, target_basic_type, name.as_ptr()) }
                         } else {
-                            self.builder
-                                .build_signed_int_to_float(
-                                    from_value.1.into_int_value(),
-                                    target_basic_type.into_float_type(),
-                                    "",
-                                )
-                                .unwrap()
-                                .into()
+                            unsafe { LLVMBuildSIToFP(self.builder, from_value.1, target_basic_type, name.as_ptr()) }
                         };
 
                         (to_type.0, value)

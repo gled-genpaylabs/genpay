@@ -1,11 +1,11 @@
 use genpay_parser::types::Type;
-use inkwell::{types::BasicTypeEnum, values::PointerValue};
+use llvm_sys::prelude::{LLVMTypeRef, LLVMValueRef};
 
 #[derive(Debug, Clone)]
-pub struct Variable<'ctx> {
+pub struct Variable {
     pub datatype: Type,
-    pub llvm_type: BasicTypeEnum<'ctx>,
-    pub ptr: PointerValue<'ctx>,
+    pub llvm_type: LLVMTypeRef,
+    pub ptr: LLVMValueRef,
     pub no_drop: bool,
     pub global: bool,
 }

@@ -297,7 +297,7 @@ fn main() {
     // Code Generator Initialization.
     // Creating custom context and a very big wrapper for builder.
     let ctx = genpay_codegen::CodeGen::create_context();
-    let mut codegen = genpay_codegen::CodeGen::new(&ctx, &module_name, &src, symtable);
+    let mut codegen = genpay_codegen::CodeGen::new(ctx, &module_name, &src, symtable);
 
     // Compiling AST
     let (module_ref, _) = codegen.compile(ast, None);
