@@ -15,8 +15,8 @@
 //! - [`genpay-lexer`](genpay_lexer) - lexical analyzer. Converts source code into abstract data types (tokens)
 //! - [`genpay-parser`](genpay_parser) - syntax analyzer. Analyzes and converts provided input into [Abstract Syntax Tree](https://en.wikipedia.org/wiki/Abstract_syntax_tree)
 //! - [`genpay-semantic`](genpay_semantic) - semantical analyzer. Recursively checks the AST for type and principle matching
-//! - [`genpay-codegen`](genpay_codegen) - code generator. Recursively compiles the AST into LLVM IR
-//! - [`genpay-linker`](genpay_linker) - module linker. Compiles the LLVM IR module to an object file and links it to a binary file.
+//! - [`genpay-codegen`](genpay_codegen) - code generator. Recursively compiles the AST
+//! - [`genpay-linker`](genpay_linker) - module linker. Compiles the module to an object file and links it to a binary file.
 //!
 //! # License
 //! Project is licensed under the MIT License. <br/>
@@ -299,45 +299,30 @@ fn main() {
     let ctx = genpay_codegen::CodeGen::create_context();
     let mut codegen = genpay_codegen::CodeGen::new(&ctx, &module_name, &src, symtable);
 
-    // Compiling: AST -> LLVM IR Module Reference
+    // Compiling AST
     let (module_ref, _) = codegen.compile(ast, None);
 
-    // --llvm argument allows user to export LLVM IR module into file
-    if args.llvm {
-        module_ref
-            .print_to_file(format!("{}.ll", args.output.display()))
-            .unwrap_or_else(|_| {
-                cli::error("Unable to write LLVM IR file!");
-                std::process::exit(1);
-            });
+    genpay_linker::compiler::ObjectCompiler::compile_module(module_ref, &module_name);
+    let compiler = genpay_linker::linker::ObjectLinker::link(
+        &format!("{module_name}.o"),
+        args.output.to_str().unwrap(),
+        external_linkages,
+    )
+    .unwrap_or_else(|err| {
+        cli::error("Linker catched an error! (object linker: `clang`)");
+        println!("\n{err}\n");
 
-        cli::info(
-            "Successfully",
-            &format!("compiled to LLVM IR: `{}.ll`", args.output.display()),
-        )
-    } else {
-        genpay_linker::compiler::ObjectCompiler::compile_module(module_ref, &module_name);
-        let compiler = genpay_linker::linker::ObjectLinker::link(
-            &format!("{module_name}.o"),
-            args.output.to_str().unwrap(),
-            external_linkages,
-        )
-        .unwrap_or_else(|err| {
-            cli::error("Linker catched an error! (object linker: `clang`)");
-            println!("\n{err}\n");
+        cli::error(
+            "Please make sure you linked all the necessary libraries (check the '-i' argument)",
+        );
+        std::process::exit(1);
+    });
 
-            cli::error(
-                "Please make sure you linked all the necessary libraries (check the '-i' argument)",
-            );
-            std::process::exit(1);
-        });
-
-        cli::info(
-            "Successfully",
-            &format!(
-                "compiled to binary (with `{compiler}`): `{}`",
-                args.output.display()
-            ),
-        )
-    };
+    cli::info(
+        "Successfully",
+        &format!(
+            "compiled to binary (with `{compiler}`): `{}`",
+            args.output.display()
+        ),
+    )
 }

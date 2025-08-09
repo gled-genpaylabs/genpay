@@ -21,10 +21,6 @@ pub struct Args {
     #[arg(short, long, action, help = "Disable compiler's warnings")]
     pub no_warns: bool,
 
-    /// `-l --llvm` flag to enable compilation into LLVM IR
-    #[arg(short, long, action, help = "Enable compilation into LLVM IR")]
-    pub llvm: bool,
-
     /// `-i --include` flag to link C library to linker
     #[arg(short, long, action, help = "Include C library to linker")]
     pub include: Vec<PathBuf>,
