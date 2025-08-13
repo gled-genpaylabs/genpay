@@ -9,13 +9,15 @@ use genpay_parser::{expressions::Expressions, types::Type, value::Value};
 /// `format!(LITERAL, ...)` -> `*char`
 #[derive(Debug, Clone)]
 pub struct FormatMacro;
-impl MacroObject for FormatMacro {
+use miette::NamedSource;
+
+impl<'s> MacroObject<'s> for FormatMacro {
     fn verify_call(
         &self,
-        analyzer: &mut Analyzer,
-        arguments: &[Expressions],
+        analyzer: &mut Analyzer<'s>,
+        arguments: &[Expressions<'s>],
         span: &(usize, usize),
-    ) -> Type {
+    ) -> Type<'s> {
         const DISPLAY_IMPLEMENTATION_FORMAT: &str = "fn display(&self) *char";
         const MINIMUM_ARGUMENTS_LEN: usize = 1;
         let return_type: Type = Type::Pointer(Box::new(Type::Char));
@@ -28,7 +30,10 @@ impl MacroObject for FormatMacro {
                     arguments.len()
                 ),
                 help: None,
-                src: analyzer.source.clone(),
+                src: NamedSource::new(
+                    analyzer.source.name().to_string(),
+                    analyzer.source.data().to_string(),
+                ),
                 span: error::position_to_span(*span),
             });
         }
@@ -51,7 +56,10 @@ impl MacroObject for FormatMacro {
                                 "Consider using right bindings syntax with curly brackets"
                                     .to_string(),
                             ),
-                            src: analyzer.source.clone(),
+                            src: NamedSource::new(
+                                analyzer.source.name().to_string(),
+                                analyzer.source.data().to_string(),
+                            ),
                             span: error::position_to_span(*literal_span),
                         }),
                     }
@@ -68,7 +76,10 @@ impl MacroObject for FormatMacro {
                         arguments.len()
                     ),
                     help: None,
-                    src: analyzer.source.clone(),
+                    src: NamedSource::new(
+                        analyzer.source.name().to_string(),
+                        analyzer.source.data().to_string(),
+                    ),
                     span: error::position_to_span(*span),
                 });
                 return return_type;
@@ -99,7 +110,10 @@ impl MacroObject for FormatMacro {
                                 SemanticError::IllegalImplementation {
                                     exception: format!("type `{expr_type}` has wrong implementation for display"),
                                     help: Some(format!("Consider using right format: {DISPLAY_IMPLEMENTATION_FORMAT}")),
-                                    src: analyzer.source.clone(),
+                                    src: NamedSource::new(
+                                analyzer.source.name().to_string(),
+                                analyzer.source.data().to_string(),
+                            ),
                                     span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                                 }
                             );
@@ -109,7 +123,10 @@ impl MacroObject for FormatMacro {
                             SemanticError::IllegalImplementation {
                                 exception: format!("type `{expr_type}` has no implementation for display"),
                                 help: Some(format!("Consider implementing necessary method: {DISPLAY_IMPLEMENTATION_FORMAT}")),
-                                src: analyzer.source.clone(),
+                                src: NamedSource::new(
+                                analyzer.source.name().to_string(),
+                                analyzer.source.data().to_string(),
+                            ),
                                 span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                             }
                         );
@@ -127,7 +144,10 @@ impl MacroObject for FormatMacro {
                                     SemanticError::IllegalImplementation {
                                         exception: format!("type `{expr_type}` has wrong implementation for display"),
                                         help: Some(format!("Consider using right format: {DISPLAY_IMPLEMENTATION_FORMAT}")),
-                                        src: analyzer.source.clone(),
+                                        src: NamedSource::new(
+                                analyzer.source.name().to_string(),
+                                analyzer.source.data().to_string(),
+                            ),
                                         span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                                     }
                                 );
@@ -137,7 +157,10 @@ impl MacroObject for FormatMacro {
                             SemanticError::IllegalImplementation {
                                 exception: format!("type `{expr_type}` has no implementation for display"),
                                 help: Some(format!("Consider implementing necessary method: {DISPLAY_IMPLEMENTATION_FORMAT}")),
-                                src: analyzer.source.clone(),
+                                src: NamedSource::new(
+                                analyzer.source.name().to_string(),
+                                analyzer.source.data().to_string(),
+                            ),
                                 span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                             }
                         );
@@ -146,7 +169,10 @@ impl MacroObject for FormatMacro {
                         analyzer.error(SemanticError::UnknownObject {
                             exception: format!("no displayable type `{expr_type}` found"),
                             help: None,
-                            src: analyzer.source.clone(),
+                            src: NamedSource::new(
+                                analyzer.source.name().to_string(),
+                                analyzer.source.data().to_string(),
+                            ),
                             span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                         });
                     }
@@ -156,7 +182,10 @@ impl MacroObject for FormatMacro {
                     analyzer.error(SemanticError::UnsupportedType {
                         exception: format!("type `{expr_type}` is not supported for display"),
                         help: None,
-                        src: analyzer.source.clone(),
+                        src: NamedSource::new(
+                            analyzer.source.name().to_string(),
+                            analyzer.source.data().to_string(),
+                        ),
                         span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                     });
                 }

@@ -9,13 +9,15 @@ use genpay_parser::{expressions::Expressions, types::Type};
 /// `sizeof!(TYPE / EXPRESSION)` -> `usize`
 #[derive(Debug, Clone)]
 pub struct SizeofMacro;
-impl MacroObject for SizeofMacro {
+use miette::NamedSource;
+
+impl<'s> MacroObject<'s> for SizeofMacro {
     fn verify_call(
         &self,
-        analyzer: &mut Analyzer,
-        arguments: &[Expressions],
+        analyzer: &mut Analyzer<'s>,
+        arguments: &[Expressions<'s>],
         span: &(usize, usize),
-    ) -> Type {
+    ) -> Type<'s> {
         const MINIMUM_ARGUMENTS_LEN: usize = 1;
         const RETURN_TYPE: Type = Type::USIZE;
 
@@ -27,7 +29,10 @@ impl MacroObject for SizeofMacro {
                     arguments.len()
                 ),
                 help: None,
-                src: analyzer.source.clone(),
+                src: NamedSource::new(
+                    analyzer.source.name().to_string(),
+                    analyzer.source.data().to_string(),
+                ),
                 span: error::position_to_span(*span),
             });
         }

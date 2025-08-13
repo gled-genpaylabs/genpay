@@ -1,7 +1,7 @@
 use genpay_parser::types::Type;
 
 #[derive(Debug, Clone)]
-pub struct ScopeElement {
-    pub datatype: Type,
+pub struct ScopeElement<'s> {
+    pub datatype: Type<'s>,
     pub public: bool,
 }
