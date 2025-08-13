@@ -34,9 +34,6 @@ pub mod token;
 /// Token Types Enumeration
 pub mod token_type;
 
-pub type LexerOk<'s> = (Vec<Token<'s>>, Vec<LexerWarning>);
-pub type LexerErr<'s> = (Vec<LexerError>, Vec<LexerWarning>);
-
 /// Main lexical analyzer instance
 ///
 /// ### Usage example:
@@ -112,7 +109,7 @@ impl<'s> Lexer<'s> {
     }
 
     /* next token -------------------------------------------------------- */
-    pub fn next(&mut self) -> Token<'s> {
+    pub fn next_token(&mut self) -> Token<'s> {
         self.skip_ws();
         let start = self.cursor;
         match self.peek() {
@@ -213,7 +210,7 @@ impl<'s> Lexer<'s> {
                 self.bump();
                 if self.peek() == Some(b'/') {
                     self.eat_while(|b| b != b'\n');
-                    self.next()
+                    self.next_token()
                 } else {
                     Token::new("/", TokenType::Divide, (start, self.cursor))
                 }
@@ -343,27 +340,17 @@ impl<'s> Lexer<'s> {
             }
         }
     }
+}
 
-    fn error(&mut self, error: LexerError) {
-        self.errors.push(error);
-    }
+impl<'s> Iterator for Lexer<'s> {
+    type Item = Token<'s>;
 
-    pub fn tokenize(&mut self) -> Result<LexerOk<'s>, LexerErr<'s>> {
-        let mut tokens = Vec::new();
-
-        loop {
-            let token = self.next();
-            if token.token_type == TokenType::EOF {
-                tokens.push(token);
-                break;
-            }
-            tokens.push(token);
-        }
-
-        if self.errors.is_empty() {
-            Ok((tokens, self.warnings.clone()))
+    fn next(&mut self) -> Option<Self::Item> {
+        let token = self.next_token();
+        if token.token_type == TokenType::EOF {
+            None
         } else {
-            Err((self.errors.clone(), self.warnings.clone()))
+            Some(token)
         }
     }
 }

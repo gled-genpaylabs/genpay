@@ -7,7 +7,7 @@
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Type {
+pub enum Type<'s> {
     SelfRef,
     Undefined,
     NoDrop,
@@ -31,22 +31,22 @@ pub enum Type {
     Null,
     Char,
 
-    Pointer(Box<Type>),
-    Array(Box<Type>, usize),
-    DynamicArray(Box<Type>),
+    Pointer(Box<Type<'s>>),
+    Array(Box<Type<'s>>, usize),
+    DynamicArray(Box<Type<'s>>),
 
-    Tuple(Vec<Type>),
-    Alias(String),
+    Tuple(Vec<Type<'s>>),
+    Alias(&'s str),
 
     // for semantical analyzer
-    Function(Vec<Type>, Box<Type>, bool), // fn foo(a: i32, b: u32) string  --->  Function([I32, U32], String)
-    Struct(IndexMap<String, Type>, IndexMap<String, Type>), // struct Abc { a: i32, b: bool, c: *u64 }  ---> Struct([I32, Bool, Pointer(U64)])
-    Enum(Vec<String>, IndexMap<String, Type>), // enum Abc { A, B, C } -> Enum([A, B, C])
+    Function(Vec<Type<'s>>, Box<Type<'s>>, bool), // fn foo(a: i32, b: u32) string  --->  Function([I32, U32], String)
+    Struct(IndexMap<&'s str, Type<'s>>, IndexMap<&'s str, Type<'s>>), // struct Abc { a: i32, b: bool, c: *u64 }  ---> Struct([I32, Bool, Pointer(U64)])
+    Enum(Vec<&'s str>, IndexMap<&'s str, Type<'s>>), // enum Abc { A, B, C } -> Enum([A, B, C])
 
-    ImportObject(String),
+    ImportObject(&'s str),
 }
 
-impl std::fmt::Display for Type {
+impl<'s> std::fmt::Display for Type<'s> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Type::SelfRef => write!(f, "&self"),

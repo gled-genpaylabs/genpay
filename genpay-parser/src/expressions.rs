@@ -19,110 +19,110 @@ use genpay_lexer::token_type::TokenType;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expressions {
+pub enum Expressions<'s> {
     /// `OBJECT BINOP EXPRESSION`
     Binary {
-        operand: String,
-        lhs: Box<Expressions>,
-        rhs: Box<Expressions>,
+        operand: &'s str,
+        lhs: Box<Expressions<'s>>,
+        rhs: Box<Expressions<'s>>,
         span: (usize, usize),
     },
     /// `UNOP OBJECT`
     Unary {
-        operand: String,
-        object: Box<Expressions>,
+        operand: &'s str,
+        object: Box<Expressions<'s>>,
         span: (usize, usize),
     },
 
     /// `OBJECT BOOLOP EXPRESSION`
     Boolean {
-        operand: String,
-        lhs: Box<Expressions>,
-        rhs: Box<Expressions>,
+        operand: &'s str,
+        lhs: Box<Expressions<'s>>,
+        rhs: Box<Expressions<'s>>,
         span: (usize, usize),
     },
     /// `OBJECT BITOP EXPRESSION`
     Bitwise {
-        operand: String,
-        lhs: Box<Expressions>,
-        rhs: Box<Expressions>,
+        operand: &'s str,
+        lhs: Box<Expressions<'s>>,
+        rhs: Box<Expressions<'s>>,
         span: (usize, usize),
     },
 
     /// `IDENTIFIER: TYPE`
     Argument {
-        name: String,
-        r#type: Type,
+        name: &'s str,
+        r#type: Type<'s>,
         span: (usize, usize),
     },
     /// `OBJECT.SUBELEMENT_1.SUBELEMENT_2`
     SubElement {
-        head: Box<Expressions>,
-        subelements: Vec<Expressions>,
+        head: Box<Expressions<'s>>,
+        subelements: Vec<Expressions<'s>>,
         span: (usize, usize),
     },
 
     /// `IDENTIFIER ( EXPRESSION, EXPRESSION, ... )`
     FnCall {
-        name: String,
-        arguments: Vec<Expressions>,
+        name: &'s str,
+        arguments: Vec<Expressions<'s>>,
         span: (usize, usize),
     },
     /// `IDENTIFIER! ( EXPRESSION, EXPRESSION, ... )`
     MacroCall {
-        name: String,
-        arguments: Vec<Expressions>,
+        name: &'s str,
+        arguments: Vec<Expressions<'s>>,
         span: (usize, usize),
     },
 
     /// `&EXPRESSION`
     Reference {
-        object: Box<Expressions>,
+        object: Box<Expressions<'s>>,
         span: (usize, usize),
     },
 
     /// `*EXPRESSION`
     Dereference {
-        object: Box<Expressions>,
+        object: Box<Expressions<'s>>,
         span: (usize, usize),
     },
 
     /// `[EXPRESSION, EXPRESSION, ...]`
     Array {
-        values: Vec<Expressions>,
+        values: Vec<Expressions<'s>>,
         len: usize,
         span: (usize, usize),
     },
     /// `(EXPRESSION, EXPRESSION, ...)`
     Tuple {
-        values: Vec<Expressions>,
+        values: Vec<Expressions<'s>>,
         span: (usize, usize),
     },
     /// `OBJECT[EXPRESSION]`
     Slice {
-        object: Box<Expressions>,
-        index: Box<Expressions>,
+        object: Box<Expressions<'s>>,
+        index: Box<Expressions<'s>>,
         span: (usize, usize),
     },
     /// `IDENTIFIER { .IDENTIFIER = EXPRESSION, .IDENTIFIER = EXPRESSION }`
     Struct {
-        name: String,
-        fields: HashMap<String, Expressions>,
+        name: &'s str,
+        fields: HashMap<&'s str, Expressions<'s>>,
         span: (usize, usize),
     },
     /// `{ STATEMENTS }`
     Scope {
-        block: Vec<Statements>,
+        block: Vec<Statements<'s>>,
         span: (usize, usize),
     },
 
-    Value(Value, (usize, usize)),
+    Value(Value<'s>, (usize, usize)),
     None,
 }
 
-impl Parser {
+impl<'s> Parser<'s> {
     #[inline]
-    pub fn get_span_expression(expr: &Expressions) -> (usize, usize) {
+    pub fn get_span_expression(expr: &Expressions<'s>) -> (usize, usize) {
         match expr {
             Expressions::Binary { span, .. } => *span,
             Expressions::Boolean { span, .. } => *span,
@@ -145,45 +145,42 @@ impl Parser {
     }
 
     #[inline]
-    pub fn span_expression(&self, expr: Expressions) -> (usize, usize) {
+    pub fn span_expression(&self, expr: Expressions<'s>) -> (usize, usize) {
         Self::get_span_expression(&expr)
     }
 }
 
-impl Parser {
+impl<'s> Parser<'s> {
     pub fn subelement_expression(
         &mut self,
-        head: Expressions,
+        head: Expressions<'s>,
         separator: TokenType,
-    ) -> Expressions {
-        // if self.expect(separator) {
-        //     let _ = self.next();
-        // }
-
+    ) -> Expressions<'s> {
+        let head_span = Self::get_span_expression(&head);
         let head = Box::new(head);
-        let span_start = self.current().span.1;
         let mut subelements = Vec::new();
-        let mut span_end = self.current().span.1;
+        let mut end_span = head_span.1;
 
-        while self.expect(separator.clone()) {
-            if self.expect(separator.clone()) {
-                let _ = self.next();
+        loop {
+            if !self.expect(separator.clone()) {
+                break;
             }
-            subelements.push(self.term());
-            span_end = self.current().span.1;
+            let _ = self.next();
+
+            let term = self.term();
+            end_span = Self::get_span_expression(&term).1;
+            subelements.push(term);
         }
 
         Expressions::SubElement {
             head,
             subelements,
-            span: (span_start, span_end),
+            span: (head_span.0, end_span),
         }
     }
 
-    pub fn binary_expression(&mut self, node: Expressions) -> Expressions {
+    pub fn binary_expression(&mut self, node: Expressions<'s>) -> Expressions<'s> {
         let node_span = Self::get_span_expression(&node);
-        let span_end;
-
         let current = self.current();
 
         match current.token_type {
@@ -192,10 +189,7 @@ impl Parser {
 
                 let lhs = node;
                 let rhs = self.expression();
-
-                self.position -= 2;
-                span_end = self.current().span.1;
-                self.position += 2;
+                let span_end = Self::get_span_expression(&rhs).1;
 
                 if PRIORITY_BINARY_OPERATORS.contains(&tty) {
                     let new_node = rhs.clone();
@@ -238,12 +232,10 @@ impl Parser {
         }
     }
 
-    pub fn boolean_expression(&mut self, node: Expressions) -> Expressions {
+    pub fn boolean_expression(&mut self, node: Expressions<'s>) -> Expressions<'s> {
         // FIXME: Expressions like `true || false` returns error "Undefined term found"
 
         let node_span = Self::get_span_expression(&node);
-        let span_end;
-
         let current = self.current();
 
         match current.token_type {
@@ -253,10 +245,7 @@ impl Parser {
 
                 let lhs = node.clone();
                 let rhs = self.expression();
-
-                self.position -= 2;
-                span_end = self.current().span.1;
-                self.position += 2;
+                let span_end = Self::get_span_expression(&rhs).1;
 
                 if PRIORITY_BOOLEAN_OPERATORS.contains(&self.current().token_type) {
                     let operand = self.current().value;
@@ -289,10 +278,8 @@ impl Parser {
         }
     }
 
-    pub fn bitwise_expression(&mut self, node: Expressions) -> Expressions {
+    pub fn bitwise_expression(&mut self, node: Expressions<'s>) -> Expressions<'s> {
         let node_span = Self::get_span_expression(&node);
-        let span_end;
-
         let current = self.current();
 
         match current.token_type {
@@ -301,10 +288,7 @@ impl Parser {
 
                 let lhs = Box::new(node);
                 let rhs = Box::new(self.expression());
-
-                self.position -= 2;
-                span_end = self.current().span.1;
-                self.position += 2;
+                let span_end = Self::get_span_expression(&rhs).1;
 
                 Expressions::Bitwise {
                     operand: current.value,
@@ -317,7 +301,7 @@ impl Parser {
         }
     }
 
-    pub fn call_expression(&mut self, fname: String, span: (usize, usize)) -> Expressions {
+    pub fn call_expression(&mut self, fname: &'s str, span: (usize, usize)) -> Expressions<'s> {
         match self.current().token_type {
             TokenType::Identifier => {
                 let _ = self.next();
@@ -338,9 +322,11 @@ impl Parser {
         let arguments =
             self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma);
 
-        self.position -= 1;
-        let span_end = self.current().span.1;
-        self.position += 1;
+        let span_end = if let Some(last_arg) = arguments.last() {
+            Self::get_span_expression(last_arg).1
+        } else {
+            self.current().span.0
+        };
 
         Expressions::FnCall {
             name: fname,
@@ -349,7 +335,7 @@ impl Parser {
         }
     }
 
-    pub fn macrocall_expression(&mut self, name: String, span: (usize, usize)) -> Expressions {
+    pub fn macrocall_expression(&mut self, name: &'s str, span: (usize, usize)) -> Expressions<'s> {
         if self.expect(TokenType::Not) {
             let _ = self.next();
         }
@@ -357,9 +343,11 @@ impl Parser {
         let arguments =
             self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma);
 
-        self.position -= 1;
-        let span_end = self.current().span.1;
-        self.position += 1;
+        let span_end = if let Some(last_arg) = arguments.last() {
+            Self::get_span_expression(last_arg).1
+        } else {
+            self.current().span.0
+        };
 
         Expressions::MacroCall {
             name,
@@ -368,7 +356,7 @@ impl Parser {
         }
     }
 
-    pub fn slice_expression(&mut self, expr: Expressions) -> Expressions {
+    pub fn slice_expression(&mut self, expr: Expressions<'s>) -> Expressions<'s> {
         if let TokenType::LBrack = self.current().token_type {
             let _ = self.next();
         }
@@ -399,7 +387,7 @@ impl Parser {
         }
     }
 
-    pub fn struct_expression(&mut self, name: String) -> Expressions {
+    pub fn struct_expression(&mut self, name: &'s str) -> Expressions<'s> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Identifier) {
             let _ = self.next();
@@ -515,11 +503,9 @@ impl Parser {
         start: TokenType,
         end: TokenType,
         separator: TokenType,
-    ) -> Vec<Expressions> {
-        let mut current = self.current();
-
+    ) -> Vec<Expressions<'s>> {
         if self.expect(start) {
-            current = self.next()
+            let _ = self.next();
         } else if self.expect(end.clone()) {
             let _ = self.next();
             return Vec::new();
@@ -527,15 +513,17 @@ impl Parser {
 
         let mut output = Vec::new();
 
-        while current.token_type != end {
-            current = self.current();
-
-            if current.token_type == separator {
-                let _ = self.next();
-            } else if current.token_type == end {
+        loop {
+            if self.expect(end.clone()) {
                 break;
-            } else {
-                output.push(self.expression());
+            }
+
+            output.push(self.expression());
+
+            if self.expect(separator.clone()) {
+                let _ = self.next();
+            } else if !self.expect(end.clone()) {
+                break;
             }
         }
 

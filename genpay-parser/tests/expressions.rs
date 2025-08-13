@@ -1,4 +1,3 @@
-use genpay_lexer::Lexer;
 use genpay_parser::{
     Parser, expressions::Expressions, statements::Statements, types::Type, value::Value,
 };
@@ -8,10 +7,7 @@ fn binary_expression() {
     const SRC: &str = "let a = 5 + 2;";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -51,10 +47,7 @@ fn binary_advanced_expression() {
     const SRC: &str = "let a = 2 + 2 * 2;";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -110,10 +103,7 @@ fn unary_negative_expression() {
     const SRC: &str = "let a = -2;";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -148,10 +138,7 @@ fn unary_not_expression() {
     const SRC: &str = "let a = !2;";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -186,10 +173,7 @@ fn boolean_eq_expression() {
     const SRC: &str = "let a = 1 == 1;";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -229,10 +213,7 @@ fn boolean_ne_expression() {
     const SRC: &str = "let a = 1 != 1;";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -272,10 +253,7 @@ fn boolean_bt_expression() {
     const SRC: &str = "let a = 1 > 1;";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -315,10 +293,7 @@ fn boolean_lt_expression() {
     const SRC: &str = "let a = 1 < 1;";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -358,10 +333,7 @@ fn boolean_advanced_expression() {
     const SRC: &str = "let a = 1 == 1 && 0 != 5;";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -434,10 +406,7 @@ fn bitwise_expression() {
     const SRC: &str = "let a = 5 << 2;";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -477,10 +446,7 @@ fn argument_expression() {
     const SRC: &str = "let a = some_arg: i32";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -511,10 +477,7 @@ fn argument_advanced_expression() {
     const SRC: &str = "let a = some_arg: *[i32; 5]";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -548,10 +511,7 @@ fn subelement_expression() {
     const SRC: &str = "let a = some_struct.field";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -592,10 +552,7 @@ fn subelement_advanced_expression() {
     const SRC: &str = "let a = some_struct.field.method()";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -650,10 +607,7 @@ fn fncall_expression() {
     const SRC: &str = "let a = call_me()";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -684,10 +638,7 @@ fn fncall_advanced_expression() {
     const SRC: &str = "let a = call_me(1, id, 1.0)";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -735,10 +686,7 @@ fn reference_expression() {
     const SRC: &str = "let a = &b";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -768,10 +716,7 @@ fn reference_advanced_expression() {
     const SRC: &str = "let a = &(b)";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -801,10 +746,7 @@ fn dereference_expression() {
     const SRC: &str = "let a = *b";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -834,10 +776,7 @@ fn dereference_advanced_expression() {
     const SRC: &str = "let a = **b";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -871,10 +810,7 @@ fn array_expression() {
     const SRC: &str = "let a = [1, 2, 3]";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -918,10 +854,7 @@ fn tuple_expression() {
     const SRC: &str = "let a = (1, 5, 4)";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -961,10 +894,7 @@ fn tuple_advanced_expression() {
     const SRC: &str = "let a = (1, 2.0, \"hello\")";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1005,10 +935,7 @@ fn slice_expression() {
     const SRC: &str = "let a = b[0]";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1044,10 +971,7 @@ fn struct_expression() {
     const SRC: &str = "let a = Person { .age = 32, .name = \"John\", .money = 333.12 };";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     if let Some(Statements::AnnotationStatement {

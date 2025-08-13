@@ -1,4 +1,3 @@
-use genpay_lexer::Lexer;
 use genpay_parser::{Parser, expressions::Expressions, statements::Statements, value::Value};
 
 #[test]
@@ -6,10 +5,7 @@ fn basic_values() {
     const SRC: &str = "123; 5.0; 'a'; \"some\"; true";
     const FILENAME: &str = "test.dn";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
-    let (tokens, _) = lexer.tokenize().unwrap();
-
-    let mut parser = Parser::new(tokens, SRC, FILENAME);
+    let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     let mut ast_iter = ast.into_iter();

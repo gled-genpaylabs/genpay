@@ -17,73 +17,73 @@ use genpay_lexer::token_type::TokenType;
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Statements {
+pub enum Statements<'s> {
     /// `OBJECT = EXPRESSION`
     AssignStatement {
-        object: Expressions,
-        value: Expressions,
+        object: Expressions<'s>,
+        value: Expressions<'s>,
         span: (usize, usize),
     },
 
     /// `OBJECT BINOP= EXPRESSION`
     BinaryAssignStatement {
-        object: Expressions,
-        operand: String,
-        value: Expressions,
+        object: Expressions<'s>,
+        operand: &'s str,
+        value: Expressions<'s>,
         span: (usize, usize),
     },
 
     /// `*OBJECT = EXPRESSION`
     DerefAssignStatement {
-        object: Expressions,
-        value: Expressions,
+        object: Expressions<'s>,
+        value: Expressions<'s>,
         span: (usize, usize),
     },
 
     /// `OBJECT[EXPRESSION] = EXPRESSION`
     SliceAssignStatement {
-        object: Expressions,
-        index: Expressions,
-        value: Expressions,
+        object: Expressions<'s>,
+        index: Expressions<'s>,
+        value: Expressions<'s>,
         span: (usize, usize),
     },
 
     /// `OBJECT.FIELD= EXPRESSION`
     FieldAssignStatement {
-        object: Expressions,
-        value: Expressions,
+        object: Expressions<'s>,
+        value: Expressions<'s>,
         span: (usize, usize),
     },
 
     /// `let IDENTIFIER = EXPRESSION`
     AnnotationStatement {
-        identifier: String,
-        datatype: Option<Type>,
-        value: Option<Expressions>,
+        identifier: &'s str,
+        datatype: Option<Type<'s>>,
+        value: Option<Expressions<'s>>,
         span: (usize, usize),
     },
 
     /// `pub/NOTHING fn IDENTIFIER ( IDENTIFIER: TYPE, IDENTIFIER: TYPE, ... ) TYPE/NOTHING { STATEMENTS }`
     FunctionDefineStatement {
-        name: String,
-        datatype: Type,
-        arguments: Vec<(String, Type)>,
-        block: Vec<Statements>,
+        name: &'s str,
+        datatype: Type<'s>,
+        arguments: Vec<(&'s str, Type<'s>)>,
+        block: Vec<Statements<'s>>,
         public: bool,
         span: (usize, usize),
         header_span: (usize, usize),
     },
     /// `NAME ( EXPRESSION, EXPRESSION, ... )`
     FunctionCallStatement {
-        name: String,
-        arguments: Vec<Expressions>,
+        name: &'s str,
+        arguments: Vec<Expressions<'s>>,
         span: (usize, usize),
     },
 
     /// `MACRONAME! ( EXPRESSION, EXPRESSION, ... )`
     MacroCallStatement {
-        name: String,
-        arguments: Vec<Expressions>,
+        name: &'s str,
+        arguments: Vec<Expressions<'s>>,
         span: (usize, usize),
     },
 
@@ -96,9 +96,9 @@ pub enum Statements {
     /// }
     /// ```
     StructDefineStatement {
-        name: String,
-        fields: IndexMap<String, Type>,
-        functions: IndexMap<String, Statements>,
+        name: &'s str,
+        fields: IndexMap<&'s str, Type<'s>>,
+        functions: IndexMap<&'s str, Statements<'s>>,
         public: bool,
         span: (usize, usize),
     },
@@ -112,61 +112,61 @@ pub enum Statements {
     /// }
     /// ```
     EnumDefineStatement {
-        name: String,
-        fields: Vec<String>,
-        functions: IndexMap<String, Statements>,
+        name: &'s str,
+        fields: Vec<&'s str>,
+        functions: IndexMap<&'s str, Statements<'s>>,
         public: bool,
         span: (usize, usize),
     },
 
     /// `typedef IDENTIFIER TYPE`
     TypedefStatement {
-        alias: String,
-        datatype: Type,
+        alias: &'s str,
+        datatype: Type<'s>,
         span: (usize, usize),
     },
 
     /// `if EXPRESSION { STATEMENTS } else { STATEMENTS }`
     IfStatement {
-        condition: Expressions,
-        then_block: Vec<Statements>,
-        else_block: Option<Vec<Statements>>,
+        condition: Expressions<'s>,
+        then_block: Vec<Statements<'s>>,
+        else_block: Option<Vec<Statements<'s>>>,
         span: (usize, usize),
     },
 
     /// `while EXPRESSION { STATEMENTS }`
     WhileStatement {
-        condition: Expressions,
-        block: Vec<Statements>,
+        condition: Expressions<'s>,
+        block: Vec<Statements<'s>>,
         span: (usize, usize),
     },
 
     /// `for IDENTIFIER = OBJECT { STATEMENTS }`
     ForStatement {
-        binding: String,
-        iterator: Expressions,
-        block: Vec<Statements>,
+        binding: &'s str,
+        iterator: Expressions<'s>,
+        block: Vec<Statements<'s>>,
         span: (usize, usize),
     },
 
     /// `import "PATH"`
     ImportStatement {
-        path: Expressions,
+        path: Expressions<'s>,
         span: (usize, usize),
     },
 
     /// `include "PATH"`
     IncludeStatement {
-        path: Expressions,
+        path: Expressions<'s>,
         span: (usize, usize),
     },
 
     /// `extern "EXT_TYPE" pub/NOTHING fn IDENTIFIER ( TYPE, TYPE, ... ) TYPE/NOTHING`
     ExternStatement {
-        identifier: String,
-        arguments: Vec<Type>,
-        return_type: Type,
-        extern_type: String,
+        identifier: &'s str,
+        arguments: Vec<Type<'s>>,
+        return_type: Type<'s>,
+        extern_type: &'s str,
         is_var_args: bool,
         public: bool,
         span: (usize, usize),
@@ -174,14 +174,14 @@ pub enum Statements {
 
     /// `_extern_declare IDENTIFIER EXPRESSION`
     ExternDeclareStatement {
-        identifier: String,
-        datatype: Type,
+        identifier: &'s str,
+        datatype: Type<'s>,
         span: (usize, usize),
     },
 
     /// `_link_c "PATH"`
     LinkCStatement {
-        path: Expressions,
+        path: Expressions<'s>,
         span: (usize, usize),
     },
 
@@ -192,23 +192,23 @@ pub enum Statements {
 
     /// `return EXPRESSION`
     ReturnStatement {
-        value: Expressions,
+        value: Expressions<'s>,
         span: (usize, usize),
     },
 
     /// `{ STATEMENTS }`
     ScopeStatement {
-        block: Vec<Statements>,
+        block: Vec<Statements<'s>>,
         span: (usize, usize),
     },
 
-    Expression(Expressions),
+    Expression(Expressions<'s>),
     None,
 }
 
-impl Parser {
+impl<'s> Parser<'s> {
     #[inline]
-    pub fn get_span_statement(stmt: &Statements) -> (usize, usize) {
+    pub fn get_span_statement(stmt: &Statements<'s>) -> (usize, usize) {
         match stmt {
             Statements::AssignStatement { span, .. } => *span,
             Statements::BinaryAssignStatement { span, .. } => *span,
@@ -239,11 +239,11 @@ impl Parser {
     }
 }
 
-impl Parser {
-    pub fn annotation_statement(&mut self) -> Statements {
+impl<'s> Parser<'s> {
+    pub fn annotation_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
 
-        if self.current().value == *"let" {
+        if self.current().value == "let" {
             let _ = self.next();
         }
 
@@ -306,7 +306,7 @@ impl Parser {
         }
     }
 
-    pub fn import_statement(&mut self) -> Statements {
+    pub fn import_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
         if self.current().token_type == TokenType::Keyword {
             let _ = self.next();
@@ -336,7 +336,7 @@ impl Parser {
         }
     }
 
-    pub fn include_statement(&mut self) -> Statements {
+    pub fn include_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
         if self.current().token_type == TokenType::Keyword {
             let _ = self.next();
@@ -364,7 +364,7 @@ impl Parser {
         }
     }
 
-    pub fn if_statement(&mut self) -> Statements {
+    pub fn if_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
         if self.current().token_type == TokenType::Keyword {
             let _ = self.next();
@@ -427,7 +427,7 @@ impl Parser {
 
                 match self.current().token_type {
                     TokenType::Keyword => {
-                        if self.current().value != *"if" {
+                        if self.current().value != "if" {
                             self.error(ParserError::UnknownExpression {
                                 exception: "unexpected keyword found after `else`".to_string(),
                                 help: "Consider opening new block, or using `if else` bundle"
@@ -511,7 +511,7 @@ impl Parser {
         }
     }
 
-    pub fn while_statement(&mut self) -> Statements {
+    pub fn while_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -562,7 +562,7 @@ impl Parser {
         }
     }
 
-    pub fn for_statement(&mut self) -> Statements {
+    pub fn for_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -630,7 +630,7 @@ impl Parser {
         }
     }
 
-    pub fn fn_statement(&mut self) -> Statements {
+    pub fn fn_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -651,7 +651,7 @@ impl Parser {
                     span: _,
                 } = arg
                 {
-                    (name.clone(), r#type.clone())
+                    (*name, r#type.clone())
                 } else {
                     // okay lets just skip this piece of code.
                     // I've made a mistake creating this embedded code, but we all make mistakes.
@@ -661,7 +661,7 @@ impl Parser {
                     if let Expressions::Reference { object, span: _ } = arg {
                         if let Expressions::Value(Value::Identifier(id), _) = *object.clone() {
                             if id == "self" {
-                                return (id, Type::SelfRef);
+                                return ("self", Type::SelfRef);
                             }
                         }
                     }
@@ -673,7 +673,7 @@ impl Parser {
                         span: error::position_to_span(self.span_expression(arg.clone())),
                     });
 
-                    (String::new(), Type::Void)
+                    ("", Type::Void)
                 }
             })
             .collect();
@@ -733,7 +733,7 @@ impl Parser {
         }
     }
 
-    pub fn return_statement(&mut self) -> Statements {
+    pub fn return_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -746,13 +746,14 @@ impl Parser {
             self.expression()
         };
 
+        let end_span = Self::get_span_expression(&return_expr).1;
         Statements::ReturnStatement {
-            value: return_expr.clone(),
-            span: (span_start, self.span_expression(return_expr).1),
+            value: return_expr,
+            span: (span_start, end_span),
         }
     }
 
-    pub fn break_statement(&mut self) -> Statements {
+    pub fn break_statement(&mut self) -> Statements<'s> {
         let span = self.current().span;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -763,68 +764,67 @@ impl Parser {
         Statements::BreakStatements { span }
     }
 
-    pub fn assign_statement(&mut self, object: Expressions, span: (usize, usize)) -> Statements {
+    pub fn assign_statement(&mut self, object: Expressions<'s>, span: (usize, usize)) -> Statements<'s> {
         if self.expect(TokenType::Equal) {
             let _ = self.next();
         }
 
         let value = self.expression();
-        let span_end = self.current().span.1;
+        let end_span = Self::get_span_expression(&value).1;
+        self.skip_eos();
 
         Statements::AssignStatement {
             object,
             value,
-            span: (span.0, span_end - 3),
+            span: (span.0, end_span),
         }
     }
 
     pub fn binary_assign_statement(
         &mut self,
-        object: Expressions,
-        op: String,
+        object: Expressions<'s>,
+        op: &'s str,
         span: (usize, usize),
-    ) -> Statements {
+    ) -> Statements<'s> {
         if self.expect(TokenType::Equal) {
             let _ = self.next();
         }
 
         let value = self.expression();
-        let span_end = self.current().span.1;
+        let end_span = Self::get_span_expression(&value).1;
         self.skip_eos();
 
         Statements::BinaryAssignStatement {
             operand: op,
             object,
             value,
-            span: (span.0, span_end - 3),
+            span: (span.0, end_span),
         }
     }
 
     pub fn slice_assign_statement(
         &mut self,
-        object: Expressions,
+        object: Expressions<'s>,
         span: (usize, usize),
-    ) -> Statements {
-        let brackets_span_start = self.current().span.0;
-        if self.expect(TokenType::LBrack) {
-            let _ = self.next();
+    ) -> Statements<'s> {
+        if !self.expect(TokenType::LBrack) {
+            // This should be an error, but for now we assume it's there
         }
+        let _ = self.next(); // consume '['
 
-        let ind = self.expression();
-        let brackets_span_end = self.current().span.1;
+        let index_expr = self.expression();
 
         if !self.expect(TokenType::RBrack) {
             self.error(ParserError::UnclosedExpression {
                 exception: "unclosed brackets in slice".to_string(),
                 help: "Close slice index with brackets".to_string(),
                 src: self.source.clone(),
-                span: error::position_to_span((brackets_span_start, brackets_span_end)),
+                span: error::position_to_span(self.current().span),
             });
-
             return Statements::None;
         }
+        let _ = self.next(); // consume ']'
 
-        let _ = self.next();
         if !self.expect(TokenType::Equal) {
             self.error(ParserError::SyntaxError {
                 exception: "expected assign operator after slice".to_string(),
@@ -832,26 +832,24 @@ impl Parser {
                 src: self.source.clone(),
                 span: error::position_to_span((span.0, self.current().span.1)),
             });
-
             self.skip_statement();
             return Statements::None;
         }
+        let _ = self.next(); // consume '='
 
-        let _ = self.next();
-        let val = self.expression();
+        let value_expr = self.expression();
+        let end_span = Self::get_span_expression(&value_expr).1;
         self.skip_eos();
-
-        let span_end = self.current().span.1;
 
         Statements::SliceAssignStatement {
             object,
-            index: ind,
-            value: val,
-            span: (span.0, span_end),
+            index: index_expr,
+            value: value_expr,
+            span: (span.0, end_span),
         }
     }
 
-    pub fn call_statement(&mut self, id: String, span: (usize, usize)) -> Statements {
+    pub fn call_statement(&mut self, id: &'s str, span: (usize, usize)) -> Statements<'s> {
         match self.current().token_type {
             TokenType::Identifier => {
                 let _ = self.next();
@@ -872,9 +870,11 @@ impl Parser {
         let arguments =
             self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma);
 
-        self.position -= 1;
-        let span_end = self.current().span.1;
-        self.position += 1;
+        let span_end = if let Some(last_arg) = arguments.last() {
+            Self::get_span_expression(last_arg).1
+        } else {
+            self.current().span.0
+        };
 
         self.skip_eos();
 
@@ -885,7 +885,7 @@ impl Parser {
         }
     }
 
-    pub fn macrocall_statement(&mut self, id: String, span: (usize, usize)) -> Statements {
+    pub fn macrocall_statement(&mut self, id: &'s str, span: (usize, usize)) -> Statements<'s> {
         if self.expect(TokenType::Not) {
             let _ = self.next();
         }
@@ -893,9 +893,11 @@ impl Parser {
         let arguments =
             self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma);
 
-        self.position -= 1;
-        let span_end = self.current().span.1;
-        self.position += 1;
+        let span_end = if let Some(last_arg) = arguments.last() {
+            Self::get_span_expression(last_arg).1
+        } else {
+            self.current().span.0
+        };
 
         self.skip_eos();
 
@@ -906,7 +908,7 @@ impl Parser {
         }
     }
 
-    pub fn struct_statement(&mut self) -> Statements {
+    pub fn struct_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -973,7 +975,7 @@ impl Parser {
                         header_span: _,
                     } = &stmt
                     {
-                        functions.insert(name.to_owned(), stmt);
+                        functions.insert(*name, stmt.clone());
                     } else {
                         unreachable!()
                     }
@@ -1029,7 +1031,7 @@ impl Parser {
                         let _ = self.next();
                     }
 
-                    if fields.contains_key(&name) {
+                    if fields.contains_key(name) {
                         self.error(ParserError::DeclarationError {
                             exception: format!("field `{name}` defined multiple times"),
                             help: "Remove field duplicate".to_string(),
@@ -1077,7 +1079,7 @@ impl Parser {
         }
     }
 
-    pub fn enum_statement(&mut self) -> Statements {
+    pub fn enum_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -1139,7 +1141,7 @@ impl Parser {
                         header_span: _,
                     } = &stmt
                     {
-                        functions.insert(name.to_owned(), stmt);
+                        functions.insert(name.to_owned(), stmt.clone());
                     } else {
                         unreachable!()
                     }
@@ -1195,7 +1197,7 @@ impl Parser {
         }
     }
 
-    pub fn typedef_statement(&mut self) -> Statements {
+    pub fn typedef_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1224,7 +1226,7 @@ impl Parser {
         }
     }
 
-    pub fn extern_declare_statement(&mut self) -> Statements {
+    pub fn extern_declare_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1256,7 +1258,7 @@ impl Parser {
         }
     }
 
-    pub fn link_c_statement(&mut self) -> Statements {
+    pub fn link_c_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1285,7 +1287,7 @@ impl Parser {
         }
     }
 
-    pub fn extern_statement(&mut self) -> Statements {
+    pub fn extern_statement(&mut self) -> Statements<'s> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1330,7 +1332,7 @@ impl Parser {
                 span: error::position_to_span(self.current().span),
             });
 
-            "undefined".to_string()
+            "undefined"
         };
 
         let _ = self.next();

@@ -28,7 +28,7 @@ use crate::{
     types::Type,
     value::Value,
 };
-use genpay_lexer::{token::Token, token_type::TokenType};
+use genpay_lexer::{token::Token, token_type::TokenType, Lexer};
 use miette::NamedSource;
 
 /// Custom Defined Error Types
@@ -42,7 +42,7 @@ pub mod types;
 /// Basic Values Enum
 pub mod value;
 
-pub type ParserOk = (Vec<Statements>, Vec<ParserWarning>);
+pub type ParserOk<'s> = (Vec<Statements<'s>>, Vec<ParserWarning>);
 pub type ParserErr = (Vec<ParserError>, Vec<ParserWarning>);
 
 const BINARY_OPERATORS: [TokenType; 5] = [
@@ -86,11 +86,11 @@ const END_STATEMENT: TokenType = TokenType::Semicolon;
 ///
 /// Function [`Parser::get_span_expression`] is used to extract span tuple from
 /// [`expressions::Expressions`] enum
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Parser {
+#[derive(Debug, Clone, PartialEq)]
+pub struct Parser<'s> {
     source: NamedSource<String>,
 
-    tokens: Vec<Token>,
+    tokens: Vec<Token<'s>>,
     position: usize,
 
     errors: Vec<ParserError>,
@@ -98,17 +98,19 @@ pub struct Parser {
     eof: bool,
 }
 
-impl Parser {
+impl<'s> Parser<'s> {
     // main
 
     /// **Structure Builder** <br/>
     /// Requires full ownership for vector of tokens, and source code with filename for error
     /// handling
-    pub fn new(tokens: Vec<Token>, source: &str, filename: &str) -> Self {
-        Self {
-            source: NamedSource::new(filename, source.to_owned()),
+    pub fn new(source: &'s str, filename: &str) -> Self {
+        let lexer = Lexer::new(source);
 
-            tokens,
+        Self {
+            source: NamedSource::new(filename, source.to_string()),
+
+            tokens: lexer.collect(),
             position: 0,
 
             errors: Vec::new(),
@@ -119,15 +121,11 @@ impl Parser {
 
     /// **Main Parser Function** <br/>
     /// Requires new created self instance. **Can be called only once!**
-    pub fn parse(&mut self) -> Result<ParserOk, ParserErr> {
+    pub fn parse(&mut self) -> Result<ParserOk<'s>, ParserErr> {
         let mut output = Vec::new();
 
-        while self.position < self.tokens.len() - 1 {
+        while self.current().token_type != TokenType::EOF {
             output.push(self.statement());
-
-            if self.eof {
-                break;
-            };
         }
 
         if !self.errors.is_empty() {
@@ -151,8 +149,8 @@ impl Parser {
         })
     }
 
-    fn get_basic_type(&mut self, datatype: String, span: (usize, usize)) -> Type {
-        match datatype.as_str() {
+    fn get_basic_type(&mut self, datatype: &'s str, span: (usize, usize)) -> Type<'s> {
+        match datatype {
             "i8" => Type::I8,
             "i16" => Type::I16,
             "i32" => Type::I32,
@@ -184,7 +182,7 @@ impl Parser {
         }
     }
 
-    fn parse_type(&mut self) -> Type {
+    fn parse_type(&mut self) -> Type<'s> {
         let current = self.current();
 
         match current.token_type {
@@ -204,11 +202,15 @@ impl Parser {
                 }
 
                 // default array
-
                 let array_type = self.parse_type();
 
-                self.skip_eos();
-                if !self.expect(TokenType::Number) {
+                if !self.expect(TokenType::Semicolon) {
+                    // TODO: add error reporting
+                }
+                let _ = self.next(); // consume semicolon
+
+                let size_token = self.current();
+                if size_token.token_type != TokenType::Number {
                     self.error(
                         ParserError::DatatypeException {
                             exception: "array size must be integer constant".to_string(),
@@ -217,13 +219,10 @@ impl Parser {
                             span: error::position_to_span(self.current().span)
                         }
                     );
-
                     return Type::Void;
                 }
+                let _ = self.next(); // consume size
 
-                let array_size = self.current().value.parse::<usize>().unwrap();
-
-                let _ = self.next();
                 if !self.expect(TokenType::RBrack) {
                     self.error(ParserError::UnclosedExpression {
                         exception: "unclosed brackets in array".to_string(),
@@ -234,8 +233,9 @@ impl Parser {
 
                     return Type::Void;
                 }
-
                 let _ = self.next();
+
+                let array_size = size_token.value.parse::<usize>().unwrap();
                 Type::Array(Box::new(array_type), array_size)
             }
             TokenType::Multiply => {
@@ -248,12 +248,17 @@ impl Parser {
                 let _ = self.next();
                 let mut types = Vec::new();
 
-                while !self.expect(TokenType::RParen) {
+                loop {
+                    if self.expect(TokenType::RParen) {
+                        break;
+                    }
+                    types.push(self.parse_type());
                     if self.expect(TokenType::Comma) {
                         let _ = self.next();
-                        continue;
-                    };
-                    types.push(self.parse_type());
+                    } else if !self.expect(TokenType::RParen) {
+                        // error: expected comma or rparen
+                        break;
+                    }
                 }
 
                 let _ = self.next();
@@ -280,21 +285,27 @@ impl Parser {
 
     // fundamental
 
-    fn next(&mut self) -> Token {
+    fn next(&mut self) -> Token<'s> {
         self.position += 1;
 
         if self.position < self.tokens.len() {
             self.tokens[self.position].clone()
         } else {
-            Token::new(String::from(""), TokenType::EOF, (0, 1))
+            Token::new("", TokenType::EOF, (0, 1))
         }
     }
 
-    fn current(&self) -> Token {
+    fn current(&self) -> Token<'s> {
+        if self.position >= self.tokens.len() {
+            let last_span = self.tokens.last().map(|t| t.span).unwrap_or((0, 1));
+            return Token::new("", TokenType::EOF, last_span);
+        }
         let mut cur = self.tokens[self.position].clone();
 
         if let TokenType::EOF = cur.token_type {
-            cur.span = self.tokens[self.position - 1].clone().span;
+            if self.position > 0 {
+                cur.span = self.tokens[self.position - 1].clone().span;
+            }
         }
 
         cur
@@ -318,8 +329,8 @@ impl Parser {
     }
 }
 
-impl Parser {
-    fn term(&mut self) -> Expressions {
+impl<'s> Parser<'s> {
+    fn term(&mut self) -> Expressions<'s> {
         let current = self.current();
         let _ = self.next();
 
@@ -402,7 +413,7 @@ impl Parser {
 
             TokenType::Identifier => {
                 let output =
-                    Expressions::Value(Value::Identifier(current.value.clone()), current.span);
+                    Expressions::Value(Value::Identifier(current.value), current.span);
 
                 match self.current().token_type {
                     TokenType::LParen => return self.call_expression(current.value, current.span),
@@ -414,7 +425,7 @@ impl Parser {
                         let _ = self.next();
                         if self.expect(TokenType::Dot) {
                             self.position -= 2;
-                            return self.struct_expression(current.value.clone());
+                            return self.struct_expression(current.value);
                         }
                         self.position -= 1;
                         return output;
@@ -444,7 +455,7 @@ impl Parser {
                 output
             }
 
-            TokenType::Ref => Expressions::Reference {
+            TokenType::Ampersand => Expressions::Reference {
                 object: Box::new(self.term()),
                 span: (current.span.0, self.current().span.1),
             },
@@ -467,7 +478,7 @@ impl Parser {
             //     let _ = self.next();
             //
             //     Expressions::Argument {
-            //         name: identifier.value,
+            //         name: identifier.value.to_string(),
             //         r#type: datatype,
             //         span: current.span
             //     }
@@ -511,7 +522,7 @@ impl Parser {
             TokenType::Type => {
                 let datatype = self.get_basic_type(current.value, current.span);
                 Expressions::Argument {
-                    name: "@genpay_type".to_string(),
+                    name: "@genpay_type",
                     r#type: datatype,
                     span: current.span,
                 }
@@ -530,7 +541,7 @@ impl Parser {
         }
     }
 
-    fn expression(&mut self) -> Expressions {
+    fn expression(&mut self) -> Expressions<'s> {
         let node = self.term();
         let current = self.current();
 
@@ -579,11 +590,15 @@ impl Parser {
         }
     }
 
-    fn statement(&mut self) -> Statements {
+    fn statement(&mut self) -> Statements<'s> {
+        if self.current().token_type == TokenType::EOF {
+            self.eof = true;
+            return Statements::None;
+        }
         let current = self.current();
 
         match current.token_type {
-            TokenType::Keyword => match current.value.as_str() {
+            TokenType::Keyword => match current.value {
                 "let" => self.annotation_statement(),
                 "import" => self.import_statement(),
                 "include" => self.include_statement(),
@@ -970,7 +985,7 @@ mod tests {
 
     #[test]
     fn get_basic_type_test() {
-        let mut parser = Parser::new(vec![], "", "");
+        let mut parser = Parser::new("", "");
 
         [
             ("i8", Type::I8),
@@ -990,7 +1005,7 @@ mod tests {
         ]
         .into_iter()
         .for_each(|(typ, exp)| {
-            assert_eq!(parser.get_basic_type(String::from(typ), (0, 0)), exp);
+            assert_eq!(parser.get_basic_type(typ, (0, 0)), exp);
         });
     }
 }
