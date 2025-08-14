@@ -83,7 +83,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                                 "struct" => {
                                     let display_function = self
                                         .scope
-                                        .get_function(format!(
+                                        .get_function(&format!(
                                             "{}_{}__{}",
                                             alias_type, alias, "display"
                                         ))
@@ -199,7 +199,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                                 "struct" => {
                                     let display_function = self
                                         .scope
-                                        .get_function(format!(
+                                        .get_function(&format!(
                                             "{}_{}__{}",
                                             alias_type, alias, "display"
                                         ))
@@ -338,7 +338,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                                 "struct" => {
                                     let display_function = self
                                         .scope
-                                        .get_function(format!(
+                                        .get_function(&format!(
                                             "{}_{}__{}",
                                             alias_type, alias, "display"
                                         ))

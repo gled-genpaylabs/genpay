@@ -1427,7 +1427,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let import = self
                     .symtable
                     .imports
-                    .get(&module_name)
+                    .get(module_name.as_str())
                     .cloned()
                     .unwrap_or_default();
                 let mut codegen = Self::new(
@@ -1488,7 +1488,7 @@ impl<'ctx> CodeGen<'ctx> {
                 };
                 self.includes.push(module_name.clone());
 
-                let include = self.symtable.included.get(&module_name).unwrap().clone();
+                let include = self.symtable.included.get(module_name.as_str()).unwrap().clone();
                 include
                     .ast
                     .iter()
@@ -2554,7 +2554,7 @@ impl<'ctx> CodeGen<'ctx> {
                                 .unwrap();
 
                             for (field_name, field_expr) in fields {
-                                let struct_field = structure.fields.get(*field_name).unwrap();
+                                let struct_field = structure.fields.get(field_name).unwrap();
                                 let field_value = self.compile_expression(
                                     field_expr.clone(),
                                     Some(struct_field.datatype.clone()),
@@ -3247,7 +3247,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn get_fn_type(
         &self,
-        datatype: Type,
+        datatype: Type<'ctx>,
         arguments: &[BasicMetadataTypeEnum<'ctx>],
         is_var_args: bool,
     ) -> FunctionType<'ctx> {

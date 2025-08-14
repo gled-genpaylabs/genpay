@@ -187,7 +187,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let structure = self.scope.get_struct(&alias).unwrap();
 
                         if let Some(destructor) = structure.functions.get("drop") {
-                            let called = self.scope.get_function(format!("struct_{alias}__drop")).unwrap().called;
+                            let called = self.scope.get_function(&format!("struct_{alias}__drop")).unwrap().called;
                             if destructor.arguments == vec![Type::Pointer(Box::new(var.datatype))] && !called {
                                 let _ = self.builder.build_call(
                                     destructor.value,
