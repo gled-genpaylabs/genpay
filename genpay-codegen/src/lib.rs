@@ -491,10 +491,10 @@ impl<'ctx> CodeGen<'ctx> {
                     let arg_datatype = match arg.1 {
                         Type::SelfRef => {
                             let prefix = prefix.clone().unwrap();
-                            let alias = prefix.replace("struct_", "").replace("enum_", "");
-                            let alias = alias.split("__").collect::<Vec<&str>>()[0];
+                            let alias_string = prefix.replace("struct_", "").replace("enum_", "");
+                            let alias = alias_string.split("__").collect::<Vec<&str>>()[0];
 
-                            Type::Alias(alias)
+                            Type::Alias(Box::leak(alias.to_string().into_boxed_str()))
                         }
                         _ => arg.1.clone(),
                     };
@@ -612,12 +612,12 @@ impl<'ctx> CodeGen<'ctx> {
                 public: _,
                 span: _,
             } => {
-                let name = format!("{}{}", prefix.clone().unwrap_or_default(), raw_name);
+                let name_string = format!("{}{}", prefix.clone().unwrap_or_default(), raw_name);
+                let name: &'ctx str = Box::leak(name_string.into_boxed_str());
                 let llvm_name = format!(
-                    "{}.{}{}",
+                    "{}.{}",
                     self.module.get_name().to_string_lossy(),
-                    prefix.unwrap_or_default(),
-                    raw_name
+                    name
                 );
 
                 let struct_type = self.context.opaque_struct_type(&llvm_name);
@@ -644,7 +644,7 @@ impl<'ctx> CodeGen<'ctx> {
                 });
 
                 self.scope.set_struct(
-                    &name,
+                    name,
                     Structure {
                         fields: fields_hashmap,
                         functions: HashMap::new(),
@@ -657,7 +657,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     self.compile_statement(
                         function_statement.clone(),
-                        Some(format!("struct_{name}__")),
+                        Some(format!("struct_{}__", name)),
                     );
 
                     let (mut function_id, mut function_value) =
@@ -666,14 +666,14 @@ impl<'ctx> CodeGen<'ctx> {
 
                     if let Some(Type::SelfRef) = function_value.arguments.first() {
                         *function_value.arguments.first_mut().unwrap() =
-                            Type::Pointer(Box::new(Type::Alias(&name)));
+                            Type::Pointer(Box::new(Type::Alias(name)));
                     }
                     self.scope
                         .set_function(&function_id, function_value.clone());
 
-                    function_id = function_id.replace(&format!("struct_{name}__"), "");
+                    function_id = function_id.replace(&format!("struct_{}__", name), "");
                     self.scope
-                        .get_mut_struct(&name)
+                        .get_mut_struct(name)
                         .unwrap()
                         .functions
                         .insert(function_id, function_value);
@@ -2355,7 +2355,7 @@ impl<'ctx> CodeGen<'ctx> {
                             match alias_type {
                                 "struct" => {
                                     let structure = self.scope.get_struct(alias).unwrap();
-                                    let field = structure.fields.get(*field).unwrap();
+                                    let field = structure.fields.get(field).unwrap();
 
                                     let ptr = self
                                         .builder
@@ -2865,7 +2865,7 @@ impl<'ctx> CodeGen<'ctx> {
                     .unwrap();
 
                 for (field_name, field_expr) in fields {
-                    let struct_field = structure.fields.get(*field_name).unwrap();
+                    let struct_field = structure.fields.get(field_name).unwrap();
                     let field_value =
                         self.compile_expression(field_expr, Some(struct_field.datatype.clone()));
 
