@@ -3,14 +3,14 @@
 //! Values is always an internal elemenets of expressions.
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Value {
+pub enum Value<'s> {
     Integer(i64),
     Float(f64),
-    String(String),
+    String(&'s str),
     Char(char),
     Boolean(bool),
-    Identifier(String),
-    Keyword(String),
+    Identifier(&'s str),
+    Keyword(&'s str),
     Null,
     Void,
 }

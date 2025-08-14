@@ -39,7 +39,7 @@ pub struct CodeGen<'ctx> {
     breaks: Vec<BasicBlock<'ctx>>,
     booleans_strings: Option<(PointerValue<'ctx>, PointerValue<'ctx>)>,
 
-    symtable: SymbolTable,
+    symtable: SymbolTable<'ctx>,
     imports: HashMap<String, ModuleContent<'ctx>>,
     includes: Vec<String>,
 }
@@ -61,7 +61,7 @@ impl<'ctx> CodeGen<'ctx> {
         context: &'ctx Context,
         module_name: &str,
         module_source: &str,
-        symtable: SymbolTable,
+        symtable: SymbolTable<'ctx>,
     ) -> Self {
         let module = context.create_module(module_name);
         let builder = context.create_builder();
@@ -102,57 +102,9 @@ impl<'ctx> CodeGen<'ctx> {
 
     pub fn compile(
         &mut self,
-        statements: Vec<Statements>,
+        statements: Vec<Statements<'ctx>>,
         prefix: Option<String>,
     ) -> (&Module<'ctx>, ModuleContent<'ctx>) {
-        // let pre_statements = statements
-        //     .iter()
-        //     .filter(|stmt| match stmt {
-        //         Statements::StructDefineStatement {
-        //             name: _,
-        //             fields: _,
-        //             functions: _,
-        //             public: _,
-        //             span: _,
-        //         } => true,
-        //         Statements::EnumDefineStatement {
-        //             name: _,
-        //             fields: _,
-        //             functions: _,
-        //             public: _,
-        //             span: _,
-        //         } => true,
-        //         Statements::TypedefStatement {
-        //             alias: _,
-        //             datatype: _,
-        //             span: _,
-        //         } => true,
-        //         Statements::ImportStatement { path: _, span: _ } => true,
-        //         Statements::FunctionDefineStatement {
-        //             name,
-        //             datatype: _,
-        //             arguments: _,
-        //             block: _,
-        //             public: _,
-        //             span: _,
-        //             header_span: _,
-        //         } => name != "main",
-        //         _ => false,
-        //     })
-        //     .collect::<Vec<&Statements>>();
-        //
-        // let after_statements = statements
-        //     .iter()
-        //     .filter(|stmt| !pre_statements.contains(stmt));
-        //
-        // pre_statements
-        //     .clone()
-        //     .into_iter()
-        //     .for_each(|stmt| self.compile_statement(stmt.clone(), prefix.clone()));
-        // after_statements
-        //     .into_iter()
-        //     .for_each(|stmt| self.compile_statement(stmt.clone(), prefix.clone()));
-
         statements
             .into_iter()
             .for_each(|stmt| self.compile_statement(stmt, prefix.clone()));
@@ -174,7 +126,7 @@ impl<'ctx> CodeGen<'ctx> {
 }
 
 impl<'ctx> CodeGen<'ctx> {
-    fn compile_statement(&mut self, statement: Statements, prefix: Option<String>) {
+    fn compile_statement(&mut self, statement: Statements<'ctx>, prefix: Option<String>) {
         match statement {
             Statements::AssignStatement {
                 object,
@@ -182,7 +134,7 @@ impl<'ctx> CodeGen<'ctx> {
                 span: _,
             } => {
                 if let Expressions::Value(Value::Identifier(identifier), _) = object {
-                    let var = self.scope.get_variable(&identifier).unwrap();
+                    let var = self.scope.get_variable(identifier).unwrap();
                     let compiled_value = self.compile_expression(value, Some(var.datatype));
 
                     self.builder.build_store(var.ptr, compiled_value.1).unwrap();
@@ -414,7 +366,7 @@ impl<'ctx> CodeGen<'ctx> {
                         if !empty_binding {
                             let alloca = self
                                 .builder
-                                .build_alloca(value.1.get_type(), &identifier)
+                                .build_alloca(value.1.get_type(), identifier)
                                 .unwrap();
 
                             self.scope.set_variable(
@@ -435,7 +387,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                         if !empty_binding {
                             let alloca =
-                                self.builder.build_alloca(basic_type, &identifier).unwrap();
+                                self.builder.build_alloca(basic_type, identifier).unwrap();
 
                             self.scope.set_variable(
                                 identifier,
@@ -455,7 +407,7 @@ impl<'ctx> CodeGen<'ctx> {
                         if !empty_binding {
                             let alloca = self
                                 .builder
-                                .build_alloca(compiled_value.1.get_type(), &identifier)
+                                .build_alloca(compiled_value.1.get_type(), identifier)
                                 .unwrap();
 
                             self.scope.set_variable(
@@ -484,7 +436,7 @@ impl<'ctx> CodeGen<'ctx> {
                 span: _,
                 header_span: _,
             } => {
-                let module_name = self.module.get_name().to_str().unwrap();
+                let module_name = self.module.get_name().to_string_lossy().to_string();
                 let name = format!("{}{}", prefix.clone().unwrap_or_default(), raw_name,);
 
                 let llvm_ir_name = format!(
@@ -528,7 +480,7 @@ impl<'ctx> CodeGen<'ctx> {
                 self.enter_new_scope();
 
                 arguments.iter().enumerate().for_each(|(index, arg)| {
-                    let arg_name = arg.0.clone();
+                    let arg_name = arg.0;
                     let arg_value = function.get_nth_param(index as u32).unwrap();
 
                     let param_type = self.get_basic_type(arg.1.clone());
@@ -539,10 +491,10 @@ impl<'ctx> CodeGen<'ctx> {
                     let arg_datatype = match arg.1 {
                         Type::SelfRef => {
                             let prefix = prefix.clone().unwrap();
-                            let alias = prefix.replace("struct_", "").replace("enum_", "");
-                            let alias = alias.split("__").collect::<Vec<&str>>()[0];
+                            let alias_string = prefix.replace("struct_", "").replace("enum_", "");
+                            let alias = alias_string.split("__").collect::<Vec<&str>>()[0];
 
-                            Type::Alias(alias.to_owned())
+                            Type::Alias(Box::leak(alias.to_string().into_boxed_str()))
                         }
                         _ => arg.1.clone(),
                     };
@@ -561,7 +513,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                 let typed_args = arguments.iter().map(|x| x.1.clone()).collect::<Vec<Type>>();
                 self.scope.set_function(
-                    name.clone(),
+                    &name,
                     Function {
                         datatype: datatype.clone(),
                         value: function,
@@ -602,7 +554,7 @@ impl<'ctx> CodeGen<'ctx> {
                 self.function = old_function;
 
                 self.scope.set_function(
-                    name.clone(),
+                    &name,
                     Function {
                         datatype: datatype.clone(),
                         value: function,
@@ -617,11 +569,11 @@ impl<'ctx> CodeGen<'ctx> {
                 span: _,
             } => {
                 {
-                    let mut_fn = self.scope.get_mut_function(&name).unwrap();
+                    let mut_fn = self.scope.get_mut_function(name).unwrap();
                     mut_fn.called = true
                 }
 
-                let function = self.scope.get_function(&name).unwrap();
+                let function = self.scope.get_function(name).unwrap();
                 let mut basic_args: Vec<BasicMetadataValueEnum> = Vec::new();
 
                 let mut function_args = function.arguments.clone();
@@ -650,7 +602,7 @@ impl<'ctx> CodeGen<'ctx> {
                 arguments,
                 span: _,
             } => {
-                self.build_macro_call(&name, arguments);
+                self.build_macro_call(name, arguments);
             }
 
             Statements::StructDefineStatement {
@@ -660,12 +612,12 @@ impl<'ctx> CodeGen<'ctx> {
                 public: _,
                 span: _,
             } => {
-                let name = format!("{}{}", prefix.clone().unwrap_or_default(), raw_name);
+                let name_string = format!("{}{}", prefix.clone().unwrap_or_default(), raw_name);
+                let name: &'ctx str = Box::leak(name_string.into_boxed_str());
                 let llvm_name = format!(
-                    "{}.{}{}",
-                    self.module.get_name().to_str().unwrap(),
-                    prefix.unwrap_or_default(),
-                    raw_name
+                    "{}.{}",
+                    self.module.get_name().to_string_lossy(),
+                    name
                 );
 
                 let struct_type = self.context.opaque_struct_type(&llvm_name);
@@ -673,10 +625,10 @@ impl<'ctx> CodeGen<'ctx> {
 
                 fields.iter().for_each(|field| {
                     compiled_fields.push(Field {
-                        name: field.0.to_owned(),
+                        name: field.0.to_string(),
                         nth: compiled_fields.len() as u32,
-                        datatype: field.1.to_owned(),
-                        llvm_type: self.get_basic_type(field.1.to_owned()),
+                        datatype: field.1.clone(),
+                        llvm_type: self.get_basic_type(field.1.clone()),
                     });
                 });
 
@@ -692,7 +644,7 @@ impl<'ctx> CodeGen<'ctx> {
                 });
 
                 self.scope.set_struct(
-                    name.clone(),
+                    name,
                     Structure {
                         fields: fields_hashmap,
                         functions: HashMap::new(),
@@ -704,8 +656,8 @@ impl<'ctx> CodeGen<'ctx> {
                     self.enter_new_scope();
 
                     self.compile_statement(
-                        function_statement.to_owned(),
-                        Some(format!("struct_{name}__")),
+                        function_statement.clone(),
+                        Some(format!("struct_{}__", name)),
                     );
 
                     let (mut function_id, mut function_value) =
@@ -714,14 +666,14 @@ impl<'ctx> CodeGen<'ctx> {
 
                     if let Some(Type::SelfRef) = function_value.arguments.first() {
                         *function_value.arguments.first_mut().unwrap() =
-                            Type::Pointer(Box::new(Type::Alias(name.clone())));
+                            Type::Pointer(Box::new(Type::Alias(name)));
                     }
                     self.scope
-                        .set_function(function_id.clone(), function_value.clone());
+                        .set_function(&function_id, function_value.clone());
 
-                    function_id = function_id.replace(&format!("struct_{name}__"), "");
+                    function_id = function_id.replace(&format!("struct_{}__", name), "");
                     self.scope
-                        .get_mut_struct(&name)
+                        .get_mut_struct(name)
                         .unwrap()
                         .functions
                         .insert(function_id, function_value);
@@ -736,9 +688,9 @@ impl<'ctx> CodeGen<'ctx> {
             } => {
                 let name = format!("{}{}", prefix.unwrap_or_default(), name);
                 self.scope.set_enum(
-                    name.clone(),
+                    &name,
                     Enumeration {
-                        fields,
+                        fields: fields.iter().map(|s| s.to_string()).collect(),
                         functions: HashMap::new(),
                         llvm_type: self.context.i8_type().into(),
                     },
@@ -746,14 +698,14 @@ impl<'ctx> CodeGen<'ctx> {
 
                 functions.iter().for_each(|(_, function_statement)| {
                     self.compile_statement(
-                        function_statement.to_owned(),
+                        function_statement.clone(),
                         Some(format!("enum_{name}__")),
                     );
 
                     self.enter_new_scope();
 
                     self.compile_statement(
-                        function_statement.to_owned(),
+                        function_statement.clone(),
                         Some(format!("enum_{name}__")),
                     );
 
@@ -924,7 +876,7 @@ impl<'ctx> CodeGen<'ctx> {
                     Type::Alias(alias) => {
                         let iterator_fn = self
                             .scope
-                            .get_function(format!("struct_{}__{}", alias, "iterate"))
+                            .get_function(&format!("struct_{}__{}", alias, "iterate"))
                             .unwrap();
                         if let Type::Tuple(types) = iterator_fn.datatype {
                             types[0].clone()
@@ -939,13 +891,13 @@ impl<'ctx> CodeGen<'ctx> {
                 let basic_binding_type = self.get_basic_type(binding_type.clone());
                 let binding_ptr = self
                     .builder
-                    .build_alloca(basic_binding_type, &binding)
+                    .build_alloca(basic_binding_type, binding)
                     .unwrap();
 
                 self.enter_new_scope();
 
                 self.scope.set_variable(
-                    binding.clone(),
+                    binding,
                     Variable {
                         datatype: binding_type,
                         llvm_type: basic_binding_type,
@@ -1048,7 +1000,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                         let iterator_fn = self
                             .scope
-                            .get_function(format!("struct_{}__{}", alias, "iterate"))
+                            .get_function(&format!("struct_{}__{}", alias, "iterate"))
                             .unwrap();
                         let iter_status_alloca = self
                             .builder
@@ -1056,7 +1008,7 @@ impl<'ctx> CodeGen<'ctx> {
                             .unwrap();
 
                         self.scope.set_variable(
-                            status_varname,
+                            &status_varname,
                             Variable {
                                 datatype: Type::Bool,
                                 llvm_type: self.context.bool_type().into(),
@@ -1155,7 +1107,7 @@ impl<'ctx> CodeGen<'ctx> {
                             .unwrap();
 
                         self.scope.set_variable(
-                            iterator_position_varname,
+                            &iterator_position_varname,
                             Variable {
                                 datatype: Type::USIZE,
                                 llvm_type: self.context.i64_type().into(),
@@ -1250,11 +1202,11 @@ impl<'ctx> CodeGen<'ctx> {
 
                     Type::Alias(alias) => {
                         let status_varname = format!("@genpay_iterator_status_{}", &binding);
-                        let status_alloca = self.scope.get_variable(status_varname).unwrap().ptr;
+                        let status_alloca = self.scope.get_variable(&status_varname).unwrap().ptr;
 
                         let iterator_fn = self
                             .scope
-                            .get_function(format!("struct_{}__{}", alias, "iterate"))
+                            .get_function(&format!("struct_{}__{}", alias, "iterate"))
                             .unwrap();
                         let iterator_struct: BasicMetadataValueEnum =
                             if compiled_iterator.1.is_pointer_value() {
@@ -1319,7 +1271,7 @@ impl<'ctx> CodeGen<'ctx> {
                             format!("@genpay_iterator_position_{}", &binding);
                         let iterator_position_ptr = self
                             .scope
-                            .get_variable(iterator_position_varname)
+                            .get_variable(&iterator_position_varname)
                             .unwrap()
                             .ptr;
 
@@ -1395,7 +1347,7 @@ impl<'ctx> CodeGen<'ctx> {
                 span: _,
             } => {
                 let basic_type = self.get_basic_type(datatype.clone());
-                let global = self.module.add_global(basic_type, None, &identifier);
+                let global = self.module.add_global(basic_type, None, identifier);
                 global.set_linkage(Linkage::External);
                 global.set_alignment(8);
 
@@ -1420,7 +1372,7 @@ impl<'ctx> CodeGen<'ctx> {
                 public: _,
                 span: _,
             } => {
-                if self.scope.get_function(&identifier).is_some() {
+                if self.scope.get_function(identifier).is_some() {
                     return;
                 }
 
@@ -1430,9 +1382,9 @@ impl<'ctx> CodeGen<'ctx> {
                     .collect::<Vec<BasicMetadataTypeEnum>>();
 
                 let fn_type = self.get_fn_type(return_type.clone(), &basic_arguments, is_var_args);
-                let fn_value = self.module.get_function(&identifier).unwrap_or_else(|| {
+                let fn_value = self.module.get_function(identifier).unwrap_or_else(|| {
                     self.module
-                        .add_function(&identifier, fn_type, Some(Linkage::External))
+                        .add_function(identifier, fn_type, Some(Linkage::External))
                 });
 
                 // little hack cuz i dont wanna add `is_var_args` argument to function structure
@@ -1459,29 +1411,29 @@ impl<'ctx> CodeGen<'ctx> {
                 let path = if let Expressions::Value(Value::String(path), _) = path {
                     path
                 } else {
-                    String::default()
+                    ""
                 };
-                let fname = std::path::Path::new(&path)
+                let fname = std::path::Path::new(path)
                     .file_name()
                     .map(|fname| fname.to_str().unwrap_or("$NONE"))
                     .unwrap();
 
                 let module_name = fname
-                    .split(".")
+                    .split('.')
                     .nth(0)
                     .map(|n| n.to_string())
-                    .unwrap_or(fname.replace(".dn", ""));
+                    .unwrap_or_else(|| fname.replace(".dn", ""));
 
                 let import = self
                     .symtable
                     .imports
-                    .get(&module_name)
+                    .get(module_name.as_str())
                     .cloned()
                     .unwrap_or_default();
                 let mut codegen = Self::new(
                     self.context,
                     &module_name,
-                    &import.source,
+                    import.source,
                     import.embedded_symtable.clone(),
                 );
 
@@ -1515,9 +1467,9 @@ impl<'ctx> CodeGen<'ctx> {
 
             Statements::IncludeStatement { path, span: _ } => {
                 let path = if let Expressions::Value(Value::String(path), _) = path {
-                    path.replace("@", "")
+                    path.replace('@', "")
                 } else {
-                    String::default()
+                    "".to_string()
                 };
 
                 let fname = std::path::Path::new(&path)
@@ -1526,17 +1478,17 @@ impl<'ctx> CodeGen<'ctx> {
                     .unwrap();
 
                 let module_name = fname
-                    .split(".")
+                    .split('.')
                     .nth(0)
                     .map(|n| n.to_string())
-                    .unwrap_or(fname.replace(".dn", ""));
+                    .unwrap_or_else(|| fname.replace(".dn", ""));
 
                 if self.includes.contains(&module_name) {
                     return;
                 };
                 self.includes.push(module_name.clone());
 
-                let include = self.symtable.included.get(&module_name).unwrap().clone();
+                let include = self.symtable.included.get(module_name.as_str()).unwrap().clone();
                 include
                     .ast
                     .iter()
@@ -1561,9 +1513,9 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn compile_expression(
         &mut self,
-        expression: Expressions,
-        expected: Option<Type>,
-    ) -> (Type, BasicValueEnum<'ctx>) {
+        expression: Expressions<'ctx>,
+        expected: Option<Type<'ctx>>,
+    ) -> (Type<'ctx>, BasicValueEnum<'ctx>) {
         match expression {
             Expressions::Value(val, _) => self.compile_value(val, expected),
             Expressions::FnCall {
@@ -1572,18 +1524,18 @@ impl<'ctx> CodeGen<'ctx> {
                 span: _,
             } => {
                 {
-                    let mut_fn = self.scope.get_mut_function(&name).unwrap();
+                    let mut_fn = self.scope.get_mut_function(name).unwrap();
                     mut_fn.called = true
                 }
 
-                let function = self.scope.get_function(&name).unwrap();
+                let function = self.scope.get_function(name).unwrap();
                 let mut args: Vec<BasicMetadataValueEnum> = Vec::new();
                 arguments
-                    .iter()
+                    .into_iter()
                     .zip(function.arguments)
                     .for_each(|(arg, fn_expected)| {
                         args.push(
-                            self.compile_expression(arg.clone(), Some(fn_expected))
+                            self.compile_expression(arg, Some(fn_expected))
                                 .1
                                 .into(),
                         )
@@ -1624,11 +1576,11 @@ impl<'ctx> CodeGen<'ctx> {
                 name,
                 arguments,
                 span: _,
-            } => self.build_macro_call(&name, arguments),
+            } => self.build_macro_call(name, arguments),
 
             Expressions::Reference { object, span: _ } => match *object {
                 Expressions::Value(Value::Identifier(id), _) => {
-                    let var = self.scope.get_variable(&id).unwrap();
+                    let var = self.scope.get_variable(id).unwrap();
 
                     (
                         Type::Pointer(Box::new(var.datatype.clone())),
@@ -1715,9 +1667,9 @@ impl<'ctx> CodeGen<'ctx> {
                     let object_ptr: BasicMetadataValueEnum = object_ptr.into();
                     let operand: BasicMetadataValueEnum = self
                         .builder
-                        .build_global_string_ptr(&operand, "@genpay_operand")
+                        .build_global_string_ptr(operand, "@genpay_operand")
                         .unwrap()
-                        .as_basic_value_enum()
+                        .as_pointer_value()
                         .into();
 
                     let function_output = self
@@ -1735,7 +1687,7 @@ impl<'ctx> CodeGen<'ctx> {
                     return (unary_function.datatype.clone(), function_output);
                 }
 
-                match operand.as_str() {
+                match operand {
                     "-" => match object_value.0 {
                         Type::I8
                         | Type::I16
@@ -1746,7 +1698,7 @@ impl<'ctx> CodeGen<'ctx> {
                         | Type::U32
                         | Type::U64
                         | Type::USIZE => (
-                            genpay_semantic::Analyzer::unsigned_to_signed_integer(&object_value.0),
+                            genpay_semantic::Analyzer::unsigned_to_signed_integer(&object_value.0).unwrap(),
                             self.builder
                                 .build_int_neg(object_value.1.into_int_value(), "")
                                 .unwrap()
@@ -1823,7 +1775,7 @@ impl<'ctx> CodeGen<'ctx> {
                 };
 
                 let output = match senior_type.clone() {
-                    typ if genpay_semantic::Analyzer::is_integer(&typ) => match operand.as_str() {
+                    typ if genpay_semantic::Analyzer::is_integer(&typ) => match operand {
                         "+" => {
                             if genpay_semantic::Analyzer::is_unsigned_integer(&typ) {
                                 self.builder
@@ -1934,7 +1886,7 @@ impl<'ctx> CodeGen<'ctx> {
                             "Unsupported for codegen operator found! Please open issue on Github!"
                         ),
                     },
-                    typ if genpay_semantic::Analyzer::is_float(&typ) => match operand.as_str() {
+                    typ if genpay_semantic::Analyzer::is_float(&typ) => match operand {
                         "+" => self
                             .builder
                             .build_float_add(
@@ -1994,7 +1946,7 @@ impl<'ctx> CodeGen<'ctx> {
                                 )
                                 .unwrap();
 
-                            let mut value = match operand.as_str() {
+                            let mut value = match operand {
                                 "+" => self.builder.build_int_add(lhs_int, rhs_int, "").unwrap(),
                                 "-" => self.builder.build_int_sub(lhs_int, rhs_int, "").unwrap(),
                                 _ => unreachable!(),
@@ -2054,9 +2006,9 @@ impl<'ctx> CodeGen<'ctx> {
                         let right_ptr: BasicMetadataValueEnum = right_ptr.into();
                         let operand: BasicMetadataValueEnum = self
                             .builder
-                            .build_global_string_ptr(&operand, "@genpay_operand")
+                            .build_global_string_ptr(operand, "@genpay_operand")
                             .unwrap()
-                            .as_basic_value_enum()
+                            .as_pointer_value()
                             .into();
 
                         self.builder
@@ -2095,7 +2047,7 @@ impl<'ctx> CodeGen<'ctx> {
                     rhs_value.0 = Type::U8;
                 }
 
-                match operand.as_str() {
+                match operand {
                     "&&" => {
                         return (
                             Type::Bool,
@@ -2148,7 +2100,7 @@ impl<'ctx> CodeGen<'ctx> {
                     }
 
                     typ if genpay_semantic::Analyzer::is_integer(&typ) || typ == Type::Char => {
-                        let predicate = match operand.as_str() {
+                        let predicate = match operand {
                             ">" => inkwell::IntPredicate::SGT,
                             "<" => inkwell::IntPredicate::SLT,
                             "<=" | "=<" => inkwell::IntPredicate::SLE,
@@ -2173,7 +2125,7 @@ impl<'ctx> CodeGen<'ctx> {
                     }
 
                     typ if genpay_semantic::Analyzer::is_float(&typ) => {
-                        let predicate = match operand.as_str() {
+                        let predicate = match operand {
                             ">" => inkwell::FloatPredicate::OGT,
                             "<" => inkwell::FloatPredicate::OLT,
                             "<=" | "=<" => inkwell::FloatPredicate::OLE,
@@ -2217,7 +2169,7 @@ impl<'ctx> CodeGen<'ctx> {
                             .left()
                             .unwrap();
 
-                        let int_predicate = match operand.as_str() {
+                        let int_predicate = match operand {
                             ">" => inkwell::IntPredicate::SGT,
                             "<" => inkwell::IntPredicate::SLT,
                             "<=" | "=<" => inkwell::IntPredicate::SLE,
@@ -2276,7 +2228,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                         // comparing
 
-                        let int_predicate = match operand.as_str() {
+                        let int_predicate = match operand {
                             ">" => inkwell::IntPredicate::SGT,
                             "<" => inkwell::IntPredicate::SLT,
                             "<=" | "=<" => inkwell::IntPredicate::SLE,
@@ -2325,7 +2277,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let right = self.compile_expression(*rhs, expected.clone());
 
                 let sign_extend = genpay_semantic::Analyzer::is_unsigned_integer(&left.0);
-                let basic_value = match operand.as_str() {
+                let basic_value = match operand {
                     "<<" => self
                         .builder
                         .build_left_shift(left.1.into_int_value(), right.1.into_int_value(), "")
@@ -2402,8 +2354,8 @@ impl<'ctx> CodeGen<'ctx> {
 
                             match alias_type {
                                 "struct" => {
-                                    let structure = self.scope.get_struct(&alias).unwrap();
-                                    let field = structure.fields.get(field).unwrap();
+                                    let structure = self.scope.get_struct(alias).unwrap();
+                                    let field = structure.fields.get(&field.to_string()).unwrap();
 
                                     let ptr = self
                                         .builder
@@ -2433,7 +2385,7 @@ impl<'ctx> CodeGen<'ctx> {
                                     prev_val = value;
                                 }
                                 "enum" => {
-                                    let enumeration = self.scope.get_enum(&alias).unwrap();
+                                    let enumeration = self.scope.get_enum(alias).unwrap();
                                     let idx =
                                         enumeration.fields.iter().position(|f| f == field).unwrap();
                                     let idx_value =
@@ -2504,13 +2456,13 @@ impl<'ctx> CodeGen<'ctx> {
                                     "struct" | "enum" => {
                                         let function = self
                                             .scope
-                                            .get_function(format!("{alias_type}_{alias}__{name}"))
+                                            .get_function(&format!("{alias_type}_{alias}__{name}"))
                                             .unwrap();
 
                                         {
                                             let mut_fn = self
                                                 .scope
-                                                .get_mut_function(format!(
+                                                .get_mut_function(&format!(
                                                     "{alias_type}_{alias}__{name}"
                                                 ))
                                                 .unwrap();
@@ -2553,8 +2505,8 @@ impl<'ctx> CodeGen<'ctx> {
                             }
                             Type::ImportObject(import_name) => {
                                 let module_content =
-                                    self.imports.get(&import_name).unwrap().clone();
-                                let function = module_content.functions.get(name).unwrap();
+                                    self.imports.get(import_name).unwrap().clone();
+                                let function = module_content.functions.get(*name).unwrap();
 
                                 let arguments = arguments
                                     .iter()
@@ -2590,10 +2542,10 @@ impl<'ctx> CodeGen<'ctx> {
                         if let Type::ImportObject(import_name) = prev_type.clone() {
                             let structure = self
                                 .imports
-                                .get(&import_name)
+                                .get(import_name)
                                 .unwrap()
                                 .structures
-                                .get(name)
+                                .get(*name)
                                 .unwrap()
                                 .clone();
                             let struct_alloca = self
@@ -2602,7 +2554,7 @@ impl<'ctx> CodeGen<'ctx> {
                                 .unwrap();
 
                             for (field_name, field_expr) in fields {
-                                let struct_field = structure.fields.get(field_name).unwrap();
+                                let struct_field = structure.fields.get(*field_name).unwrap();
                                 let field_value = self.compile_expression(
                                     field_expr.clone(),
                                     Some(struct_field.datatype.clone()),
@@ -2628,7 +2580,7 @@ impl<'ctx> CodeGen<'ctx> {
                                     .unwrap(),
                             };
 
-                            prev_type = Type::Alias(format!("{import_name}.{name}"));
+                            prev_type = Type::Alias(name);
                             prev_val = value;
                         } else {
                             unreachable!()
@@ -2906,14 +2858,14 @@ impl<'ctx> CodeGen<'ctx> {
                 fields,
                 span: _,
             } => {
-                let structure = self.scope.get_struct(&name).unwrap();
+                let structure = self.scope.get_struct(name).unwrap();
                 let struct_alloca = self
                     .builder
                     .build_alloca(structure.llvm_type, &format!("struct.{name}.init"))
                     .unwrap();
 
                 for (field_name, field_expr) in fields {
-                    let struct_field = structure.fields.get(&field_name).unwrap();
+                    let struct_field = structure.fields.get(field_name).unwrap();
                     let field_value =
                         self.compile_expression(field_expr, Some(struct_field.datatype.clone()));
 
@@ -2952,9 +2904,9 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn compile_value(
         &mut self,
-        value: Value,
-        expected: Option<Type>,
-    ) -> (Type, BasicValueEnum<'ctx>) {
+        value: Value<'ctx>,
+        expected: Option<Type<'ctx>>,
+    ) -> (Type<'ctx>, BasicValueEnum<'ctx>) {
         match value {
             Value::Integer(int) => {
                 if genpay_semantic::Analyzer::is_integer(&expected.clone().unwrap_or(Type::Void))
@@ -2998,7 +2950,7 @@ impl<'ctx> CodeGen<'ctx> {
                         Type::I32,
                         self.context.i32_type().const_int(int as u64, true).into(),
                     ),
-                    -9_223_372_036_854_775_808..=9_223_372_036_854_775_807 => (
+                    _ => (
                         Type::I64,
                         self.context.i64_type().const_int(int as u64, true).into(),
                     ),
@@ -3023,7 +2975,7 @@ impl<'ctx> CodeGen<'ctx> {
             Value::String(str) => {
                 let global_value = self
                     .builder
-                    .build_global_string_ptr(&str, "const_str")
+                    .build_global_string_ptr(str, "const_str")
                     .unwrap();
                 global_value.set_constant(false);
                 (
@@ -3041,28 +2993,28 @@ impl<'ctx> CodeGen<'ctx> {
             ),
             Value::Identifier(id) => {
                 // current module objects
-                if self.scope.get_struct(&id).is_some() {
+                if self.scope.get_struct(id).is_some() {
                     return (Type::Alias(id), self.context.i8_type().const_zero().into());
                 }
-                if let Some(typedef) = self.scope.get_typedef(&id) {
+                if let Some(typedef) = self.scope.get_typedef(id) {
                     return (typedef.clone(), self.context.i8_type().const_zero().into());
                 }
-                if self.scope.get_enum(&id).is_some() {
+                if self.scope.get_enum(id).is_some() {
                     return (Type::Alias(id), self.context.i8_type().const_zero().into());
                 }
 
                 // seeking through imports
-                if self.imports.contains_key(&id) {
+                if self.imports.contains_key(id) {
                     return (
                         Type::ImportObject(id),
                         self.context.i8_type().const_zero().into(),
                     );
                 }
 
-                let variable = self.scope.get_mut_variable(&id).unwrap(); // already checked by semantic analyzer
+                let variable = self.scope.get_mut_variable(id).unwrap(); // already checked by semantic analyzer
 
                 if variable.global {
-                    let global_value = self.module.get_global(&id).unwrap().as_basic_value_enum();
+                    let global_value = self.module.get_global(id).unwrap().as_basic_value_enum();
                     return (variable.datatype.clone(), global_value);
                 }
 
@@ -3138,7 +3090,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_global_string_ptr(
                 &format!(
                     "\n* Runtime Panic at `{}.genpay` <line {}>\n{}",
-                    self.module.get_name().to_str().unwrap(),
+                    self.module.get_name().to_string_lossy(),
                     call_line,
                     message
                 ),
@@ -3212,7 +3164,7 @@ impl<'ctx> CodeGen<'ctx> {
 
 impl<'ctx> CodeGen<'ctx> {
     #[inline]
-    fn get_basic_type(&self, datatype: Type) -> BasicTypeEnum<'ctx> {
+    fn get_basic_type(&self, datatype: Type<'ctx>) -> BasicTypeEnum<'ctx> {
         match datatype {
             Type::I8 => self.context.i8_type().into(),
             Type::I16 => self.context.i16_type().into(),
@@ -3252,9 +3204,9 @@ impl<'ctx> CodeGen<'ctx> {
                     return self.context.bool_type().as_basic_type_enum();
                 }
 
-                let struct_type = self.scope.get_struct(&alias);
-                let enum_type = self.scope.get_enum(&alias);
-                let typedef_type = self.scope.get_typedef(&alias);
+                let struct_type = self.scope.get_struct(alias);
+                let enum_type = self.scope.get_enum(alias);
+                let typedef_type = self.scope.get_typedef(alias);
 
                 if let Some(struct_type) = struct_type {
                     return struct_type.llvm_type;
@@ -3295,7 +3247,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn get_fn_type(
         &self,
-        datatype: Type,
+        datatype: Type<'ctx>,
         arguments: &[BasicMetadataTypeEnum<'ctx>],
         is_var_args: bool,
     ) -> FunctionType<'ctx> {
@@ -3309,9 +3261,9 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn get_alias_type(&self, alias_type: Type, import_name: Option<&str>) -> Option<&str> {
         if let Type::Alias(alias) = alias_type {
-            let struct_type = self.scope.get_struct(&alias);
-            let enum_type = self.scope.get_enum(&alias);
-            let typedef_type = self.scope.get_typedef(&alias);
+            let struct_type = self.scope.get_struct(alias);
+            let enum_type = self.scope.get_enum(alias);
+            let typedef_type = self.scope.get_typedef(alias);
 
             if struct_type.is_some() {
                 return Some("struct");
@@ -3326,8 +3278,8 @@ impl<'ctx> CodeGen<'ctx> {
             if let Some(import_name) = import_name {
                 let import = self.imports.get(import_name).unwrap();
 
-                let struct_type = import.structures.get(&alias);
-                let enum_type = import.enumerations.get(&alias);
+                let struct_type = import.structures.get(alias);
+                let enum_type = import.enumerations.get(alias);
 
                 if struct_type.is_some() {
                     return Some("struct");
@@ -3342,8 +3294,8 @@ impl<'ctx> CodeGen<'ctx> {
                     .imports
                     .values()
                     .map(|import| {
-                        let struct_type = import.structures.get(&alias);
-                        let enum_type = import.enumerations.get(&alias);
+                        let struct_type = import.structures.get(alias);
+                        let enum_type = import.enumerations.get(alias);
 
                         if struct_type.is_some() {
                             return Some("struct");

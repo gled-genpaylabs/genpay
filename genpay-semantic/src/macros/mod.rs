@@ -15,13 +15,13 @@ mod print;
 mod println;
 mod sizeof;
 
-pub trait MacroObject: std::fmt::Debug {
+pub trait MacroObject<'s>: std::fmt::Debug {
     fn verify_call(
         &self,
-        analyzer: &mut Analyzer,
-        arguments: &[Expressions],
+        analyzer: &mut Analyzer<'s>,
+        arguments: &[Expressions<'s>],
         span: &(usize, usize),
-    ) -> Type;
+    ) -> Type<'s>;
 }
 
 /// Enumeration of all existing macros
@@ -36,13 +36,13 @@ pub enum CompilerMacros {
     None,
 }
 
-impl MacroObject for CompilerMacros {
+impl<'s> MacroObject<'s> for CompilerMacros {
     fn verify_call(
         &self,
-        analyzer: &mut Analyzer,
-        arguments: &[Expressions],
+        analyzer: &mut Analyzer<'s>,
+        arguments: &[Expressions<'s>],
         span: &(usize, usize),
-    ) -> Type {
+    ) -> Type<'s> {
         match self {
             CompilerMacros::PrintMacro(instance) => instance.verify_call(analyzer, arguments, span),
             CompilerMacros::PrintlnMacro(instance) => {

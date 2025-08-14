@@ -9,13 +9,15 @@ use genpay_parser::{expressions::Expressions, types::Type, value::Value};
 /// `format!(LITERAL, ...)` -> `*char`
 #[derive(Debug, Clone)]
 pub struct FormatMacro;
-impl MacroObject for FormatMacro {
+use miette::NamedSource;
+
+impl<'s> MacroObject<'s> for FormatMacro {
     fn verify_call(
         &self,
-        analyzer: &mut Analyzer,
-        arguments: &[Expressions],
+        analyzer: &mut Analyzer<'s>,
+        arguments: &[Expressions<'s>],
         span: &(usize, usize),
-    ) -> Type {
+    ) -> Type<'s> {
         const DISPLAY_IMPLEMENTATION_FORMAT: &str = "fn display(&self) *char";
         const MINIMUM_ARGUMENTS_LEN: usize = 1;
         let return_type: Type = Type::Pointer(Box::new(Type::Char));

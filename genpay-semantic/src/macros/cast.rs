@@ -9,13 +9,14 @@ use genpay_parser::{expressions::Expressions, types::Type};
 /// `cast!(EXPRESSION, TYPE)` -> `usize`
 #[derive(Debug, Clone)]
 pub struct CastMacro;
-impl MacroObject for CastMacro {
+use miette::NamedSource;
+impl<'s> MacroObject<'s> for CastMacro {
     fn verify_call(
         &self,
-        analyzer: &mut Analyzer,
-        arguments: &[Expressions],
+        analyzer: &mut Analyzer<'s>,
+        arguments: &[Expressions<'s>],
         span: &(usize, usize),
-    ) -> Type {
+    ) -> Type<'s> {
         const MINIMUM_ARGUMENTS_LEN: usize = 2;
 
         if arguments.len() < MINIMUM_ARGUMENTS_LEN {
@@ -54,10 +55,9 @@ impl MacroObject for CastMacro {
             });
         }
 
-        let (from_type, target_type) = (
-            analyzer.visit_expression(&arguments[0], None),
-            analyzer.visit_expression(&arguments[1], None),
-        );
+        let from_type = analyzer.visit_expression(&arguments[0], None);
+        let target_type = analyzer.visit_expression(&arguments[1], None);
+
         analyzer
             .verify_cast(&from_type, &target_type)
             .unwrap_or_else(|err| {

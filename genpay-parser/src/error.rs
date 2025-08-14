@@ -1,3 +1,4 @@
+use genpay_lexer::error::LexerError;
 use miette::{Diagnostic, NamedSource, SourceSpan};
 use thiserror::Error;
 
@@ -10,6 +11,10 @@ pub fn position_to_span(span: (usize, usize)) -> SourceSpan {
 /// Parser Errors
 #[derive(Debug, Error, Diagnostic, Clone, PartialEq, Eq)]
 pub enum ParserError {
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    LexerError(#[from] LexerError),
+
     #[error("Datatype exception found")]
     #[diagnostic(
         severity(Error),

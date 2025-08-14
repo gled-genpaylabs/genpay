@@ -132,51 +132,11 @@ fn main() {
     let handler = miette::GraphicalReportHandler::new();
     let mut total_warns = 0;
 
-    let (tokens, warns) = match lexer.tokenize() {
-        Ok(res) => res,
-        Err((errors, warns)) => {
-            println!();
-            errors.iter().for_each(|e| {
-                let mut buf = String::new();
-                handler.render_report(&mut buf, e).unwrap();
-
-                eprintln!("{buf}");
-            });
-
-            if !no_warns {
-                warns.iter().for_each(|w| {
-                    let mut buf = String::new();
-                    handler.render_report(&mut buf, w).unwrap();
-
-                    eprintln!("{buf}");
-                });
-            }
-
-            cli::error(&format!("`{}` returned {} errors", &fname, errors.len()));
-            if !warns.is_empty() && !no_warns {
-                cli::warn(&format!("`{}` generated {} warnings", &fname, warns.len()))
-            }
-
-            std::process::exit(1);
-        }
-    };
-
-    if !no_warns {
-        warns.iter().for_each(|w| {
-            let mut buf = String::new();
-            handler.render_report(&mut buf, w).unwrap();
-
-            eprintln!("{buf}");
-        });
-    }
-
-    total_warns += warns.len();
-
-    cli::info("Parsing", &format!("syntax tree ({} tokens)", tokens.len()));
+    cli::info("Parsing", "syntax tree");
 
     // Syntax Analyzer initialization.
     // It takes full ownership for tokens vector (because we don't need them anymore)
-    let mut parser = genpay_parser::Parser::new(tokens, &src, fname);
+    let mut parser = genpay_parser::Parser::new(&src, fname);
     let (ast, warns) = match parser.parse() {
         Ok(ast) => ast,
         Err(e) => {
