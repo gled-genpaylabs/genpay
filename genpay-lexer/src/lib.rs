@@ -27,8 +27,6 @@ use miette::NamedSource;
 
 /// Error Handling Module
 pub mod error;
-/// Helpful Macros Module
-mod macros;
 /// Token Object and Implementations
 pub mod token;
 /// Token Types Enumeration
