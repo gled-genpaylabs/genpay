@@ -2355,7 +2355,7 @@ impl<'ctx> CodeGen<'ctx> {
                             match alias_type {
                                 "struct" => {
                                     let structure = self.scope.get_struct(alias).unwrap();
-                                    let field = structure.fields.get(field).unwrap();
+                                    let field = structure.fields.get(*field).unwrap();
 
                                     let ptr = self
                                         .builder
@@ -2865,7 +2865,7 @@ impl<'ctx> CodeGen<'ctx> {
                     .unwrap();
 
                 for (field_name, field_expr) in fields {
-                    let struct_field = structure.fields.get(field_name).unwrap();
+                    let struct_field = structure.fields.get(*field_name).unwrap();
                     let field_value =
                         self.compile_expression(field_expr, Some(struct_field.datatype.clone()));
 
