@@ -14,6 +14,6 @@ pub struct Structure<'ctx> {
 pub struct Field<'ctx> {
     pub name: String,
     pub nth: u32,
-    pub datatype: Type,
+    pub datatype: Type<'ctx>,
     pub llvm_type: BasicTypeEnum<'ctx>,
 }
