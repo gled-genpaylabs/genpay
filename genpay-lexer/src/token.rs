@@ -17,7 +17,7 @@ use crate::token_type::TokenType;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Token<'s> {
-    pub value: &'s str,
+    pub value: &'s static str,
     pub token_type: TokenType,
     pub span: (usize, usize),
 }
