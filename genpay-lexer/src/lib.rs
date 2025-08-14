@@ -6,20 +6,20 @@
 //!
 //! ## Usage
 //! ```rust
-//! use genpay_lexer::Lexer;
+//! use genpay_lexer::{Lexer, token_type::TokenType};
 //!
 //! let input = "1 + 1";
-//! let mut lexer = Lexer::new(input);
+//! let mut lexer = Lexer::new(input, "test.gen");
 //!
-//! let (tokens, _) = lexer.tokenize().unwrap();
+//! let tokens: Vec<_> = lexer.collect();
 //!
-//! assert!(tokens.len() == 4); // 3 tokens and EOF (End Of File)
+//! assert!(tokens.len() == 3);
 //!
 //! println!("{:?}", tokens);
 //! ```
 
 use crate::{
-    error::{LexerError, LexerWarning},
+    error::LexerError,
     token::Token,
     token_type::TokenType,
 };
@@ -39,18 +39,16 @@ pub mod token_type;
 /// ### Usage example:
 pub struct Lexer<'s> {
     src: &'s str,
+    filename: &'s str,
     cursor: usize,
-    errors: Vec<LexerError>,
-    warnings: Vec<LexerWarning>,
 }
 
 impl<'s> Lexer<'s> {
-    pub fn new(src: &'s str) -> Self {
+    pub fn new(src: &'s str, filename: &'s str) -> Self {
         Lexer {
             src,
+            filename,
             cursor: 0,
-            errors: Vec::new(),
-            warnings: Vec::new(),
         }
     }
 
@@ -109,11 +107,11 @@ impl<'s> Lexer<'s> {
     }
 
     /* next token -------------------------------------------------------- */
-    pub fn next_token(&mut self) -> Token<'s> {
+    pub fn next_token(&mut self) -> Result<Token<'s>, LexerError> {
         self.skip_ws();
         let start = self.cursor;
         match self.peek() {
-            None => Token::new("", TokenType::EOF, (start, start)),
+            None => Ok(Token::new("", TokenType::EOF, (start, start))),
             Some(b'a'..=b'z' | b'A'..=b'Z' | b'_') => {
                 let ident = self.eat_while(|b| b.is_ascii_alphanumeric() || b == b'_');
                 let token_type = match ident {
@@ -151,7 +149,7 @@ impl<'s> Lexer<'s> {
                     "void" => TokenType::Type,
                     _ => TokenType::Identifier,
                 };
-                Token::new(ident, token_type, (start, self.cursor))
+                Ok(Token::new(ident, token_type, (start, self.cursor)))
             }
             Some(b'0'..=b'9') => {
                 let num = self.eat_while_radix(10, |b| b.is_ascii_digit());
@@ -161,21 +159,21 @@ impl<'s> Lexer<'s> {
                     let mut value = String::from(num);
                     value.push('.');
                     value.push_str(frac);
-                    Token::new(
+                    Ok(Token::new(
                         self.slice(start),
                         TokenType::FloatNumber,
                         (start, self.cursor),
-                    )
+                    ))
                 } else if self.peek() == Some(b'x') {
                     self.bump();
                     let num = self.eat_while_radix(16, |b| b.is_ascii_hexdigit());
-                    Token::new(self.slice(start), TokenType::Number, (start, self.cursor))
+                    Ok(Token::new(self.slice(start), TokenType::Number, (start, self.cursor)))
                 } else if self.peek() == Some(b'b') {
                     self.bump();
                     let num = self.eat_while_radix(2, |b| b == b'0' || b == b'1');
-                    Token::new(self.slice(start), TokenType::Number, (start, self.cursor))
+                    Ok(Token::new(self.slice(start), TokenType::Number, (start, self.cursor)))
                 } else {
-                    Token::new(num, TokenType::Number, (start, self.cursor))
+                    Ok(Token::new(num, TokenType::Number, (start, self.cursor)))
                 }
             }
             Some(b'"') => {
@@ -184,7 +182,7 @@ impl<'s> Lexer<'s> {
                 if self.peek() == Some(b'"') {
                     self.bump();
                 }
-                Token::new(lit, TokenType::String, (start, self.cursor))
+                Ok(Token::new(lit, TokenType::String, (start, self.cursor)))
             }
             Some(b'\'') => {
                 self.bump(); // opening quote
@@ -192,19 +190,19 @@ impl<'s> Lexer<'s> {
                 if self.peek() == Some(b'\'') {
                     self.bump();
                 }
-                Token::new(lit, TokenType::Char, (start, self.cursor))
+                Ok(Token::new(lit, TokenType::Char, (start, self.cursor)))
             }
             Some(b'+') => {
                 self.bump();
-                Token::new("+", TokenType::Plus, (start, self.cursor))
+                Ok(Token::new("+", TokenType::Plus, (start, self.cursor)))
             }
             Some(b'-') => {
                 self.bump();
-                Token::new("-", TokenType::Minus, (start, self.cursor))
+                Ok(Token::new("-", TokenType::Minus, (start, self.cursor)))
             }
             Some(b'*') => {
                 self.bump();
-                Token::new("*", TokenType::Multiply, (start, self.cursor))
+                Ok(Token::new("*", TokenType::Multiply, (start, self.cursor)))
             }
             Some(b'/') => {
                 self.bump();
@@ -212,145 +210,137 @@ impl<'s> Lexer<'s> {
                     self.eat_while(|b| b != b'\n');
                     self.next_token()
                 } else {
-                    Token::new("/", TokenType::Divide, (start, self.cursor))
+                    Ok(Token::new("/", TokenType::Divide, (start, self.cursor)))
                 }
             }
             Some(b'%') => {
                 self.bump();
-                Token::new("%", TokenType::Modulus, (start, self.cursor))
+                Ok(Token::new("%", TokenType::Modulus, (start, self.cursor)))
             }
             Some(b'=') => {
                 self.bump();
                 if self.peek() == Some(b'=') {
                     self.bump();
-                    Token::new("==", TokenType::Eq, (start, self.cursor))
+                    Ok(Token::new("==", TokenType::Eq, (start, self.cursor)))
                 } else {
-                    Token::new("=", TokenType::Equal, (start, self.cursor))
+                    Ok(Token::new("=", TokenType::Equal, (start, self.cursor)))
                 }
             }
             Some(b'!') => {
                 self.bump();
                 if self.peek() == Some(b'=') {
                     self.bump();
-                    Token::new("!=", TokenType::Ne, (start, self.cursor))
+                    Ok(Token::new("!=", TokenType::Ne, (start, self.cursor)))
                 } else {
-                    Token::new("!", TokenType::Not, (start, self.cursor))
+                    Ok(Token::new("!", TokenType::Not, (start, self.cursor)))
                 }
             }
             Some(b'<') => {
                 self.bump();
                 if self.peek() == Some(b'=') {
                     self.bump();
-                    Token::new("<=", TokenType::Leq, (start, self.cursor))
+                    Ok(Token::new("<=", TokenType::Leq, (start, self.cursor)))
                 } else if self.peek() == Some(b'<') {
                     self.bump();
-                    Token::new("<<", TokenType::LShift, (start, self.cursor))
+                    Ok(Token::new("<<", TokenType::LShift, (start, self.cursor)))
                 } else {
-                    Token::new("<", TokenType::Lt, (start, self.cursor))
+                    Ok(Token::new("<", TokenType::Lt, (start, self.cursor)))
                 }
             }
             Some(b'>') => {
                 self.bump();
                 if self.peek() == Some(b'=') {
                     self.bump();
-                    Token::new(">=", TokenType::Beq, (start, self.cursor))
+                    Ok(Token::new(">=", TokenType::Beq, (start, self.cursor)))
                 } else if self.peek() == Some(b'>') {
                     self.bump();
-                    Token::new(">>", TokenType::RShift, (start, self.cursor))
+                    Ok(Token::new(">>", TokenType::RShift, (start, self.cursor)))
                 } else {
-                    Token::new(">", TokenType::Bt, (start, self.cursor))
+                    Ok(Token::new(">", TokenType::Bt, (start, self.cursor)))
                 }
             }
             Some(b'&') => {
                 self.bump();
                 if self.peek() == Some(b'&') {
                     self.bump();
-                    Token::new("&&", TokenType::And, (start, self.cursor))
+                    Ok(Token::new("&&", TokenType::And, (start, self.cursor)))
                 } else {
-                    Token::new("&", TokenType::Ampersand, (start, self.cursor))
+                    Ok(Token::new("&", TokenType::Ampersand, (start, self.cursor)))
                 }
             }
             Some(b'|') => {
                 self.bump();
                 if self.peek() == Some(b'|') {
                     self.bump();
-                    Token::new("||", TokenType::Or, (start, self.cursor))
+                    Ok(Token::new("||", TokenType::Or, (start, self.cursor)))
                 } else {
-                    Token::new("|", TokenType::Verbar, (start, self.cursor))
+                    Ok(Token::new("|", TokenType::Verbar, (start, self.cursor)))
                 }
             }
             Some(b'^') => {
                 self.bump();
-                Token::new("^", TokenType::Xor, (start, self.cursor))
+                Ok(Token::new("^", TokenType::Xor, (start, self.cursor)))
             }
             Some(b'(') => {
                 self.bump();
-                Token::new("(", TokenType::LParen, (start, self.cursor))
+                Ok(Token::new("(", TokenType::LParen, (start, self.cursor)))
             }
             Some(b')') => {
                 self.bump();
-                Token::new(")", TokenType::RParen, (start, self.cursor))
+                Ok(Token::new(")", TokenType::RParen, (start, self.cursor)))
             }
             Some(b'{') => {
                 self.bump();
-                Token::new("{", TokenType::LBrace, (start, self.cursor))
+                Ok(Token::new("{", TokenType::LBrace, (start, self.cursor)))
             }
             Some(b'}') => {
                 self.bump();
-                Token::new("}", TokenType::RBrace, (start, self.cursor))
+                Ok(Token::new("}", TokenType::RBrace, (start, self.cursor)))
             }
             Some(b'[') => {
                 self.bump();
-                Token::new("[", TokenType::LBrack, (start, self.cursor))
+                Ok(Token::new("[", TokenType::LBrack, (start, self.cursor)))
             }
             Some(b']') => {
                 self.bump();
-                Token::new("]", TokenType::RBrack, (start, self.cursor))
+                Ok(Token::new("]", TokenType::RBrack, (start, self.cursor)))
             }
             Some(b',') => {
                 self.bump();
-                Token::new(",", TokenType::Comma, (start, self.cursor))
+                Ok(Token::new(",", TokenType::Comma, (start, self.cursor)))
             }
             Some(b'.') => {
                 self.bump();
-                Token::new(".", TokenType::Dot, (start, self.cursor))
+                Ok(Token::new(".", TokenType::Dot, (start, self.cursor)))
             }
             Some(b':') => {
                 self.bump();
-                Token::new(":", TokenType::DoubleDots, (start, self.cursor))
+                Ok(Token::new(":", TokenType::DoubleDots, (start, self.cursor)))
             }
             Some(b';') => {
                 self.bump();
-                Token::new(";", TokenType::Semicolon, (start, self.cursor))
+                Ok(Token::new(";", TokenType::Semicolon, (start, self.cursor)))
             }
             Some(c) => {
                 self.bump();
-                let mut errors = Vec::new();
-                let warnings: Vec<LexerWarning> = Vec::new();
-                errors.push(LexerError::UnknownCharacter {
+                Err(LexerError::UnknownCharacter {
                     character: c as char,
-                    src: NamedSource::new("unknown", self.src.to_string()),
+                    src: NamedSource::new(self.filename, self.src.to_string()),
                     span: (start, 1).into(),
-                });
-                Token::new(
-                    self.slice(start),
-                    TokenType::Identifier,
-                    (start, self.cursor),
-                )
+                })
             }
         }
     }
 }
 
 impl<'s> Iterator for Lexer<'s> {
-    type Item = Token<'s>;
+    type Item = Result<Token<'s>, LexerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let token = self.next_token();
-        if token.token_type == TokenType::EOF {
-            None
-        } else {
-            Some(token)
+        match self.next_token() {
+            Ok(token) if token.token_type == TokenType::EOF => None,
+            Ok(token) => Some(Ok(token)),
+            Err(e) => Some(Err(e)),
         }
     }
 }

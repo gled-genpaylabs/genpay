@@ -30,10 +30,7 @@ impl<'s> MacroObject<'s> for FormatMacro {
                     arguments.len()
                 ),
                 help: None,
-                src: NamedSource::new(
-                    analyzer.source.name().to_string(),
-                    analyzer.source.data().to_string(),
-                ),
+                src: analyzer.source.clone(),
                 span: error::position_to_span(*span),
             });
         }
@@ -56,10 +53,7 @@ impl<'s> MacroObject<'s> for FormatMacro {
                                 "Consider using right bindings syntax with curly brackets"
                                     .to_string(),
                             ),
-                            src: NamedSource::new(
-                                analyzer.source.name().to_string(),
-                                analyzer.source.data().to_string(),
-                            ),
+                            src: analyzer.source.clone(),
                             span: error::position_to_span(*literal_span),
                         }),
                     }
@@ -76,10 +70,7 @@ impl<'s> MacroObject<'s> for FormatMacro {
                         arguments.len()
                     ),
                     help: None,
-                    src: NamedSource::new(
-                        analyzer.source.name().to_string(),
-                        analyzer.source.data().to_string(),
-                    ),
+                    src: analyzer.source.clone(),
                     span: error::position_to_span(*span),
                 });
                 return return_type;
@@ -110,10 +101,7 @@ impl<'s> MacroObject<'s> for FormatMacro {
                                 SemanticError::IllegalImplementation {
                                     exception: format!("type `{expr_type}` has wrong implementation for display"),
                                     help: Some(format!("Consider using right format: {DISPLAY_IMPLEMENTATION_FORMAT}")),
-                                    src: NamedSource::new(
-                                analyzer.source.name().to_string(),
-                                analyzer.source.data().to_string(),
-                            ),
+                                    src: analyzer.source.clone(),
                                     span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                                 }
                             );
@@ -123,10 +111,7 @@ impl<'s> MacroObject<'s> for FormatMacro {
                             SemanticError::IllegalImplementation {
                                 exception: format!("type `{expr_type}` has no implementation for display"),
                                 help: Some(format!("Consider implementing necessary method: {DISPLAY_IMPLEMENTATION_FORMAT}")),
-                                src: NamedSource::new(
-                                analyzer.source.name().to_string(),
-                                analyzer.source.data().to_string(),
-                            ),
+                                src: analyzer.source.clone(),
                                 span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                             }
                         );
@@ -144,10 +129,7 @@ impl<'s> MacroObject<'s> for FormatMacro {
                                     SemanticError::IllegalImplementation {
                                         exception: format!("type `{expr_type}` has wrong implementation for display"),
                                         help: Some(format!("Consider using right format: {DISPLAY_IMPLEMENTATION_FORMAT}")),
-                                        src: NamedSource::new(
-                                analyzer.source.name().to_string(),
-                                analyzer.source.data().to_string(),
-                            ),
+                                        src: analyzer.source.clone(),
                                         span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                                     }
                                 );
@@ -157,10 +139,7 @@ impl<'s> MacroObject<'s> for FormatMacro {
                             SemanticError::IllegalImplementation {
                                 exception: format!("type `{expr_type}` has no implementation for display"),
                                 help: Some(format!("Consider implementing necessary method: {DISPLAY_IMPLEMENTATION_FORMAT}")),
-                                src: NamedSource::new(
-                                analyzer.source.name().to_string(),
-                                analyzer.source.data().to_string(),
-                            ),
+                                src: analyzer.source.clone(),
                                 span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                             }
                         );
@@ -169,10 +148,7 @@ impl<'s> MacroObject<'s> for FormatMacro {
                         analyzer.error(SemanticError::UnknownObject {
                             exception: format!("no displayable type `{expr_type}` found"),
                             help: None,
-                            src: NamedSource::new(
-                                analyzer.source.name().to_string(),
-                                analyzer.source.data().to_string(),
-                            ),
+                            src: analyzer.source.clone(),
                             span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                         });
                     }
@@ -182,10 +158,7 @@ impl<'s> MacroObject<'s> for FormatMacro {
                     analyzer.error(SemanticError::UnsupportedType {
                         exception: format!("type `{expr_type}` is not supported for display"),
                         help: None,
-                        src: NamedSource::new(
-                            analyzer.source.name().to_string(),
-                            analyzer.source.data().to_string(),
-                        ),
+                        src: analyzer.source.clone(),
                         span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                     });
                 }

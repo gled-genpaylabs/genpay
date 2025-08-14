@@ -104,16 +104,25 @@ impl<'s> Parser<'s> {
     /// **Structure Builder** <br/>
     /// Requires full ownership for vector of tokens, and source code with filename for error
     /// handling
-    pub fn new(source: &'s str, filename: &str) -> Self {
-        let lexer = Lexer::new(source);
+    pub fn new(source: &'s str, filename: &'s str) -> Self {
+        let lexer = Lexer::new(source, filename);
+        let mut tokens = Vec::new();
+        let mut errors = Vec::new();
+
+        for result in lexer {
+            match result {
+                Ok(token) => tokens.push(token),
+                Err(err) => errors.push(err.into()),
+            }
+        }
 
         Self {
             source: NamedSource::new(filename, source.to_string()),
 
-            tokens: lexer.collect(),
+            tokens,
             position: 0,
 
-            errors: Vec::new(),
+            errors,
             warnings: Vec::new(),
             eof: false,
         }

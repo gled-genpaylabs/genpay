@@ -2,16 +2,17 @@ use genpay_lexer::{token::Token, token_type::TokenType, Lexer};
 
 fn assert_tokens(lexer: &mut Lexer, expected: &[Token]) {
     for expected_token in expected {
-        let token = lexer.next();
+        let token = lexer.next().unwrap().unwrap();
         assert_eq!(token.token_type, expected_token.token_type);
         assert_eq!(token.value, expected_token.value);
     }
+    assert!(lexer.next().is_none());
 }
 
 #[test]
 fn basic_types() {
     let input = "i8 i16 i32 i64 u8 u16 u32 u64 usize char bool void";
-    let mut lexer = Lexer::new(input);
+    let mut lexer = Lexer::new(input, "test.gen");
 
     let expected = vec![
         Token::new("i8", TokenType::Type, (0, 2)),
@@ -26,7 +27,6 @@ fn basic_types() {
         Token::new("char", TokenType::Type, (36, 40)),
         Token::new("bool", TokenType::Type, (41, 45)),
         Token::new("void", TokenType::Type, (46, 50)),
-        Token::new("", TokenType::EOF, (50, 50)),
     ];
 
     assert_tokens(&mut lexer, &expected);
@@ -35,12 +35,11 @@ fn basic_types() {
 #[test]
 fn boolean_keywords() {
     let input = "true false";
-    let mut lexer = Lexer::new(input);
+    let mut lexer = Lexer::new(input, "test.gen");
 
     let expected = vec![
         Token::new("true", TokenType::Boolean, (0, 4)),
         Token::new("false", TokenType::Boolean, (5, 10)),
-        Token::new("", TokenType::EOF, (10, 10)),
     ];
 
     assert_tokens(&mut lexer, &expected);
@@ -49,7 +48,7 @@ fn boolean_keywords() {
 #[test]
 fn main_keywords() {
     let input = "let fn import return struct enum typedef";
-    let mut lexer = Lexer::new(input);
+    let mut lexer = Lexer::new(input, "test.gen");
 
     let expected = vec![
         Token::new("let", TokenType::Keyword, (0, 3)),
@@ -59,7 +58,6 @@ fn main_keywords() {
         Token::new("struct", TokenType::Keyword, (21, 27)),
         Token::new("enum", TokenType::Keyword, (28, 32)),
         Token::new("typedef", TokenType::Keyword, (33, 40)),
-        Token::new("", TokenType::EOF, (40, 40)),
     ];
 
     assert_tokens(&mut lexer, &expected);
@@ -68,7 +66,7 @@ fn main_keywords() {
 #[test]
 fn constructions_keywords() {
     let input = "if else while for break";
-    let mut lexer = Lexer::new(input);
+    let mut lexer = Lexer::new(input, "test.gen");
 
     let expected = vec![
         Token::new("if", TokenType::Keyword, (0, 2)),
@@ -76,7 +74,6 @@ fn constructions_keywords() {
         Token::new("while", TokenType::Keyword, (8, 13)),
         Token::new("for", TokenType::Keyword, (14, 17)),
         Token::new("break", TokenType::Keyword, (18, 23)),
-        Token::new("", TokenType::EOF, (23, 23)),
     ];
 
     assert_tokens(&mut lexer, &expected);

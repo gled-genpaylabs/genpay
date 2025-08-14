@@ -29,10 +29,7 @@ impl<'s> MacroObject<'s> for SizeofMacro {
                     arguments.len()
                 ),
                 help: None,
-                src: NamedSource::new(
-                    analyzer.source.name().to_string(),
-                    analyzer.source.data().to_string(),
-                ),
+                src: analyzer.source.clone(),
                 span: error::position_to_span(*span),
             });
         }

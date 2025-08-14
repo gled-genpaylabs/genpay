@@ -25,13 +25,13 @@ fn is_unsigned_integer() {
 
 #[test]
 fn unsigned_to_signed_integer() {
-    assert_eq!(Type::I8, Analyzer::unsigned_to_signed_integer(&Type::U8));
-    assert_eq!(Type::I16, Analyzer::unsigned_to_signed_integer(&Type::U16));
-    assert_eq!(Type::I32, Analyzer::unsigned_to_signed_integer(&Type::U32));
-    assert_eq!(Type::I64, Analyzer::unsigned_to_signed_integer(&Type::U64));
+    assert_eq!(Type::I8, Analyzer::unsigned_to_signed_integer(&Type::U8).unwrap());
+    assert_eq!(Type::I16, Analyzer::unsigned_to_signed_integer(&Type::U16).unwrap());
+    assert_eq!(Type::I32, Analyzer::unsigned_to_signed_integer(&Type::U32).unwrap());
+    assert_eq!(Type::I64, Analyzer::unsigned_to_signed_integer(&Type::U64).unwrap());
     assert_eq!(
         Type::I64,
-        Analyzer::unsigned_to_signed_integer(&Type::USIZE)
+        Analyzer::unsigned_to_signed_integer(&Type::USIZE).unwrap()
     );
 }
 

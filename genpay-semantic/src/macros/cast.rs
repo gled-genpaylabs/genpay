@@ -27,10 +27,7 @@ impl<'s> MacroObject<'s> for CastMacro {
                     arguments.len()
                 ),
                 help: None,
-                src: NamedSource::new(
-                    analyzer.source.name().to_string(),
-                    analyzer.source.data().to_string(),
-                ),
+                src: analyzer.source.clone(),
                 span: error::position_to_span(*span),
             });
         }
@@ -53,10 +50,7 @@ impl<'s> MacroObject<'s> for CastMacro {
             analyzer.error(SemanticError::ArgumentException {
                 exception: "wrong arguments for casting found".to_string(),
                 help: Some("Consider using right syntax: cast!(EXPRESSION, TYPE)".to_string()),
-                src: NamedSource::new(
-                    analyzer.source.name().to_string(),
-                    analyzer.source.data().to_string(),
-                ),
+                src: analyzer.source.clone(),
                 span: error::position_to_span(*span),
             });
         }
@@ -70,10 +64,7 @@ impl<'s> MacroObject<'s> for CastMacro {
                 analyzer.error(SemanticError::SemanticalError {
                     exception: err,
                     help: None,
-                    src: NamedSource::new(
-                        analyzer.source.name().to_string(),
-                        analyzer.source.data().to_string(),
-                    ),
+                    src: analyzer.source.clone(),
                     span: error::position_to_span(*span),
                 });
             });

@@ -29,7 +29,7 @@ pub struct SymbolTable<'s> {
 /// // or with default
 /// let mut import = Import::default();
 ///
-/// import.add_fn(String::from("func"), Type::Undefined);
+/// import.add_fn("func", Type::Undefined);
 /// assert!(import.get_fn("func").is_some());
 /// ```
 #[derive(Debug, Clone)]
