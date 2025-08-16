@@ -22,6 +22,9 @@
 //! Project is licensed under the MIT License. <br/>
 //! See LICENSE file on Github: <https://github.com/gled-genpaylabs/genpay/blob/master/LICENSE>
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 
