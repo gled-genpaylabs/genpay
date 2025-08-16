@@ -164,11 +164,11 @@ impl<'s> Lexer<'s> {
                     ))
                 } else if self.peek() == Some(b'x') {
                     self.bump();
-                    let num = self.eat_while_radix(16, |b| b.is_ascii_hexdigit());
+                    let _num = self.eat_while_radix(16, |b| b.is_ascii_hexdigit());
                     Ok(Token::new(self.slice(start), TokenType::Number, (start, self.cursor)))
                 } else if self.peek() == Some(b'b') {
                     self.bump();
-                    let num = self.eat_while_radix(2, |b| b == b'0' || b == b'1');
+                    let _num = self.eat_while_radix(2, |b| b == b'0' || b == b'1');
                     Ok(Token::new(self.slice(start), TokenType::Number, (start, self.cursor)))
                 } else {
                     Ok(Token::new(num, TokenType::Number, (start, self.cursor)))

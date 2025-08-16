@@ -645,7 +645,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                 let mut fields_hashmap = HashMap::new();
                 compiled_fields.into_iter().for_each(|field| {
-                    fields_hashmap.insert(field.name.clone(), field);
+                    fields_hashmap.insert(field.name, field);
                 });
 
                 self.scope.set_struct(
