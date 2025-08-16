@@ -106,6 +106,10 @@ impl<'s> Parser<'s> {
     /// handling
     pub fn new(source: &'s str, filename: &'s str) -> Self {
         let lexer = Lexer::new(source, filename);
+        Self::new_with_lexer(lexer, source, filename)
+    }
+
+    pub fn new_with_lexer(lexer: Lexer<'s>, source: &'s str, filename: &'s str) -> Self {
         let mut tokens = Vec::new();
         let mut errors = Vec::new();
 
@@ -118,10 +122,8 @@ impl<'s> Parser<'s> {
 
         Self {
             source: NamedSource::new(filename, source.to_string()),
-
             tokens,
             position: 0,
-
             errors,
             warnings: Vec::new(),
             eof: false,
