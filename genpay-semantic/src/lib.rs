@@ -30,7 +30,6 @@ use genpay_parser::{
     expressions::Expressions, statements::Statements, types::Type, value::Value, Parser,
 };
 use miette::NamedSource;
-use std::collections::HashMap;
 use std::{collections::{BTreeMap, HashMap}, ffi::OsStr, path::PathBuf};
 
 mod element;
