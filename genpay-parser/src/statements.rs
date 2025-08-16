@@ -14,7 +14,7 @@ use crate::{
     value::Value,
 };
 use genpay_lexer::token_type::TokenType;
-use indexmap::IndexMap;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statements<'s> {
@@ -97,8 +97,8 @@ pub enum Statements<'s> {
     /// ```
     StructDefineStatement {
         name: &'s str,
-        fields: IndexMap<&'s str, Type<'s>>,
-        functions: IndexMap<&'s str, Statements<'s>>,
+        fields: BTreeMap<&'s str, Type<'s>>,
+        functions: BTreeMap<&'s str, Statements<'s>>,
         public: bool,
         span: (usize, usize),
     },
@@ -114,7 +114,7 @@ pub enum Statements<'s> {
     EnumDefineStatement {
         name: &'s str,
         fields: Vec<&'s str>,
-        functions: IndexMap<&'s str, Statements<'s>>,
+        functions: BTreeMap<&'s str, Statements<'s>>,
         public: bool,
         span: (usize, usize),
     },
@@ -940,8 +940,8 @@ impl<'s> Parser<'s> {
         }
 
         let _ = self.next();
-        let mut fields = IndexMap::new();
-        let mut functions = IndexMap::new();
+        let mut fields = BTreeMap::new();
+        let mut functions = BTreeMap::new();
 
         let mut method_mode = false;
         let mut mode_reported = false;
@@ -1112,7 +1112,7 @@ impl<'s> Parser<'s> {
         let _ = self.next();
 
         let mut fields = Vec::new();
-        let mut functions = IndexMap::new();
+        let mut functions = BTreeMap::new();
 
         while !self.expect(TokenType::RBrace) {
             match self.current().token_type {
