@@ -147,20 +147,20 @@ impl<'ctx> Scope<'ctx> {
     }
 
     // tech
-    pub fn stricted_variables(&self) -> HashMap<&'ctx str, Variable<'ctx>> {
-        self.variables.clone()
+    pub fn stricted_variables(&self) -> std::collections::hash_map::Iter<'_, &'ctx str, Variable<'ctx>> {
+        self.variables.iter()
     }
 
-    pub fn stricted_functions(&self) -> HashMap<&'ctx str, Function<'ctx>> {
-        self.functions.clone()
+    pub fn stricted_functions(&self) -> std::collections::hash_map::Iter<'_, &'ctx str, Function<'ctx>> {
+        self.functions.iter()
     }
 
-    pub fn stricted_structs(&self) -> HashMap<&'ctx str, Structure<'ctx>> {
-        self.structures.clone()
+    pub fn stricted_structs(&self) -> std::collections::hash_map::Iter<'_, &'ctx str, Structure<'ctx>> {
+        self.structures.iter()
     }
 
-    pub fn stricted_enums(&self) -> HashMap<&'ctx str, Enumeration<'ctx>> {
-        self.enumerations.clone()
+    pub fn stricted_enums(&self) -> std::collections::hash_map::Iter<'_, &'ctx str, Enumeration<'ctx>> {
+        self.enumerations.iter()
     }
 }
 

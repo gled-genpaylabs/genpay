@@ -110,9 +110,9 @@ impl<'ctx> CodeGen<'ctx> {
             .for_each(|stmt| self.compile_statement(stmt, prefix));
 
         let module_content = {
-            let functions = self.scope.stricted_functions();
-            let structures = self.scope.stricted_structs();
-            let enumerations = self.scope.stricted_enums();
+            let functions = self.scope.stricted_functions().map(|(k, v)| (*k, v.clone())).collect();
+            let structures = self.scope.stricted_structs().map(|(k, v)| (*k, v.clone())).collect();
+            let enumerations = self.scope.stricted_enums().map(|(k, v)| (*k, v.clone())).collect();
 
             ModuleContent {
                 functions,
@@ -437,7 +437,11 @@ impl<'ctx> CodeGen<'ctx> {
                 header_span: _,
             } => {
                 let module_name = self.module.get_name().to_string_lossy();
-                let name = format!("{}{}", prefix.unwrap_or_default(), raw_name,);
+                let name = if let Some(prefix) = prefix {
+                    Box::leak(format!("{}{}", prefix, raw_name).into_boxed_str())
+                } else {
+                    raw_name
+                };
 
                 let llvm_ir_name = format!(
                     "{}{}{}({})",
@@ -488,13 +492,15 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let _ = self.builder.build_store(param_alloca, arg_value);
 
-                    let arg_datatype = match arg.1 {
+                    let arg_datatype = match arg.1.clone() {
                         Type::SelfRef => {
-                            let prefix = prefix.clone().unwrap();
-                            let alias_string = prefix.replace("struct_", "").replace("enum_", "");
-                            let alias = alias_string.split("__").collect::<Vec<&str>>()[0];
-
-                            Type::Alias(Box::leak(alias.to_string().into_boxed_str()))
+                            let prefix_str = prefix.unwrap();
+                            let alias_part = prefix_str
+                                .strip_prefix("struct_")
+                                .or_else(|| prefix_str.strip_prefix("enum_"))
+                                .unwrap();
+                            let alias = alias_part.strip_suffix("__").unwrap();
+                            Type::Alias(alias)
                         }
                         _ => arg.1.clone(),
                     };
@@ -513,7 +519,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                 let typed_args = arguments.iter().map(|x| x.1.clone()).collect::<Vec<Type>>();
                 self.scope.set_function(
-                    &name,
+                    name,
                     Function {
                         datatype: datatype.clone(),
                         value: function,
@@ -554,7 +560,7 @@ impl<'ctx> CodeGen<'ctx> {
                 self.function = old_function;
 
                 self.scope.set_function(
-                    &name,
+                    name,
                     Function {
                         datatype: datatype.clone(),
                         value: function,
@@ -670,12 +676,13 @@ impl<'ctx> CodeGen<'ctx> {
                     self.scope
                         .set_function(&function_id, function_value.clone());
 
-                    function_id = Box::leak(function_id.replace(&format!("struct_{}__", name), "").into_boxed_str());
+                    let prefix_to_strip = format!("struct_{}__", name);
+                    let function_id_in_struct = function_id.strip_prefix(&prefix_to_strip).unwrap();
                     self.scope
                         .get_mut_struct(name)
                         .unwrap()
                         .functions
-                        .insert(function_id, function_value);
+                        .insert(function_id_in_struct, function_value);
                 });
             }
             Statements::EnumDefineStatement {
@@ -708,16 +715,17 @@ impl<'ctx> CodeGen<'ctx> {
                         Some(Box::leak(format!("enum_{name}__").into_boxed_str())),
                     );
 
-                    let (mut function_id, function_value) =
+                    let (function_id, function_value) =
                         self.scope.stricted_functions().into_iter().last().unwrap();
                     self.exit_scope_raw();
 
-                    function_id = Box::leak(function_id.replace(&format!("struct_{name}__"), "").into_boxed_str());
+                    let prefix_to_strip = format!("enum_{}__", name);
+                    let function_id_in_enum = function_id.strip_prefix(&prefix_to_strip).unwrap();
                     self.scope
                         .get_mut_enum(name)
                         .unwrap()
                         .functions
-                        .insert(function_id, function_value);
+                        .insert(function_id_in_enum, function_value);
                 });
             }
             Statements::TypedefStatement {
@@ -1417,11 +1425,10 @@ impl<'ctx> CodeGen<'ctx> {
                     .map(|fname| fname.to_str().unwrap_or("$NONE"))
                     .unwrap();
 
-                let module_name = fname
-                    .split('.')
-                    .nth(0)
-                    .map(|n| n.to_string())
-                    .unwrap_or_else(|| fname.replace(".dn", ""));
+                let module_name = match fname.split('.').next() {
+                    Some(n) => n.to_string(),
+                    None => fname.replace(".dn", ""),
+                };
 
                 let static_module_name: &'ctx str = Box::leak(module_name.into_boxed_str());
                 let import = self
@@ -1477,11 +1484,10 @@ impl<'ctx> CodeGen<'ctx> {
                     .map(|fname| fname.to_str().unwrap_or("$NONE"))
                     .unwrap();
 
-                let module_name = fname
-                    .split('.')
-                    .nth(0)
-                    .map(|n| n.to_string())
-                    .unwrap_or_else(|| fname.replace(".dn", ""));
+                let module_name = match fname.split('.').next() {
+                    Some(n) => n.to_string(),
+                    None => fname.replace(".dn", ""),
+                };
 
                 let static_module_name: &'ctx str = Box::leak(module_name.into_boxed_str());
                 if self.includes.contains(&static_module_name) {
