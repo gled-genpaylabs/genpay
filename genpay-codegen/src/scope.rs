@@ -183,7 +183,7 @@ impl<'ctx> CodeGen<'ctx> {
         scope_variables.into_iter().for_each(|(name, var)| {
             match var.datatype.clone() {
                 Type::Alias(alias) => {
-                    if matches!(self.get_alias_type(var.datatype.clone(), None), Some("struct")) && name != "self" && !var.no_drop {
+                    if matches!(self.get_alias_type(var.datatype.clone(), None), Some("struct")) && *name != "self" && !var.no_drop {
                         let structure = self.scope.get_struct(&alias).unwrap();
 
                         if let Some(destructor) = structure.functions.get("drop") {

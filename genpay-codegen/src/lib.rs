@@ -682,7 +682,7 @@ impl<'ctx> CodeGen<'ctx> {
                         .get_mut_struct(name)
                         .unwrap()
                         .functions
-                        .insert(function_id_in_struct, function_value);
+                        .insert(function_id_in_struct, function_value.clone());
                 });
             }
             Statements::EnumDefineStatement {
@@ -725,7 +725,7 @@ impl<'ctx> CodeGen<'ctx> {
                         .get_mut_enum(name)
                         .unwrap()
                         .functions
-                        .insert(function_id_in_enum, function_value);
+                        .insert(function_id_in_enum, function_value.clone());
                 });
             }
             Statements::TypedefStatement {
