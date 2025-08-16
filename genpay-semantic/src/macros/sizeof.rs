@@ -9,7 +9,6 @@ use genpay_parser::{expressions::Expressions, types::Type};
 /// `sizeof!(TYPE / EXPRESSION)` -> `usize`
 #[derive(Debug, Clone)]
 pub struct SizeofMacro;
-use miette::NamedSource;
 
 impl<'s> MacroObject<'s> for SizeofMacro {
     fn verify_call(

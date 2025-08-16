@@ -125,7 +125,7 @@ fn main() {
     );
 
     // Lexical Analyzer Initialization
-    let mut lexer = genpay_lexer::Lexer::new(&src, fname);
+    let _lexer = genpay_lexer::Lexer::new(&src, fname);
 
     // `miette` graphical reporter (for this amazing error reports).
     // "total_warns" variable made just for reporting how much warnings we've got at the end

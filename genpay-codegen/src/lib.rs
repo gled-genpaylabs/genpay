@@ -28,7 +28,7 @@ mod structure;
 mod variable;
 
 pub struct CodeGen<'ctx> {
-    source: String,
+    source: &'ctx str,
 
     context: &'ctx Context,
     builder: Builder<'ctx>,
@@ -40,15 +40,15 @@ pub struct CodeGen<'ctx> {
     booleans_strings: Option<(PointerValue<'ctx>, PointerValue<'ctx>)>,
 
     symtable: SymbolTable<'ctx>,
-    imports: HashMap<String, ModuleContent<'ctx>>,
-    includes: Vec<String>,
+    imports: HashMap<&'ctx str, ModuleContent<'ctx>>,
+    includes: Vec<&'ctx str>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ModuleContent<'ctx> {
-    pub functions: HashMap<String, Function<'ctx>>,
-    pub structures: HashMap<String, Structure<'ctx>>,
-    pub enumerations: HashMap<String, Enumeration<'ctx>>,
+    pub functions: HashMap<&'ctx str, Function<'ctx>>,
+    pub structures: HashMap<&'ctx str, Structure<'ctx>>,
+    pub enumerations: HashMap<&'ctx str, Enumeration<'ctx>>,
 }
 
 impl<'ctx> CodeGen<'ctx> {
@@ -59,8 +59,8 @@ impl<'ctx> CodeGen<'ctx> {
 
     pub fn new(
         context: &'ctx Context,
-        module_name: &str,
-        module_source: &str,
+        module_name: &'ctx str,
+        module_source: &'ctx str,
         symtable: SymbolTable<'ctx>,
     ) -> Self {
         let module = context.create_module(module_name);
@@ -83,7 +83,7 @@ impl<'ctx> CodeGen<'ctx> {
             .unwrap();
 
         Self {
-            source: module_source.to_owned(),
+            source: module_source,
 
             context,
             builder,
@@ -103,16 +103,16 @@ impl<'ctx> CodeGen<'ctx> {
     pub fn compile(
         &mut self,
         statements: Vec<Statements<'ctx>>,
-        prefix: Option<String>,
+        prefix: Option<&'ctx str>,
     ) -> (&Module<'ctx>, ModuleContent<'ctx>) {
         statements
             .into_iter()
-            .for_each(|stmt| self.compile_statement(stmt, prefix.clone()));
+            .for_each(|stmt| self.compile_statement(stmt, prefix));
 
         let module_content = {
-            let functions = self.scope.stricted_functions();
-            let structures = self.scope.stricted_structs();
-            let enumerations = self.scope.stricted_enums();
+            let functions = self.scope.stricted_functions().map(|(k, v)| (*k, v.clone())).collect();
+            let structures = self.scope.stricted_structs().map(|(k, v)| (*k, v.clone())).collect();
+            let enumerations = self.scope.stricted_enums().map(|(k, v)| (*k, v.clone())).collect();
 
             ModuleContent {
                 functions,
@@ -126,7 +126,7 @@ impl<'ctx> CodeGen<'ctx> {
 }
 
 impl<'ctx> CodeGen<'ctx> {
-    fn compile_statement(&mut self, statement: Statements<'ctx>, prefix: Option<String>) {
+    fn compile_statement(&mut self, statement: Statements<'ctx>, prefix: Option<&'ctx str>) {
         match statement {
             Statements::AssignStatement {
                 object,
@@ -436,8 +436,12 @@ impl<'ctx> CodeGen<'ctx> {
                 span: _,
                 header_span: _,
             } => {
-                let module_name = self.module.get_name().to_string_lossy().to_string();
-                let name = format!("{}{}", prefix.clone().unwrap_or_default(), raw_name,);
+                let module_name = self.module.get_name().to_string_lossy();
+                let name = if let Some(prefix) = prefix {
+                    Box::leak(format!("{}{}", prefix, raw_name).into_boxed_str())
+                } else {
+                    raw_name
+                };
 
                 let llvm_ir_name = format!(
                     "{}{}{}({})",
@@ -446,7 +450,7 @@ impl<'ctx> CodeGen<'ctx> {
                     } else {
                         format!("{module_name}.")
                     },
-                    prefix.clone().unwrap_or_default(),
+                    prefix.unwrap_or_default(),
                     raw_name,
                     arguments
                         .iter()
@@ -488,13 +492,15 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let _ = self.builder.build_store(param_alloca, arg_value);
 
-                    let arg_datatype = match arg.1 {
+                    let arg_datatype = match arg.1.clone() {
                         Type::SelfRef => {
-                            let prefix = prefix.clone().unwrap();
-                            let alias_string = prefix.replace("struct_", "").replace("enum_", "");
-                            let alias = alias_string.split("__").collect::<Vec<&str>>()[0];
-
-                            Type::Alias(Box::leak(alias.to_string().into_boxed_str()))
+                            let prefix_str = prefix.unwrap();
+                            let alias_part = prefix_str
+                                .strip_prefix("struct_")
+                                .or_else(|| prefix_str.strip_prefix("enum_"))
+                                .unwrap();
+                            let alias = alias_part.strip_suffix("__").unwrap();
+                            Type::Alias(alias)
                         }
                         _ => arg.1.clone(),
                     };
@@ -513,7 +519,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                 let typed_args = arguments.iter().map(|x| x.1.clone()).collect::<Vec<Type>>();
                 self.scope.set_function(
-                    &name,
+                    name,
                     Function {
                         datatype: datatype.clone(),
                         value: function,
@@ -554,7 +560,7 @@ impl<'ctx> CodeGen<'ctx> {
                 self.function = old_function;
 
                 self.scope.set_function(
-                    &name,
+                    name,
                     Function {
                         datatype: datatype.clone(),
                         value: function,
@@ -612,8 +618,7 @@ impl<'ctx> CodeGen<'ctx> {
                 public: _,
                 span: _,
             } => {
-                let name_string = format!("{}{}", prefix.clone().unwrap_or_default(), raw_name);
-                let name: &'ctx str = Box::leak(name_string.into_boxed_str());
+                let name = Box::leak(format!("{}{}", prefix.unwrap_or_default(), raw_name).into_boxed_str());
                 let llvm_name = format!(
                     "{}.{}",
                     self.module.get_name().to_string_lossy(),
@@ -625,7 +630,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                 fields.iter().for_each(|field| {
                     compiled_fields.push(Field {
-                        name: field.0.to_string(),
+                        name: field.0,
                         nth: compiled_fields.len() as u32,
                         datatype: field.1.clone(),
                         llvm_type: self.get_basic_type(field.1.clone()),
@@ -640,7 +645,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                 let mut fields_hashmap = HashMap::new();
                 compiled_fields.into_iter().for_each(|field| {
-                    fields_hashmap.insert(field.name.clone(), field);
+                    fields_hashmap.insert(field.name, field);
                 });
 
                 self.scope.set_struct(
@@ -652,16 +657,15 @@ impl<'ctx> CodeGen<'ctx> {
                     },
                 );
 
-                functions.iter().for_each(|(_, function_statement)| {
+                for (_, function_statement) in functions.iter() {
                     self.enter_new_scope();
 
                     self.compile_statement(
                         function_statement.clone(),
-                        Some(format!("struct_{}__", name)),
+                        Some(Box::leak(format!("struct_{}__", name).into_boxed_str())),
                     );
 
-                    let (mut function_id, mut function_value) =
-                        self.scope.stricted_functions().into_iter().last().unwrap();
+                    let (function_id, mut function_value) = self.scope.stricted_functions().last().map(|(id, f)| (*id, f.clone())).unwrap();
                     self.exit_scope_raw();
 
                     if let Some(Type::SelfRef) = function_value.arguments.first() {
@@ -669,15 +673,16 @@ impl<'ctx> CodeGen<'ctx> {
                             Type::Pointer(Box::new(Type::Alias(name)));
                     }
                     self.scope
-                        .set_function(&function_id, function_value.clone());
+                        .set_function(function_id, function_value.clone());
 
-                    function_id = function_id.replace(&format!("struct_{}__", name), "");
+                    let prefix_to_strip = format!("struct_{}__", name);
+                    let function_id_in_struct = function_id.strip_prefix(&prefix_to_strip).unwrap();
                     self.scope
                         .get_mut_struct(name)
                         .unwrap()
                         .functions
-                        .insert(function_id, function_value);
-                });
+                        .insert(function_id_in_struct, function_value);
+                }
             }
             Statements::EnumDefineStatement {
                 name,
@@ -686,40 +691,40 @@ impl<'ctx> CodeGen<'ctx> {
                 public: _,
                 span: _,
             } => {
-                let name = format!("{}{}", prefix.unwrap_or_default(), name);
+                let name = Box::leak(format!("{}{}", prefix.unwrap_or_default(), name).into_boxed_str());
                 self.scope.set_enum(
-                    &name,
+                    name,
                     Enumeration {
-                        fields: fields.iter().map(|s| s.to_string()).collect(),
+                        fields: fields.iter().map(|s| *s).collect(),
                         functions: HashMap::new(),
                         llvm_type: self.context.i8_type().into(),
                     },
                 );
 
-                functions.iter().for_each(|(_, function_statement)| {
+                for (_, function_statement) in functions.iter() {
                     self.compile_statement(
                         function_statement.clone(),
-                        Some(format!("enum_{name}__")),
+                        Some(Box::leak(format!("enum_{name}__").into_boxed_str())),
                     );
 
                     self.enter_new_scope();
 
                     self.compile_statement(
                         function_statement.clone(),
-                        Some(format!("enum_{name}__")),
+                        Some(Box::leak(format!("enum_{name}__").into_boxed_str())),
                     );
 
-                    let (mut function_id, function_value) =
-                        self.scope.stricted_functions().into_iter().last().unwrap();
+                    let (function_id, function_value) = self.scope.stricted_functions().last().map(|(id, f)| (*id, f.clone())).unwrap();
                     self.exit_scope_raw();
 
-                    function_id = function_id.replace(&format!("struct_{name}__"), "");
+                    let prefix_to_strip = format!("enum_{}__", name);
+                    let function_id_in_enum = function_id.strip_prefix(&prefix_to_strip).unwrap();
                     self.scope
-                        .get_mut_enum(&name)
+                        .get_mut_enum(name)
                         .unwrap()
                         .functions
-                        .insert(function_id, function_value);
-                });
+                        .insert(function_id_in_enum, function_value);
+                }
             }
             Statements::TypedefStatement {
                 alias,
@@ -997,6 +1002,7 @@ impl<'ctx> CodeGen<'ctx> {
                     Type::Alias(alias) => {
                         // allocating iterator status
                         let status_varname = format!("@genpay_iterator_status_{}", &binding);
+                        let static_status_varname = Box::leak(status_varname.clone().into_boxed_str());
 
                         let iterator_fn = self
                             .scope
@@ -1008,7 +1014,7 @@ impl<'ctx> CodeGen<'ctx> {
                             .unwrap();
 
                         self.scope.set_variable(
-                            &status_varname,
+                            static_status_varname,
                             Variable {
                                 datatype: Type::Bool,
                                 llvm_type: self.context.bool_type().into(),
@@ -1101,13 +1107,14 @@ impl<'ctx> CodeGen<'ctx> {
                         // allocating iterator position
                         let iterator_position_varname =
                             format!("@genpay_iterator_position_{}", &binding);
+                        let static_iterator_position_varname = Box::leak(iterator_position_varname.clone().into_boxed_str());
                         let iterator_position_alloca = self
                             .builder
                             .build_alloca(self.context.i64_type(), &iterator_position_varname)
                             .unwrap();
 
                         self.scope.set_variable(
-                            &iterator_position_varname,
+                            static_iterator_position_varname,
                             Variable {
                                 datatype: Type::USIZE,
                                 llvm_type: self.context.i64_type().into(),
@@ -1418,21 +1425,21 @@ impl<'ctx> CodeGen<'ctx> {
                     .map(|fname| fname.to_str().unwrap_or("$NONE"))
                     .unwrap();
 
-                let module_name = fname
-                    .split('.')
-                    .nth(0)
-                    .map(|n| n.to_string())
-                    .unwrap_or_else(|| fname.replace(".dn", ""));
+                let module_name = match fname.split('.').next() {
+                    Some(n) => n.to_string(),
+                    None => fname.replace(".dn", ""),
+                };
 
+                let static_module_name: &'ctx str = Box::leak(module_name.clone().into_boxed_str());
                 let import = self
                     .symtable
                     .imports
-                    .get(module_name.as_str())
+                    .get(static_module_name)
                     .cloned()
                     .unwrap_or_default();
                 let mut codegen = Self::new(
                     self.context,
-                    &module_name,
+                    static_module_name,
                     import.source,
                     import.embedded_symtable.clone(),
                 );
@@ -1462,7 +1469,7 @@ impl<'ctx> CodeGen<'ctx> {
                     func.1.value = declared_fn;
                 });
 
-                self.imports.insert(module_name, module_content);
+                self.imports.insert(static_module_name, module_content);
             }
 
             Statements::IncludeStatement { path, span: _ } => {
@@ -1477,18 +1484,18 @@ impl<'ctx> CodeGen<'ctx> {
                     .map(|fname| fname.to_str().unwrap_or("$NONE"))
                     .unwrap();
 
-                let module_name = fname
-                    .split('.')
-                    .nth(0)
-                    .map(|n| n.to_string())
-                    .unwrap_or_else(|| fname.replace(".dn", ""));
+                let module_name = match fname.split('.').next() {
+                    Some(n) => n.to_string(),
+                    None => fname.replace(".dn", ""),
+                };
 
-                if self.includes.contains(&module_name) {
+                let static_module_name: &'ctx str = Box::leak(module_name.into_boxed_str());
+                if self.includes.contains(&static_module_name) {
                     return;
                 };
-                self.includes.push(module_name.clone());
+                self.includes.push(static_module_name);
 
-                let include = self.symtable.included.get(module_name.as_str()).unwrap().clone();
+                let include = self.symtable.included.get(static_module_name).unwrap().clone();
                 include
                     .ast
                     .iter()
@@ -2355,7 +2362,7 @@ impl<'ctx> CodeGen<'ctx> {
                             match alias_type {
                                 "struct" => {
                                     let structure = self.scope.get_struct(alias).unwrap();
-                                    let field = structure.fields.get(&field.to_string()).unwrap();
+                                    let field = structure.fields.get(field).unwrap();
 
                                     let ptr = self
                                         .builder

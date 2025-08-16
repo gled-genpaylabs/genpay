@@ -299,7 +299,7 @@ impl<'s> Analyzer<'s> {
                     object: object.clone(),
                     span: *span,
                     value: Expressions::Binary {
-                        operand: operand.clone(),
+                        operand: *operand,
                         lhs: Box::new(object.clone()),
                         rhs: Box::new(value.clone()),
                         span: *span,

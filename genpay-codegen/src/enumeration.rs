@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Enumeration<'ctx> {
-    pub fields: Vec<String>,
-    pub functions: HashMap<String, Function<'ctx>>,
+    pub fields: Vec<&'ctx str>,
+    pub functions: HashMap<&'ctx str, Function<'ctx>>,
     pub llvm_type: BasicTypeEnum<'ctx>,
 }
