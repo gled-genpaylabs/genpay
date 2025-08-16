@@ -13,6 +13,7 @@ miette = { version = "7.5.0", features = ["fancy"] }
 inkwell = { version = "0.5.0", features = ["llvm18-0"] }
 colored = "3.0.0"
 thiserror = "2.0.12"
+mimalloc = "0.1.47"
 
 genpay-lexer = { path = "../genpay-lexer" }
 genpay-parser = { path = "../genpay-parser" }
