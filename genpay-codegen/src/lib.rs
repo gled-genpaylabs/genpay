@@ -657,7 +657,7 @@ impl<'ctx> CodeGen<'ctx> {
                     },
                 );
 
-                functions.iter().for_each(|(_, function_statement)| {
+                for (_, function_statement) in functions.iter() {
                     self.enter_new_scope();
 
                     self.compile_statement(
@@ -682,7 +682,7 @@ impl<'ctx> CodeGen<'ctx> {
                         .unwrap()
                         .functions
                         .insert(function_id_in_struct, function_value);
-                });
+                }
             }
             Statements::EnumDefineStatement {
                 name,
@@ -701,7 +701,7 @@ impl<'ctx> CodeGen<'ctx> {
                     },
                 );
 
-                functions.iter().for_each(|(_, function_statement)| {
+                for (_, function_statement) in functions.iter() {
                     self.compile_statement(
                         function_statement.clone(),
                         Some(Box::leak(format!("enum_{name}__").into_boxed_str())),
@@ -724,7 +724,7 @@ impl<'ctx> CodeGen<'ctx> {
                         .unwrap()
                         .functions
                         .insert(function_id_in_enum, function_value);
-                });
+                }
             }
             Statements::TypedefStatement {
                 alias,
