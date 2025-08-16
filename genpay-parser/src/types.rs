@@ -4,7 +4,7 @@
 //! <br/>
 //! Other types is _advanced_ (pointers, arrays, structs and etc.)
 
-use indexmap::IndexMap;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type<'s> {
@@ -40,8 +40,8 @@ pub enum Type<'s> {
 
     // for semantical analyzer
     Function(Vec<Type<'s>>, Box<Type<'s>>, bool), // fn foo(a: i32, b: u32) string  --->  Function([I32, U32], String)
-    Struct(IndexMap<&'s str, Type<'s>>, IndexMap<&'s str, Type<'s>>), // struct Abc { a: i32, b: bool, c: *u64 }  ---> Struct([I32, Bool, Pointer(U64)])
-    Enum(Vec<&'s str>, IndexMap<&'s str, Type<'s>>), // enum Abc { A, B, C } -> Enum([A, B, C])
+    Struct(BTreeMap<&'s str, Type<'s>>, BTreeMap<&'s str, Type<'s>>), // struct Abc { a: i32, b: bool, c: *u64 }  ---> Struct([I32, Bool, Pointer(U64)])
+    Enum(Vec<&'s str>, BTreeMap<&'s str, Type<'s>>), // enum Abc { A, B, C } -> Enum([A, B, C])
 
     ImportObject(&'s str),
 }

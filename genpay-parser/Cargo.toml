@@ -11,4 +11,3 @@ license.workspace = true
 miette = { version = "7.5.0", features = ["fancy"] }
 thiserror = "2.0.12"
 genpay-lexer = { path = "../genpay-lexer" }
-indexmap = "2.9.0"
