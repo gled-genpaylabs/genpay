@@ -1,5 +1,6 @@
 use crate::{
-    CodeGen, enumeration::Enumeration, function::Function, structure::Structure, variable::Variable,
+    enumeration::Enumeration, function::Function, structure::Structure, variable::Variable,
+    InkwellBackend,
 };
 use genpay_parser::types::Type;
 use std::collections::HashMap;
@@ -164,7 +165,7 @@ impl<'ctx> Scope<'ctx> {
     }
 }
 
-impl<'ctx> CodeGen<'ctx> {
+impl<'ctx> InkwellBackend<'ctx> {
     pub fn enter_scope(&mut self, mut scope: Scope<'ctx>) {
         let parent = self.scope.to_owned();
         scope.parent = Some(parent);

@@ -1,3 +1,4 @@
+use crate::CodeGenBackend;
 use genpay_parser::{expressions::Expressions, types::Type, value::Value};
 use inkwell::{
     AddressSpace,
@@ -6,7 +7,7 @@ use inkwell::{
     values::{BasicMetadataValueEnum, BasicValueEnum},
 };
 
-use crate::CodeGen;
+use crate::InkwellBackend;
 
 pub trait StandartMacros<'ctx> {
     fn build_macro_call(
@@ -16,7 +17,7 @@ pub trait StandartMacros<'ctx> {
     ) -> (Type<'ctx>, BasicValueEnum<'ctx>);
 }
 
-impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
+impl<'ctx> StandartMacros<'ctx> for InkwellBackend<'ctx> {
     fn build_macro_call(
         &mut self,
         id: &str,
@@ -41,9 +42,9 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     .map(|(typ, _)| self.type_specifier(typ))
                     .collect::<Vec<String>>();
 
-                format_specifiers.into_iter().for_each(|spec| {
+                format_specifiers.iter().for_each(|spec| {
                     if let Some(position) = literal.find("{}") {
-                        literal.replace_range(position..position + 2, &spec);
+                        literal.replace_range(position..position + 2, spec);
                     }
                 });
 
@@ -153,9 +154,9 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     .map(|(typ, _)| self.type_specifier(typ))
                     .collect::<Vec<String>>();
 
-                format_specifiers.into_iter().for_each(|spec| {
+                format_specifiers.iter().for_each(|spec| {
                     if let Some(position) = literal.find("{}") {
-                        literal.replace_range(position..position + 2, &spec);
+                        literal.replace_range(position..position + 2, spec);
                     }
                 });
 
@@ -311,9 +312,9 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     .map(|(typ, _)| self.type_specifier(typ))
                     .collect::<Vec<String>>();
 
-                format_specifiers.into_iter().for_each(|spec| {
+                format_specifiers.iter().for_each(|spec| {
                     if let Some(position) = literal.find("{}") {
-                        literal.replace_range(position..position + 2, &spec);
+                        literal.replace_range(position..position + 2, spec);
                     }
                 });
 

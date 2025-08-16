@@ -1,6 +1,12 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use colored::Colorize;
 use std::path::PathBuf;
+
+#[derive(ValueEnum, Clone, Debug, Copy, PartialEq, Eq)]
+pub enum Backend {
+    Llvm,
+    Cranelift,
+}
 
 /// Command Line Interface with [`clap`]
 #[derive(Parser, Debug)]
@@ -16,6 +22,10 @@ pub struct Args {
     pub path: PathBuf,
     /// Path to output file
     pub output: PathBuf,
+
+    /// `-b --backend` flag to select compiler's backend
+    #[arg(short, long, value_enum, default_value_t = Backend::Llvm)]
+    pub backend: Backend,
 
     /// `-n --no-warns` flag to disable compiler's warnings
     #[arg(short, long, action, help = "Disable compiler's warnings")]

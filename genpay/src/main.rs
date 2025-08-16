@@ -128,7 +128,7 @@ fn main() {
     );
 
     // Lexical Analyzer Initialization
-    let lexer = genpay_lexer::Lexer::new(&src, fname);
+    let _lexer = genpay_lexer::Lexer::new(&src, fname);
 
     // `miette` graphical reporter (for this amazing error reports).
     // "total_warns" variable made just for reporting how much warnings we've got at the end
@@ -139,7 +139,7 @@ fn main() {
 
     // Syntax Analyzer initialization.
     // It takes full ownership for tokens vector (because we don't need them anymore)
-    let mut parser = genpay_parser::Parser::new_with_lexer(lexer, &src, fname);
+    let mut parser = genpay_parser::Parser::new(&src, fname);
     let (ast, warns) = match parser.parse() {
         Ok(ast) => ast,
         Err(e) => {
@@ -259,8 +259,29 @@ fn main() {
 
     // Code Generator Initialization.
     // Creating custom context and a very big wrapper for builder.
-    let ctx = genpay_codegen::CodeGen::create_context();
-    let mut codegen = genpay_codegen::CodeGen::new(&ctx, &module_name, &src, symtable);
+    let ctx = genpay_codegen::InkwellBackend::create_context();
+    let mut codegen = {
+        let backend = match args.backend {
+            cli::Backend::Llvm => {
+                let inkwell_backend =
+                    genpay_codegen::InkwellBackend::new(&ctx, &module_name, &src, symtable);
+                genpay_codegen::Backend::Inkwell(inkwell_backend)
+            }
+            cli::Backend::Cranelift => {
+                #[cfg(feature = "cranelift")]
+                {
+                    let cranelift_backend = genpay_codegen::cranelift::CraneliftBackend::new();
+                    genpay_codegen::Backend::Cranelift(cranelift_backend)
+                }
+                #[cfg(not(feature = "cranelift"))]
+                {
+                    cli::error("Cranelift backend is not enabled in this build. Recompile with --features cranelift");
+                    std::process::exit(1);
+                }
+            }
+        };
+        genpay_codegen::CodeGen::new(backend)
+    };
 
     // Compiling AST
     let (module_ref, _) = codegen.compile(ast, None);

@@ -20,6 +20,55 @@ use inkwell::{
 use genpay_semantic::symtable::SymbolTable;
 use std::collections::HashMap;
 
+pub trait CodeGenBackend<'ctx> {
+    type BackendValue;
+
+    fn compile_statement(&mut self, statement: Statements<'ctx>, prefix: Option<&'ctx str>);
+    fn compile_expression(
+        &mut self,
+        expression: Expressions<'ctx>,
+        expected: Option<Type<'ctx>>,
+    ) -> (Type<'ctx>, Self::BackendValue);
+    fn compile_value(
+        &mut self,
+        value: Value<'ctx>,
+        expected: Option<Type<'ctx>>,
+    ) -> (Type<'ctx>, Self::BackendValue);
+}
+
+pub enum Backend<'ctx> {
+    Inkwell(InkwellBackend<'ctx>),
+    #[cfg(feature = "cranelift")]
+    Cranelift(crate::cranelift::CraneliftBackend),
+}
+
+pub struct CodeGen<'ctx> {
+    backend: Backend<'ctx>,
+}
+
+impl<'ctx> CodeGen<'ctx> {
+    pub fn new(backend: Backend<'ctx>) -> Self {
+        Self { backend }
+    }
+
+    pub fn compile(
+        &mut self,
+        statements: Vec<Statements<'ctx>>,
+        prefix: Option<&'ctx str>,
+    ) -> (&inkwell::module::Module<'ctx>, ModuleContent<'ctx>) {
+        match &mut self.backend {
+            Backend::Inkwell(backend) => backend.compile(statements, prefix),
+            #[cfg(feature = "cranelift")]
+            Backend::Cranelift(_) => {
+                unimplemented!("Cranelift backend is not yet implemented for compile");
+            }
+        }
+    }
+}
+
+#[cfg(feature = "cranelift")]
+pub mod cranelift;
+
 mod enumeration;
 mod function;
 mod macros;
@@ -27,7 +76,7 @@ mod scope;
 mod structure;
 mod variable;
 
-pub struct CodeGen<'ctx> {
+pub struct InkwellBackend<'ctx> {
     source: &'ctx str,
 
     context: &'ctx Context,
@@ -51,7 +100,7 @@ pub struct ModuleContent<'ctx> {
     pub enumerations: HashMap<&'ctx str, Enumeration<'ctx>>,
 }
 
-impl<'ctx> CodeGen<'ctx> {
+impl<'ctx> InkwellBackend<'ctx> {
     pub fn create_context() -> Context {
         inkwell::targets::Target::initialize_all(&inkwell::targets::InitializationConfig::default());
         inkwell::context::Context::create()
@@ -107,7 +156,7 @@ impl<'ctx> CodeGen<'ctx> {
     ) -> (&Module<'ctx>, ModuleContent<'ctx>) {
         statements
             .into_iter()
-            .for_each(|stmt| self.compile_statement(stmt, prefix));
+            .for_each(|stmt| self.inkwell_compile_statement(stmt, prefix));
 
         let module_content = {
             let functions = self.scope.stricted_functions().map(|(k, v)| (*k, v.clone())).collect();
@@ -125,8 +174,32 @@ impl<'ctx> CodeGen<'ctx> {
     }
 }
 
-impl<'ctx> CodeGen<'ctx> {
+impl<'ctx> CodeGenBackend<'ctx> for InkwellBackend<'ctx> {
+    type BackendValue = BasicValueEnum<'ctx>;
+
     fn compile_statement(&mut self, statement: Statements<'ctx>, prefix: Option<&'ctx str>) {
+        self.inkwell_compile_statement(statement, prefix)
+    }
+
+    fn compile_expression(
+        &mut self,
+        expression: Expressions<'ctx>,
+        expected: Option<Type<'ctx>>,
+    ) -> (Type<'ctx>, Self::BackendValue) {
+        self.inkwell_compile_expression(expression, expected)
+    }
+
+    fn compile_value(
+        &mut self,
+        value: Value<'ctx>,
+        expected: Option<Type<'ctx>>,
+    ) -> (Type<'ctx>, Self::BackendValue) {
+        self.inkwell_compile_value(value, expected)
+    }
+}
+
+impl<'ctx> InkwellBackend<'ctx> {
+    fn inkwell_compile_statement(&mut self, statement: Statements<'ctx>, prefix: Option<&'ctx str>) {
         match statement {
             Statements::AssignStatement {
                 object,
@@ -135,13 +208,13 @@ impl<'ctx> CodeGen<'ctx> {
             } => {
                 if let Expressions::Value(Value::Identifier(identifier), _) = object {
                     let var = self.scope.get_variable(identifier).unwrap();
-                    let compiled_value = self.compile_expression(value, Some(var.datatype));
+                    let compiled_value = self.inkwell_compile_expression(value, Some(var.datatype));
 
                     self.builder.build_store(var.ptr, compiled_value.1).unwrap();
                 } else {
                     let ptr = self
-                        .compile_expression(object, Some(Type::Pointer(Box::new(Type::Undefined))));
-                    let value = self.compile_expression(value, None);
+                        .inkwell_compile_expression(object, Some(Type::Pointer(Box::new(Type::Undefined))));
+                    let value = self.inkwell_compile_expression(value, None);
 
                     let _ = self
                         .builder
@@ -165,18 +238,18 @@ impl<'ctx> CodeGen<'ctx> {
                     span,
                 };
 
-                self.compile_statement(stmt, prefix);
+                self.inkwell_compile_statement(stmt, prefix);
             }
             Statements::DerefAssignStatement {
                 object,
                 value,
                 span: _,
             } => {
-                let (instance_type, instance_ptr) = self.compile_expression(object.clone(), None);
+                let (instance_type, instance_ptr) = self.inkwell_compile_expression(object.clone(), None);
 
                 match instance_type {
                     Type::Pointer(ptr_type) => {
-                        let compiled_value = self.compile_expression(value, Some(*ptr_type));
+                        let compiled_value = self.inkwell_compile_expression(value, Some(*ptr_type));
 
                         self.builder
                             .build_store(instance_ptr.into_pointer_value(), compiled_value.1)
@@ -185,7 +258,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     Type::Alias(alias) => {
                         let instance_ptr = self
-                            .compile_expression(
+                            .inkwell_compile_expression(
                                 object,
                                 Some(Type::Pointer(Box::new(Type::Undefined))),
                             )
@@ -195,7 +268,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let deref_assign_fn = struct_type.functions.get("deref_assign").unwrap();
 
                         let compiled_value = self
-                            .compile_expression(value, Some(deref_assign_fn.arguments[1].clone()));
+                            .inkwell_compile_expression(value, Some(deref_assign_fn.arguments[1].clone()));
                         self.builder
                             .build_call(
                                 deref_assign_fn.value,
@@ -216,8 +289,8 @@ impl<'ctx> CodeGen<'ctx> {
                 value,
                 span,
             } => {
-                let obj = self.compile_expression(object.clone(), None);
-                let idx = self.compile_expression(index, Some(Type::USIZE));
+                let obj = self.inkwell_compile_expression(object.clone(), None);
+                let idx = self.inkwell_compile_expression(index, Some(Type::USIZE));
 
                 match obj.0 {
                     Type::Array(item_type, len) => {
@@ -225,7 +298,7 @@ impl<'ctx> CodeGen<'ctx> {
                             obj.1.into_pointer_value()
                         } else {
                             let recompiled = self
-                                .compile_expression(
+                                .inkwell_compile_expression(
                                     object,
                                     Some(Type::Pointer(Box::new(Type::Undefined))),
                                 )
@@ -233,7 +306,7 @@ impl<'ctx> CodeGen<'ctx> {
                             recompiled.into_pointer_value()
                         };
 
-                        let value = self.compile_expression(value, Some(*item_type.clone()));
+                        let value = self.inkwell_compile_expression(value, Some(*item_type.clone()));
 
                         // checking for the right index
                         let checker_block = self
@@ -296,7 +369,7 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                     Type::Pointer(ptr_type) => {
                         // compiling value and ptr
-                        let value = self.compile_expression(value, Some(*ptr_type.clone()));
+                        let value = self.inkwell_compile_expression(value, Some(*ptr_type.clone()));
                         let ptr = unsafe {
                             self.builder
                                 .build_in_bounds_gep(
@@ -314,7 +387,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     Type::Alias(alias) => {
                         let instance_ptr = self
-                            .compile_expression(
+                            .inkwell_compile_expression(
                                 object,
                                 Some(Type::Pointer(Box::new(Type::Undefined))),
                             )
@@ -323,7 +396,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let struct_type = self.scope.get_struct(alias).unwrap();
                         let slice_assign_fn = struct_type.functions.get("slice_assign").unwrap();
                         let compiled_value = self
-                            .compile_expression(value, Some(slice_assign_fn.arguments[2].clone()));
+                            .inkwell_compile_expression(value, Some(slice_assign_fn.arguments[2].clone()));
 
                         self.builder
                             .build_call(
@@ -343,8 +416,8 @@ impl<'ctx> CodeGen<'ctx> {
                 span: _,
             } => {
                 let compiled_object =
-                    self.compile_expression(object, Some(Type::Pointer(Box::new(Type::Undefined))));
-                let compiled_value = self.compile_expression(value, Some(compiled_object.0));
+                    self.inkwell_compile_expression(object, Some(Type::Pointer(Box::new(Type::Undefined))));
+                let compiled_value = self.inkwell_compile_expression(value, Some(compiled_object.0));
 
                 self.builder
                     .build_store(compiled_object.1.into_pointer_value(), compiled_value.1)
@@ -361,7 +434,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                 match (datatype, value) {
                     (Some(datatype), Some(value)) => {
-                        let value = self.compile_expression(value, Some(datatype.clone()));
+                        let value = self.inkwell_compile_expression(value, Some(datatype.clone()));
 
                         if !empty_binding {
                             let alloca = self
@@ -402,7 +475,7 @@ impl<'ctx> CodeGen<'ctx> {
                         }
                     }
                     (_, Some(value)) => {
-                        let compiled_value = self.compile_expression(value, None);
+                        let compiled_value = self.inkwell_compile_expression(value, None);
 
                         if !empty_binding {
                             let alloca = self
@@ -529,7 +602,7 @@ impl<'ctx> CodeGen<'ctx> {
                 );
                 block
                     .iter()
-                    .for_each(|stmt| self.compile_statement(stmt.clone(), None));
+                    .for_each(|stmt| self.inkwell_compile_statement(stmt.clone(), None));
 
                 if datatype == Type::Void {
                     self.builder.build_return(None).unwrap();
@@ -595,7 +668,7 @@ impl<'ctx> CodeGen<'ctx> {
                     .into_iter()
                     .zip(function_args)
                     .for_each(|(expr, expected)| {
-                        basic_args.push(self.compile_expression(expr, Some(expected)).1.into());
+                        basic_args.push(self.inkwell_compile_expression(expr, Some(expected)).1.into());
                     });
 
                 self.builder
@@ -660,7 +733,7 @@ impl<'ctx> CodeGen<'ctx> {
                 for (_, function_statement) in functions.iter() {
                     self.enter_new_scope();
 
-                    self.compile_statement(
+                    self.inkwell_compile_statement(
                         function_statement.clone(),
                         Some(Box::leak(format!("struct_{}__", name).into_boxed_str())),
                     );
@@ -702,14 +775,14 @@ impl<'ctx> CodeGen<'ctx> {
                 );
 
                 for (_, function_statement) in functions.iter() {
-                    self.compile_statement(
+                    self.inkwell_compile_statement(
                         function_statement.clone(),
                         Some(Box::leak(format!("enum_{name}__").into_boxed_str())),
                     );
 
                     self.enter_new_scope();
 
-                    self.compile_statement(
+                    self.inkwell_compile_statement(
                         function_statement.clone(),
                         Some(Box::leak(format!("enum_{name}__").into_boxed_str())),
                     );
@@ -740,7 +813,7 @@ impl<'ctx> CodeGen<'ctx> {
                 else_block,
                 span: _,
             } => {
-                let condition = self.compile_expression(condition, None);
+                let condition = self.inkwell_compile_expression(condition, None);
 
                 let then_basic_block = self
                     .context
@@ -770,7 +843,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                 then_block
                     .into_iter()
-                    .for_each(|stmt| self.compile_statement(stmt, None));
+                    .for_each(|stmt| self.inkwell_compile_statement(stmt, None));
 
                 self.exit_scope();
                 self.build_branch(after_basic_block);
@@ -782,7 +855,7 @@ impl<'ctx> CodeGen<'ctx> {
                     else_block
                         .unwrap()
                         .into_iter()
-                        .for_each(|stmt| self.compile_statement(stmt, None));
+                        .for_each(|stmt| self.inkwell_compile_statement(stmt, None));
 
                     self.exit_scope();
                     self.build_branch(after_basic_block);
@@ -812,7 +885,7 @@ impl<'ctx> CodeGen<'ctx> {
                 self.builder.position_at_end(condition_block);
                 self.breaks.push(after_block);
 
-                let compiled_condition = self.compile_expression(condition, None);
+                let compiled_condition = self.inkwell_compile_expression(condition, None);
 
                 let _ = self.builder.build_conditional_branch(
                     compiled_condition.1.into_int_value(),
@@ -825,7 +898,7 @@ impl<'ctx> CodeGen<'ctx> {
                 self.builder.position_at_end(statements_block);
                 block
                     .into_iter()
-                    .for_each(|statement| self.compile_statement(statement, prefix.clone()));
+                    .for_each(|statement| self.inkwell_compile_statement(statement, prefix.clone()));
 
                 self.exit_scope();
 
@@ -856,7 +929,7 @@ impl<'ctx> CodeGen<'ctx> {
                 // binding initialization
 
                 let mut compiled_iterator = self
-                    .compile_expression(iterator, Some(Type::Pointer(Box::new(Type::Undefined))));
+                    .inkwell_compile_expression(iterator, Some(Type::Pointer(Box::new(Type::Undefined))));
 
                 if let Type::Pointer(ptr_type) = compiled_iterator.0 {
                     compiled_iterator.0 = *ptr_type.clone();
@@ -1181,7 +1254,7 @@ impl<'ctx> CodeGen<'ctx> {
                 self.builder.position_at_end(statements_block);
                 block
                     .into_iter()
-                    .for_each(|statement| self.compile_statement(statement, prefix.clone()));
+                    .for_each(|statement| self.inkwell_compile_statement(statement, prefix.clone()));
 
                 self.exit_scope();
 
@@ -1340,7 +1413,7 @@ impl<'ctx> CodeGen<'ctx> {
                     .unwrap();
             }
             Statements::ReturnStatement { value, span: _ } => {
-                let compiled_value = self.compile_expression(value, Some(Type::NoDrop));
+                let compiled_value = self.inkwell_compile_expression(value, Some(Type::NoDrop));
                 if compiled_value.0 != Type::Void {
                     self.builder.build_return(Some(&compiled_value.1)).unwrap();
                 }
@@ -1499,32 +1572,32 @@ impl<'ctx> CodeGen<'ctx> {
                 include
                     .ast
                     .iter()
-                    .for_each(|stmt| self.compile_statement(stmt.clone(), None));
+                    .for_each(|stmt| self.inkwell_compile_statement(stmt.clone(), None));
             }
 
             Statements::ScopeStatement { block, span: _ } => {
                 self.enter_new_scope();
                 block
                     .iter()
-                    .for_each(|stmt| self.compile_statement(stmt.clone(), None));
+                    .for_each(|stmt| self.inkwell_compile_statement(stmt.clone(), None));
 
                 self.exit_scope();
             }
 
             Statements::Expression(expr) => {
-                let _ = self.compile_expression(expr, None);
+                let _ = self.inkwell_compile_expression(expr, None);
             }
             Statements::None => unreachable!(),
         }
     }
 
-    fn compile_expression(
+    fn inkwell_compile_expression(
         &mut self,
         expression: Expressions<'ctx>,
         expected: Option<Type<'ctx>>,
     ) -> (Type<'ctx>, BasicValueEnum<'ctx>) {
         match expression {
-            Expressions::Value(val, _) => self.compile_value(val, expected),
+            Expressions::Value(val, _) => self.inkwell_compile_value(val, expected),
             Expressions::FnCall {
                 name,
                 arguments,
@@ -1542,7 +1615,7 @@ impl<'ctx> CodeGen<'ctx> {
                     .zip(function.arguments)
                     .for_each(|(arg, fn_expected)| {
                         args.push(
-                            self.compile_expression(arg, Some(fn_expected))
+                            self.inkwell_compile_expression(arg, Some(fn_expected))
                                 .1
                                 .into(),
                         )
@@ -1595,7 +1668,7 @@ impl<'ctx> CodeGen<'ctx> {
                     )
                 }
                 _ => {
-                    let value = self.compile_expression(
+                    let value = self.inkwell_compile_expression(
                         *object,
                         Some(Type::Pointer(Box::new(Type::Undefined))),
                     );
@@ -1606,7 +1679,7 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             },
             Expressions::Dereference { object, span: _ } => {
-                let (datatype, ptr) = self.compile_expression(*object.clone(), None);
+                let (datatype, ptr) = self.inkwell_compile_expression(*object.clone(), None);
 
                 match datatype {
                     Type::Pointer(ptr_type) => {
@@ -1621,7 +1694,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     Type::Alias(alias) => {
                         let ptr = self
-                            .compile_expression(
+                            .inkwell_compile_expression(
                                 *object,
                                 Some(Type::Pointer(Box::new(Type::Undefined))),
                             )
@@ -1655,7 +1728,7 @@ impl<'ctx> CodeGen<'ctx> {
                 object,
                 span: _,
             } => {
-                let object_value = self.compile_expression(*object, expected);
+                let object_value = self.inkwell_compile_expression(*object, expected);
 
                 if let Type::Alias(alias) = &object_value.0 {
                     let structure = self.scope.get_struct(alias).unwrap();
@@ -1748,8 +1821,8 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 });
 
-                let lhs_value = self.compile_expression(*lhs.clone(), expected.clone());
-                let rhs_value = self.compile_expression(*rhs.clone(), expected.clone());
+                let lhs_value = self.inkwell_compile_expression(*lhs.clone(), expected.clone());
+                let rhs_value = self.inkwell_compile_expression(*rhs.clone(), expected.clone());
 
                 let senior_type = match lhs_value.0.clone() {
                     typ if genpay_semantic::Analyzer::is_integer(&typ) => {
@@ -1990,20 +2063,20 @@ impl<'ctx> CodeGen<'ctx> {
 
                     Type::Alias(alias) => {
                         // let exp = Some(Type::Pointer(Box::new(Type::Undefined)));
-                        // let lhs_value = self.compile_expression(*lhs, exp.clone());
-                        // let rhs_value = self.compile_expression(*rhs, exp);
+                        // let lhs_value = self.inkwell_compile_expression(*lhs, exp.clone());
+                        // let rhs_value = self.inkwell_compile_expression(*rhs, exp);
 
                         let structure = self.scope.get_struct(alias).unwrap();
                         let binary_function = structure.functions.get("binary").unwrap();
 
                         let left_ptr = self
-                            .compile_expression(
+                            .inkwell_compile_expression(
                                 *lhs.clone(),
                                 Some(Type::Pointer(Box::new(Type::Undefined))),
                             )
                             .1;
                         let right_ptr = self
-                            .compile_expression(
+                            .inkwell_compile_expression(
                                 *rhs.clone(),
                                 Some(Type::Pointer(Box::new(Type::Undefined))),
                             )
@@ -2041,9 +2114,9 @@ impl<'ctx> CodeGen<'ctx> {
                 rhs,
                 span: _,
             } => {
-                let mut lhs_value = self.compile_expression(*lhs.clone(), expected.clone());
+                let mut lhs_value = self.inkwell_compile_expression(*lhs.clone(), expected.clone());
                 let mut rhs_value =
-                    self.compile_expression(*rhs.clone(), Some(lhs_value.0.clone()));
+                    self.inkwell_compile_expression(*rhs.clone(), Some(lhs_value.0.clone()));
 
                 if let Type::Alias(left) = &lhs_value.0
                     && let Type::Alias(right) = &rhs_value.0
@@ -2206,13 +2279,13 @@ impl<'ctx> CodeGen<'ctx> {
                         let compare_function = structure.functions.get("compare").unwrap();
 
                         let left_ptr = self
-                            .compile_expression(
+                            .inkwell_compile_expression(
                                 *lhs.clone(),
                                 Some(Type::Pointer(Box::new(Type::Undefined))),
                             )
                             .1;
                         let right_ptr = self
-                            .compile_expression(
+                            .inkwell_compile_expression(
                                 *rhs.clone(),
                                 Some(Type::Pointer(Box::new(Type::Undefined))),
                             )
@@ -2280,8 +2353,8 @@ impl<'ctx> CodeGen<'ctx> {
                 rhs,
                 span: _,
             } => {
-                let left = self.compile_expression(*lhs, expected.clone());
-                let right = self.compile_expression(*rhs, expected.clone());
+                let left = self.inkwell_compile_expression(*lhs, expected.clone());
+                let right = self.inkwell_compile_expression(*rhs, expected.clone());
 
                 let sign_extend = genpay_semantic::Analyzer::is_unsigned_integer(&left.0);
                 let basic_value = match operand {
@@ -2328,7 +2401,7 @@ impl<'ctx> CodeGen<'ctx> {
                 span: _,
             } => {
                 let compiled_head =
-                    self.compile_expression(*head, Some(Type::Pointer(Box::new(Type::Undefined))));
+                    self.inkwell_compile_expression(*head, Some(Type::Pointer(Box::new(Type::Undefined))));
 
                 let mut prev_val = compiled_head.1;
                 let mut prev_type = compiled_head.0;
@@ -2480,7 +2553,7 @@ impl<'ctx> CodeGen<'ctx> {
                                             .iter()
                                             .zip(function.arguments.clone())
                                             .map(|(arg, exp)| {
-                                                self.compile_expression(arg.clone(), Some(exp))
+                                                self.inkwell_compile_expression(arg.clone(), Some(exp))
                                                     .1
                                                     .into()
                                             })
@@ -2519,7 +2592,7 @@ impl<'ctx> CodeGen<'ctx> {
                                     .iter()
                                     .zip(function.arguments.clone())
                                     .map(|(arg, exp)| {
-                                        self.compile_expression(arg.clone(), Some(exp)).1.into()
+                                        self.inkwell_compile_expression(arg.clone(), Some(exp)).1.into()
                                     })
                                     .collect::<Vec<BasicMetadataValueEnum>>();
 
@@ -2562,7 +2635,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                             for (field_name, field_expr) in fields {
                                 let struct_field = structure.fields.get(*field_name).unwrap();
-                                let field_value = self.compile_expression(
+                                let field_value = self.inkwell_compile_expression(
                                     field_expr.clone(),
                                     Some(struct_field.datatype.clone()),
                                 );
@@ -2613,7 +2686,7 @@ impl<'ctx> CodeGen<'ctx> {
                 self.builder.position_at_end(entry);
                 block
                     .iter()
-                    .for_each(|stmt| self.compile_statement(stmt.to_owned(), None));
+                    .for_each(|stmt| self.inkwell_compile_statement(stmt.to_owned(), None));
 
                 self.builder.position_at_end(current_position);
                 let scope_result = self
@@ -2639,7 +2712,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                 let compiled_values = values
                     .into_iter()
-                    .map(|val| self.compile_expression(val, expected_items_type.clone()))
+                    .map(|val| self.inkwell_compile_expression(val, expected_items_type.clone()))
                     .collect::<Vec<(Type, BasicValueEnum)>>();
 
                 let arr_type = compiled_values[0].0.clone();
@@ -2682,7 +2755,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let compiled_values = values
                     .into_iter()
                     .zip(expected_types)
-                    .map(|(val, exp)| self.compile_expression(val, exp))
+                    .map(|(val, exp)| self.inkwell_compile_expression(val, exp))
                     .collect::<Vec<(Type, BasicValueEnum)>>();
                 let tuple_type = self.context.struct_type(
                     &compiled_values
@@ -2735,8 +2808,8 @@ impl<'ctx> CodeGen<'ctx> {
                 index,
                 span,
             } => {
-                let obj = self.compile_expression(*object.clone(), None);
-                let idx = self.compile_expression(*index, Some(Type::USIZE));
+                let obj = self.inkwell_compile_expression(*object.clone(), None);
+                let idx = self.inkwell_compile_expression(*index, Some(Type::USIZE));
 
                 match obj.0 {
                     Type::Array(ret_type, len) => {
@@ -2744,7 +2817,7 @@ impl<'ctx> CodeGen<'ctx> {
                             obj.1.into_pointer_value()
                         } else {
                             let recompiled = self
-                                .compile_expression(
+                                .inkwell_compile_expression(
                                     *object.clone(),
                                     Some(Type::Pointer(Box::new(Type::Undefined))),
                                 )
@@ -2833,7 +2906,7 @@ impl<'ctx> CodeGen<'ctx> {
                     Type::Alias(alias) => {
                         // getting struct ptr and type
                         let ptr = self
-                            .compile_expression(
+                            .inkwell_compile_expression(
                                 *object,
                                 Some(Type::Pointer(Box::new(Type::Undefined))),
                             )
@@ -2874,7 +2947,7 @@ impl<'ctx> CodeGen<'ctx> {
                 for (field_name, field_expr) in fields {
                     let struct_field = structure.fields.get(field_name).unwrap();
                     let field_value =
-                        self.compile_expression(field_expr, Some(struct_field.datatype.clone()));
+                        self.inkwell_compile_expression(field_expr, Some(struct_field.datatype.clone()));
 
                     // let ordered_index = self
                     //     .context
@@ -2909,7 +2982,7 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    fn compile_value(
+    fn inkwell_compile_value(
         &mut self,
         value: Value<'ctx>,
         expected: Option<Type<'ctx>>,
@@ -3075,7 +3148,7 @@ impl<'ctx> CodeGen<'ctx> {
     }
 }
 
-impl<'ctx> CodeGen<'ctx> {
+impl<'ctx> InkwellBackend<'ctx> {
     fn build_panic(
         &mut self,
         message: impl std::convert::AsRef<str>,
@@ -3169,7 +3242,7 @@ impl<'ctx> CodeGen<'ctx> {
     }
 }
 
-impl<'ctx> CodeGen<'ctx> {
+impl<'ctx> InkwellBackend<'ctx> {
     #[inline]
     fn get_basic_type(&self, datatype: Type<'ctx>) -> BasicTypeEnum<'ctx> {
         match datatype {
@@ -3409,8 +3482,8 @@ mod tests {
 
     #[test]
     fn panic_function_test() {
-        let ctx = CodeGen::create_context();
-        let mut codegen = CodeGen::new(
+        let ctx = InkwellBackend::create_context();
+        let mut codegen = InkwellBackend::new(
             &ctx,
             "",
             "",
@@ -3435,8 +3508,8 @@ mod tests {
 
     #[test]
     fn boolean_strings_test() {
-        let ctx = CodeGen::create_context();
-        let mut codegen = CodeGen::new(
+        let ctx = InkwellBackend::create_context();
+        let mut codegen = InkwellBackend::new(
             &ctx,
             "",
             "",
