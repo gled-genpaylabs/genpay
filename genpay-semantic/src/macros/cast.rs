@@ -9,7 +9,6 @@ use genpay_parser::{expressions::Expressions, types::Type};
 /// `cast!(EXPRESSION, TYPE)` -> `usize`
 #[derive(Debug, Clone)]
 pub struct CastMacro;
-use miette::NamedSource;
 impl<'s> MacroObject<'s> for CastMacro {
     fn verify_call(
         &self,

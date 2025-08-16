@@ -9,7 +9,6 @@ use genpay_parser::{expressions::Expressions, types::Type, value::Value};
 /// `format!(LITERAL, ...)` -> `*char`
 #[derive(Debug, Clone)]
 pub struct FormatMacro;
-use miette::NamedSource;
 
 impl<'s> MacroObject<'s> for FormatMacro {
     fn verify_call(

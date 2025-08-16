@@ -624,7 +624,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                 fields.iter().for_each(|field| {
                     compiled_fields.push(Field {
-                        name: field.0.to_string(),
+                        name: field.0,
                         nth: compiled_fields.len() as u32,
                         datatype: field.1.clone(),
                         llvm_type: self.get_basic_type(field.1.clone()),
@@ -656,7 +656,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     self.compile_statement(
                         function_statement.clone(),
-                        Some(format!("struct_{}__", name)),
+                        Some(Box::leak(format!("struct_{}__", name).into_boxed_str())),
                     );
 
                     let (mut function_id, mut function_value) =
@@ -670,7 +670,7 @@ impl<'ctx> CodeGen<'ctx> {
                     self.scope
                         .set_function(&function_id, function_value.clone());
 
-                    function_id = function_id.replace(&format!("struct_{}__", name), "");
+                    function_id = Box::leak(function_id.replace(&format!("struct_{}__", name), "").into_boxed_str());
                     self.scope
                         .get_mut_struct(name)
                         .unwrap()
@@ -698,23 +698,23 @@ impl<'ctx> CodeGen<'ctx> {
                 functions.iter().for_each(|(_, function_statement)| {
                     self.compile_statement(
                         function_statement.clone(),
-                        Some(format!("enum_{name}__")),
+                        Some(Box::leak(format!("enum_{name}__").into_boxed_str())),
                     );
 
                     self.enter_new_scope();
 
                     self.compile_statement(
                         function_statement.clone(),
-                        Some(format!("enum_{name}__")),
+                        Some(Box::leak(format!("enum_{name}__").into_boxed_str())),
                     );
 
                     let (mut function_id, function_value) =
                         self.scope.stricted_functions().into_iter().last().unwrap();
                     self.exit_scope_raw();
 
-                    function_id = function_id.replace(&format!("struct_{name}__"), "");
+                    function_id = Box::leak(function_id.replace(&format!("struct_{name}__"), "").into_boxed_str());
                     self.scope
-                        .get_mut_enum(&name)
+                        .get_mut_enum(name)
                         .unwrap()
                         .functions
                         .insert(function_id, function_value);
@@ -2356,7 +2356,7 @@ impl<'ctx> CodeGen<'ctx> {
                             match alias_type {
                                 "struct" => {
                                     let structure = self.scope.get_struct(alias).unwrap();
-                                    let field = structure.fields.get(&field.to_string()).unwrap();
+                                    let field = structure.fields.get(field).unwrap();
 
                                     let ptr = self
                                         .builder
