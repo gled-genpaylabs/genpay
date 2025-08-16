@@ -8,11 +8,11 @@ use std::collections::HashMap;
 pub struct Scope<'ctx> {
     parent: Option<Box<Scope<'ctx>>>,
 
-    variables: HashMap<String, Variable<'ctx>>,
-    functions: HashMap<String, Function<'ctx>>,
-    structures: HashMap<String, Structure<'ctx>>,
-    enumerations: HashMap<String, Enumeration<'ctx>>,
-    typedefs: HashMap<String, Type<'ctx>>,
+    variables: HashMap<&'ctx str, Variable<'ctx>>,
+    functions: HashMap<&'ctx str, Function<'ctx>>,
+    structures: HashMap<&'ctx str, Structure<'ctx>>,
+    enumerations: HashMap<&'ctx str, Enumeration<'ctx>>,
+    typedefs: HashMap<&'ctx str, Type<'ctx>>,
 }
 
 impl<'ctx> Default for Scope<'ctx> {
@@ -35,8 +35,8 @@ impl<'ctx> Scope<'ctx> {
     }
 
     // variables
-    pub fn set_variable(&mut self, id: &str, object: Variable<'ctx>) {
-        self.variables.insert(id.into(), object);
+    pub fn set_variable(&mut self, id: &'ctx str, object: Variable<'ctx>) {
+        self.variables.insert(id, object);
     }
 
     pub fn get_variable(&self, id: &str) -> Option<Variable<'ctx>> {
@@ -63,8 +63,8 @@ impl<'ctx> Scope<'ctx> {
     }
 
     // functions
-    pub fn set_function(&mut self, id: &str, object: Function<'ctx>) {
-        self.functions.insert(id.into(), object);
+    pub fn set_function(&mut self, id: &'ctx str, object: Function<'ctx>) {
+        self.functions.insert(id, object);
     }
 
     pub fn get_function(&self, id: &str) -> Option<Function<'ctx>> {
@@ -87,8 +87,8 @@ impl<'ctx> Scope<'ctx> {
     }
 
     // structures
-    pub fn set_struct(&mut self, id: &str, object: Structure<'ctx>) {
-        self.structures.insert(id.into(), object);
+    pub fn set_struct(&mut self, id: &'ctx str, object: Structure<'ctx>) {
+        self.structures.insert(id, object);
     }
 
     pub fn get_struct(&self, id: &str) -> Option<Structure<'ctx>> {
@@ -111,8 +111,8 @@ impl<'ctx> Scope<'ctx> {
     }
 
     // enums
-    pub fn set_enum(&mut self, id: &str, object: Enumeration<'ctx>) {
-        self.enumerations.insert(id.into(), object);
+    pub fn set_enum(&mut self, id: &'ctx str, object: Enumeration<'ctx>) {
+        self.enumerations.insert(id, object);
     }
 
     pub fn get_enum(&self, id: &str) -> Option<Enumeration<'ctx>> {
@@ -134,8 +134,8 @@ impl<'ctx> Scope<'ctx> {
     }
 
     // typedefs
-    pub fn set_typedef(&mut self, id: &str, object: Type<'ctx>) {
-        self.typedefs.insert(id.into(), object);
+    pub fn set_typedef(&mut self, id: &'ctx str, object: Type<'ctx>) {
+        self.typedefs.insert(id, object);
     }
 
     pub fn get_typedef(&self, id: &str) -> Option<Type<'ctx>> {
@@ -147,20 +147,20 @@ impl<'ctx> Scope<'ctx> {
     }
 
     // tech
-    pub fn stricted_variables(&self) -> HashMap<String, Variable<'ctx>> {
-        self.variables.to_owned()
+    pub fn stricted_variables(&self) -> HashMap<&'ctx str, Variable<'ctx>> {
+        self.variables.clone()
     }
 
-    pub fn stricted_functions(&self) -> HashMap<String, Function<'ctx>> {
-        self.functions.to_owned()
+    pub fn stricted_functions(&self) -> HashMap<&'ctx str, Function<'ctx>> {
+        self.functions.clone()
     }
 
-    pub fn stricted_structs(&self) -> HashMap<String, Structure<'ctx>> {
-        self.structures.to_owned()
+    pub fn stricted_structs(&self) -> HashMap<&'ctx str, Structure<'ctx>> {
+        self.structures.clone()
     }
 
-    pub fn stricted_enums(&self) -> HashMap<String, Enumeration<'ctx>> {
-        self.enumerations.to_owned()
+    pub fn stricted_enums(&self) -> HashMap<&'ctx str, Enumeration<'ctx>> {
+        self.enumerations.clone()
     }
 }
 

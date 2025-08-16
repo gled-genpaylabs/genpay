@@ -28,7 +28,7 @@ mod structure;
 mod variable;
 
 pub struct CodeGen<'ctx> {
-    source: String,
+    source: &'ctx str,
 
     context: &'ctx Context,
     builder: Builder<'ctx>,
@@ -40,15 +40,15 @@ pub struct CodeGen<'ctx> {
     booleans_strings: Option<(PointerValue<'ctx>, PointerValue<'ctx>)>,
 
     symtable: SymbolTable<'ctx>,
-    imports: HashMap<String, ModuleContent<'ctx>>,
-    includes: Vec<String>,
+    imports: HashMap<&'ctx str, ModuleContent<'ctx>>,
+    includes: Vec<&'ctx str>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ModuleContent<'ctx> {
-    pub functions: HashMap<String, Function<'ctx>>,
-    pub structures: HashMap<String, Structure<'ctx>>,
-    pub enumerations: HashMap<String, Enumeration<'ctx>>,
+    pub functions: HashMap<&'ctx str, Function<'ctx>>,
+    pub structures: HashMap<&'ctx str, Structure<'ctx>>,
+    pub enumerations: HashMap<&'ctx str, Enumeration<'ctx>>,
 }
 
 impl<'ctx> CodeGen<'ctx> {
@@ -59,8 +59,8 @@ impl<'ctx> CodeGen<'ctx> {
 
     pub fn new(
         context: &'ctx Context,
-        module_name: &str,
-        module_source: &str,
+        module_name: &'ctx str,
+        module_source: &'ctx str,
         symtable: SymbolTable<'ctx>,
     ) -> Self {
         let module = context.create_module(module_name);
@@ -83,7 +83,7 @@ impl<'ctx> CodeGen<'ctx> {
             .unwrap();
 
         Self {
-            source: module_source.to_owned(),
+            source: module_source,
 
             context,
             builder,
@@ -103,11 +103,11 @@ impl<'ctx> CodeGen<'ctx> {
     pub fn compile(
         &mut self,
         statements: Vec<Statements<'ctx>>,
-        prefix: Option<String>,
+        prefix: Option<&'ctx str>,
     ) -> (&Module<'ctx>, ModuleContent<'ctx>) {
         statements
             .into_iter()
-            .for_each(|stmt| self.compile_statement(stmt, prefix.clone()));
+            .for_each(|stmt| self.compile_statement(stmt, prefix));
 
         let module_content = {
             let functions = self.scope.stricted_functions();
@@ -126,7 +126,7 @@ impl<'ctx> CodeGen<'ctx> {
 }
 
 impl<'ctx> CodeGen<'ctx> {
-    fn compile_statement(&mut self, statement: Statements<'ctx>, prefix: Option<String>) {
+    fn compile_statement(&mut self, statement: Statements<'ctx>, prefix: Option<&'ctx str>) {
         match statement {
             Statements::AssignStatement {
                 object,
@@ -436,8 +436,8 @@ impl<'ctx> CodeGen<'ctx> {
                 span: _,
                 header_span: _,
             } => {
-                let module_name = self.module.get_name().to_string_lossy().to_string();
-                let name = format!("{}{}", prefix.clone().unwrap_or_default(), raw_name,);
+                let module_name = self.module.get_name().to_string_lossy();
+                let name = format!("{}{}", prefix.unwrap_or_default(), raw_name,);
 
                 let llvm_ir_name = format!(
                     "{}{}{}({})",
@@ -446,7 +446,7 @@ impl<'ctx> CodeGen<'ctx> {
                     } else {
                         format!("{module_name}.")
                     },
-                    prefix.clone().unwrap_or_default(),
+                    prefix.unwrap_or_default(),
                     raw_name,
                     arguments
                         .iter()
@@ -612,8 +612,7 @@ impl<'ctx> CodeGen<'ctx> {
                 public: _,
                 span: _,
             } => {
-                let name_string = format!("{}{}", prefix.clone().unwrap_or_default(), raw_name);
-                let name: &'ctx str = Box::leak(name_string.into_boxed_str());
+                let name = Box::leak(format!("{}{}", prefix.unwrap_or_default(), raw_name).into_boxed_str());
                 let llvm_name = format!(
                     "{}.{}",
                     self.module.get_name().to_string_lossy(),
@@ -686,11 +685,11 @@ impl<'ctx> CodeGen<'ctx> {
                 public: _,
                 span: _,
             } => {
-                let name = format!("{}{}", prefix.unwrap_or_default(), name);
+                let name = Box::leak(format!("{}{}", prefix.unwrap_or_default(), name).into_boxed_str());
                 self.scope.set_enum(
-                    &name,
+                    name,
                     Enumeration {
-                        fields: fields.iter().map(|s| s.to_string()).collect(),
+                        fields: fields.iter().map(|s| *s).collect(),
                         functions: HashMap::new(),
                         llvm_type: self.context.i8_type().into(),
                     },
@@ -1424,15 +1423,16 @@ impl<'ctx> CodeGen<'ctx> {
                     .map(|n| n.to_string())
                     .unwrap_or_else(|| fname.replace(".dn", ""));
 
+                let static_module_name: &'ctx str = Box::leak(module_name.into_boxed_str());
                 let import = self
                     .symtable
                     .imports
-                    .get(module_name.as_str())
+                    .get(static_module_name)
                     .cloned()
                     .unwrap_or_default();
                 let mut codegen = Self::new(
                     self.context,
-                    &module_name,
+                    static_module_name,
                     import.source,
                     import.embedded_symtable.clone(),
                 );
@@ -1462,7 +1462,7 @@ impl<'ctx> CodeGen<'ctx> {
                     func.1.value = declared_fn;
                 });
 
-                self.imports.insert(module_name, module_content);
+                self.imports.insert(static_module_name, module_content);
             }
 
             Statements::IncludeStatement { path, span: _ } => {
@@ -1483,12 +1483,13 @@ impl<'ctx> CodeGen<'ctx> {
                     .map(|n| n.to_string())
                     .unwrap_or_else(|| fname.replace(".dn", ""));
 
-                if self.includes.contains(&module_name) {
+                let static_module_name: &'ctx str = Box::leak(module_name.into_boxed_str());
+                if self.includes.contains(&static_module_name) {
                     return;
                 };
-                self.includes.push(module_name.clone());
+                self.includes.push(static_module_name);
 
-                let include = self.symtable.included.get(module_name.as_str()).unwrap().clone();
+                let include = self.symtable.included.get(static_module_name).unwrap().clone();
                 include
                     .ast
                     .iter()
