@@ -29,9 +29,8 @@ use crate::{
 use genpay_parser::{
     expressions::Expressions, statements::Statements, types::Type, value::Value, Parser,
 };
-use indexmap::IndexMap;
 use miette::NamedSource;
-use std::{collections::HashMap, ffi::OsStr, path::PathBuf};
+use std::{collections::{BTreeMap, HashMap}, ffi::OsStr, path::PathBuf};
 
 mod element;
 mod error;
@@ -911,7 +910,7 @@ impl<'s> Analyzer<'s> {
                 public,
                 span,
             } => {
-                let pre_type = Type::Struct(fields.clone(), IndexMap::new());
+                let pre_type = Type::Struct(fields.clone(), BTreeMap::new());
                 if self
                     .scope
                     .structures
@@ -1030,7 +1029,7 @@ impl<'s> Analyzer<'s> {
                 public,
                 span,
             } => {
-                let pre_type = Type::Enum(fields.clone(), IndexMap::new());
+                let pre_type = Type::Enum(fields.clone(), BTreeMap::new());
                 self.scope.enums.insert(
                     *name,
                     element::ScopeElement {
