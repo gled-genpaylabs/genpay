@@ -1,13 +1,28 @@
+use genpay_lexer::Lexer;
 use genpay_parser::{
-    Parser, expressions::Expressions, statements::Statements, types::Type, value::Value,
+    expressions::Expressions, statements::Statements, types::Type, value::Value, Parser,
 };
+
+fn new_parser<'s>(src: &'s str, filename: &'s str) -> Parser<'s> {
+    let lexer = Lexer::new(src, filename);
+    let mut tokens = Vec::new();
+    let mut errors = Vec::new();
+
+    for result in lexer {
+        match result {
+            Ok(token) => tokens.push(token),
+            Err(err) => errors.push(err.into()),
+        }
+    }
+    Parser::new(tokens, errors, src, filename)
+}
 
 #[test]
 fn assign_statement() {
     const SRC: &str = "some_var = 5;";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -17,7 +32,7 @@ fn assign_statement() {
             span: _,
         }) => {
             if let Expressions::Value(Value::Identifier(identifier), _) = object {
-                assert_eq!(*identifier, "some_var");
+                assert_eq!(identifier, "some_var");
             } else {
                 panic!("Wrong obj expr parsed")
             }
@@ -36,7 +51,7 @@ fn binary_assign_statement() {
     const SRC: &str = "some_var += 5;";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -47,10 +62,10 @@ fn binary_assign_statement() {
             span: _,
         }) => {
             if let Expressions::Value(Value::Identifier(identifier), _) = object {
-                assert_eq!(*identifier, "some_var");
+                assert_eq!(identifier, "some_var");
             }
 
-            assert_eq!(*operand, "+");
+            assert_eq!(operand, "+");
 
             if let Expressions::Value(Value::Integer(5), _) = value {
             } else {
@@ -66,7 +81,7 @@ fn deref_assign_statement() {
     const SRC: &str = "*ptr = 5;";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -76,7 +91,7 @@ fn deref_assign_statement() {
             span: _,
         }) => {
             if let Expressions::Value(Value::Identifier(identifier), _) = object {
-                assert_eq!(*identifier, "ptr");
+                assert_eq!(identifier, "ptr");
             }
 
             if let Expressions::Value(Value::Integer(5), _) = value {
@@ -93,7 +108,7 @@ fn slice_assign_statement() {
     const SRC: &str = "list[0] = 5;";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -104,7 +119,7 @@ fn slice_assign_statement() {
             span: _,
         }) => {
             if let Expressions::Value(Value::Identifier(identifier), _) = object {
-                assert_eq!(*identifier, "list");
+                assert_eq!(identifier, "list");
             }
 
             if let Expressions::Value(Value::Integer(0), _) = index {
@@ -125,7 +140,7 @@ fn field_assign_statement() {
     const SRC: &str = "some_struct.field = 12";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -146,7 +161,7 @@ fn field_assign_statement() {
                     panic!("Wrong head expr found")
                 };
                 if let Some(Expressions::Value(Value::Identifier(field), _)) = subelements.first() {
-                    assert_eq!(*field, "field");
+                    assert_eq!(field, "field");
                 } else {
                     panic!("Wrong subelement expr found")
                 }
@@ -167,7 +182,7 @@ fn annotation_statement() {
     const SRC: &str = "let var;";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -177,7 +192,7 @@ fn annotation_statement() {
             value,
             span: _,
         }) => {
-            assert_eq!(*identifier, "var");
+            assert_eq!(identifier, "var");
             assert!(datatype.is_none());
             assert!(value.is_none());
         }
@@ -190,7 +205,7 @@ fn annotation_statement_with_type() {
     const SRC: &str = "let var: i32;";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -200,7 +215,7 @@ fn annotation_statement_with_type() {
             value,
             span: _,
         }) => {
-            assert_eq!(*identifier, "var");
+            assert_eq!(identifier, "var");
             assert!(datatype.is_some());
             assert!(value.is_none());
 
@@ -215,7 +230,7 @@ fn annotation_statement_with_value() {
     const SRC: &str = "let var = 15;";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -225,7 +240,7 @@ fn annotation_statement_with_value() {
             value,
             span: _,
         }) => {
-            assert_eq!(*identifier, "var");
+            assert_eq!(identifier, "var");
             assert!(datatype.is_none());
             assert!(value.is_some());
 
@@ -243,7 +258,7 @@ fn annotation_statement_full() {
     const SRC: &str = "let var: usize = 15;";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -253,7 +268,7 @@ fn annotation_statement_full() {
             value,
             span: _,
         }) => {
-            assert_eq!(*identifier, "var");
+            assert_eq!(identifier, "var");
             assert!(datatype.is_some());
             assert!(value.is_some());
 
@@ -272,7 +287,7 @@ fn function_define_statement() {
     const SRC: &str = "fn foo() {}";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -285,11 +300,11 @@ fn function_define_statement() {
             span: _,
             header_span: _,
         }) => {
-            assert_eq!(*name, "foo");
-            assert_eq!(datatype, &Type::Void);
+            assert_eq!(name, "foo");
+            assert_eq!(*datatype, Type::Void);
             assert!(arguments.is_empty());
             assert!(block.is_empty());
-            assert!(!public);
+            assert!(!*public);
         }
         _ => panic!("Wrong statement parsed"),
     }
@@ -300,7 +315,7 @@ fn function_define_statement_with_type() {
     const SRC: &str = "fn foo() usize {}";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -313,11 +328,11 @@ fn function_define_statement_with_type() {
             span: _,
             header_span: _,
         }) => {
-            assert_eq!(*name, "foo");
-            assert_eq!(datatype, &Type::USIZE);
+            assert_eq!(name, "foo");
+            assert_eq!(*datatype, Type::USIZE);
             assert!(arguments.is_empty());
             assert!(block.is_empty());
-            assert!(!public);
+            assert!(!*public);
         }
         _ => panic!("Wrong statement parsed"),
     }
@@ -328,7 +343,7 @@ fn function_define_statement_with_args() {
     const SRC: &str = "fn foo(a: i32, b: u64) usize {}";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -341,22 +356,22 @@ fn function_define_statement_with_args() {
             span: _,
             header_span: _,
         }) => {
-            assert_eq!(*name, "foo");
-            assert_eq!(datatype, &Type::USIZE);
+            assert_eq!(name, "foo");
+            assert_eq!(*datatype, Type::USIZE);
             assert!(block.is_empty());
             assert!(!arguments.is_empty());
-            assert!(!public);
+            assert!(!*public);
 
             if let Some((argname, argtype)) = arguments.first() {
-                assert_eq!(*argname, "a");
-                assert_eq!(argtype, &Type::I32);
+                assert_eq!(argname, "a");
+                assert_eq!(*argtype, Type::I32);
             } else {
                 panic!("Wrong argument expr parsed")
             }
 
             if let Some((argname, argtype)) = arguments.get(1) {
-                assert_eq!(*argname, "b");
-                assert_eq!(argtype, &Type::U64);
+                assert_eq!(argname, "b");
+                assert_eq!(*argtype, Type::U64);
             } else {
                 panic!("Wrong argument expr parsed")
             }
@@ -370,7 +385,7 @@ fn function_define_statement_with_block() {
     const SRC: &str = "fn foo(a: i32, b: u64) { return 1; }";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -383,22 +398,22 @@ fn function_define_statement_with_block() {
             span: _,
             header_span: _,
         }) => {
-            assert_eq!(*name, "foo");
-            assert_eq!(datatype, &Type::Void);
+            assert_eq!(name, "foo");
+            assert_eq!(*datatype, Type::Void);
             assert!(!block.is_empty());
             assert!(!arguments.is_empty());
-            assert!(!public);
+            assert!(!*public);
 
             if let Some((argname, argtype)) = arguments.first() {
-                assert_eq!(*argname, "a");
-                assert_eq!(argtype, &Type::I32);
+                assert_eq!(argname, "a");
+                assert_eq!(*argtype, Type::I32);
             } else {
                 panic!("Wrong argument expr parsed")
             }
 
             if let Some((argname, argtype)) = arguments.get(1) {
-                assert_eq!(*argname, "b");
-                assert_eq!(argtype, &Type::U64);
+                assert_eq!(argname, "b");
+                assert_eq!(*argtype, Type::U64);
             } else {
                 panic!("Wrong argument expr parsed")
             }
@@ -421,7 +436,7 @@ fn function_define_statement_public() {
     const SRC: &str = "pub fn foo(a: i32, b: u64) { return 1; }";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -472,7 +487,7 @@ fn function_call_statement() {
     const SRC: &str = "foo()";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -493,7 +508,7 @@ fn function_call_advanced_statement() {
     const SRC: &str = "foo(1, 2)";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -523,7 +538,7 @@ fn struct_define_statement() {
     const SRC: &str = "struct Person { name: *char, age: u8 }";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -557,7 +572,7 @@ fn struct_define_with_fn_statement() {
     const SRC: &str = "struct Person { name: *char, age: u8, fn foo() {} }";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -605,7 +620,7 @@ fn struct_define_public_statement() {
     const SRC: &str = "pub struct Person { name: *char, age: u8, fn foo() {} }";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -655,7 +670,7 @@ fn enum_define_statement() {
     const SRC: &str = "enum ABC { A, B, C }";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -693,7 +708,7 @@ fn enum_define_with_fn_statement() {
     const SRC: &str = "enum ABC { A, B, C, fn foo() {} }";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -747,7 +762,7 @@ fn enum_define_pub_statement() {
     const SRC: &str = "pub enum ABC { A, B, C }";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -785,7 +800,7 @@ fn typedef_statement() {
     const SRC: &str = "typedef int i32";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -806,7 +821,7 @@ fn typedef_advanced_statement() {
     const SRC: &str = "typedef array_ptr *[i32; 5]";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -830,7 +845,7 @@ fn if_statement() {
     const SRC: &str = "if true {};";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -857,7 +872,7 @@ fn if_else_statement() {
     const SRC: &str = "if true {} else {};";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -884,7 +899,7 @@ fn while_statement() {
     const SRC: &str = "while true {}";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -907,7 +922,7 @@ fn for_statement() {
     const SRC: &str = "for i = 5 {}";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -932,7 +947,7 @@ fn import_statement() {
     const SRC: &str = "import \"module.dn\"";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -952,7 +967,7 @@ fn break_statement() {
     const SRC: &str = "break";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {
@@ -966,7 +981,7 @@ fn return_statement() {
     const SRC: &str = "return 15;";
     const FILENAME: &str = "test.dn";
 
-    let mut parser = Parser::new(SRC, FILENAME);
+    let mut parser = new_parser(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
 
     match ast.first() {

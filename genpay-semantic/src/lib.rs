@@ -1659,7 +1659,17 @@ impl<'s> Analyzer<'s> {
 
                 // Lexical & Syntax Analyzers
                 let lexer = genpay_lexer::Lexer::new(static_src, static_fname);
-                let mut parser = Parser::new_with_lexer(lexer, static_src, static_fname);
+                let mut tokens = Vec::new();
+                let mut errors = Vec::new();
+
+                for result in lexer {
+                    match result {
+                        Ok(token) => tokens.push(token),
+                        Err(err) => errors.push(err.into()),
+                    }
+                }
+
+                let mut parser = Parser::new(tokens, errors, static_src, static_fname);
                 let (ast, _) = match parser.parse() {
                     Ok(ast) => ast,
                     Err((errors, _)) => {
