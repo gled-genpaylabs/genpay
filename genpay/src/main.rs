@@ -129,6 +129,15 @@ fn main() {
 
     // Lexical Analyzer Initialization
     let lexer = genpay_lexer::Lexer::new(&src, fname);
+    let mut tokens = Vec::new();
+    let mut errors = Vec::new();
+
+    for result in lexer {
+        match result {
+            Ok(token) => tokens.push(token),
+            Err(err) => errors.push(err.into()),
+        }
+    }
 
     // `miette` graphical reporter (for this amazing error reports).
     // "total_warns" variable made just for reporting how much warnings we've got at the end
@@ -139,7 +148,7 @@ fn main() {
 
     // Syntax Analyzer initialization.
     // It takes full ownership for tokens vector (because we don't need them anymore)
-    let mut parser = genpay_parser::Parser::new_with_lexer(lexer, &src, fname);
+    let mut parser = genpay_parser::Parser::new(tokens, errors, &src, fname);
     let (ast, warns) = match parser.parse() {
         Ok(ast) => ast,
         Err(e) => {

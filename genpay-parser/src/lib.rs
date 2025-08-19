@@ -28,7 +28,7 @@ use crate::{
     types::Type,
     value::Value,
 };
-use genpay_lexer::{token::Token, token_type::TokenType, Lexer};
+use genpay_lexer::{token::Token, token_type::TokenType};
 use miette::NamedSource;
 
 /// Custom Defined Error Types
@@ -104,22 +104,12 @@ impl<'s> Parser<'s> {
     /// **Structure Builder** <br/>
     /// Requires full ownership for vector of tokens, and source code with filename for error
     /// handling
-    pub fn new(source: &'s str, filename: &'s str) -> Self {
-        let lexer = Lexer::new(source, filename);
-        Self::new_with_lexer(lexer, source, filename)
-    }
-
-    pub fn new_with_lexer(lexer: Lexer<'s>, source: &'s str, filename: &'s str) -> Self {
-        let mut tokens = Vec::new();
-        let mut errors = Vec::new();
-
-        for result in lexer {
-            match result {
-                Ok(token) => tokens.push(token),
-                Err(err) => errors.push(err.into()),
-            }
-        }
-
+    pub fn new(
+        tokens: Vec<Token<'s>>,
+        errors: Vec<ParserError>,
+        source: &'s str,
+        filename: &'s str,
+    ) -> Self {
         Self {
             source: NamedSource::new(filename, source.to_string()),
             tokens,
@@ -996,7 +986,7 @@ mod tests {
 
     #[test]
     fn get_basic_type_test() {
-        let mut parser = Parser::new("", "");
+        let mut parser = Parser::new(Vec::new(), Vec::new(), "", "");
 
         [
             ("i8", Type::I8),
