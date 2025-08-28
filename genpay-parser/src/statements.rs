@@ -67,8 +67,8 @@ pub enum Statements<'s> {
     FunctionDefineStatement {
         name: &'s str,
         datatype: Type<'s>,
-        arguments: Vec<(&'s str, Type<'s>)>,
-        block: Vec<Statements<'s>>,
+        arguments: Box<[(&'s str, Type<'s>)]>,
+        block: Box<[Statements<'s>]>,
         public: bool,
         span: (usize, usize),
         header_span: (usize, usize),
@@ -676,7 +676,7 @@ impl<'s> Parser<'s> {
                     ("", Type::Void)
                 }
             })
-            .collect();
+            .collect::<Vec<(&str, Type)>>();
 
         let mut datatype = Type::Void;
         if !self.expect(TokenType::LBrace) {
@@ -725,8 +725,8 @@ impl<'s> Parser<'s> {
         Statements::FunctionDefineStatement {
             name: identifier,
             datatype,
-            arguments: arguments_tuples,
-            block,
+            arguments: arguments_tuples.into_boxed_slice(),
+            block: block.into_boxed_slice(),
             public: false,
             span: (span_start, span_end),
             header_span,
