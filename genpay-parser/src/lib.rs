@@ -384,7 +384,7 @@ impl<'s> Parser<'s> {
                     let _ = self.next();
 
                     return Expressions::Tuple {
-                        values: Vec::new(),
+                        values: Vec::new().into_boxed_slice(),
                         span: (span_start, span_end),
                     };
                 }
@@ -411,7 +411,7 @@ impl<'s> Parser<'s> {
                     }
 
                     return Expressions::Tuple {
-                        values,
+                        values: values.into_boxed_slice(),
                         span: (span_start, span_end),
                     };
                 }
