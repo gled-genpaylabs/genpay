@@ -717,7 +717,10 @@ impl<'s> Parser<'s> {
                 }
                 self.skip_eos();
 
-                Statements::ScopeStatement { block, span }
+                Statements::ScopeStatement {
+                    block: block.into_boxed_slice(),
+                    span,
+                }
             }
             TokenType::Multiply => {
                 let span_start = self.current().span.0;

@@ -76,14 +76,14 @@ pub enum Statements<'s> {
     /// `NAME ( EXPRESSION, EXPRESSION, ... )`
     FunctionCallStatement {
         name: &'s str,
-        arguments: Vec<Expressions<'s>>,
+        arguments: Box<[Expressions<'s>]>,
         span: (usize, usize),
     },
 
     /// `MACRONAME! ( EXPRESSION, EXPRESSION, ... )`
     MacroCallStatement {
         name: &'s str,
-        arguments: Vec<Expressions<'s>>,
+        arguments: Box<[Expressions<'s>]>,
         span: (usize, usize),
     },
 
@@ -113,7 +113,7 @@ pub enum Statements<'s> {
     /// ```
     EnumDefineStatement {
         name: &'s str,
-        fields: Vec<&'s str>,
+        fields: Box<[&'s str]>,
         functions: BTreeMap<&'s str, Statements<'s>>,
         public: bool,
         span: (usize, usize),
@@ -129,15 +129,15 @@ pub enum Statements<'s> {
     /// `if EXPRESSION { STATEMENTS } else { STATEMENTS }`
     IfStatement {
         condition: Expressions<'s>,
-        then_block: Vec<Statements<'s>>,
-        else_block: Option<Vec<Statements<'s>>>,
+        then_block: Box<[Statements<'s>]>,
+        else_block: Option<Box<[Statements<'s>]>>,
         span: (usize, usize),
     },
 
     /// `while EXPRESSION { STATEMENTS }`
     WhileStatement {
         condition: Expressions<'s>,
-        block: Vec<Statements<'s>>,
+        block: Box<[Statements<'s>]>,
         span: (usize, usize),
     },
 
@@ -145,7 +145,7 @@ pub enum Statements<'s> {
     ForStatement {
         binding: &'s str,
         iterator: Expressions<'s>,
-        block: Vec<Statements<'s>>,
+        block: Box<[Statements<'s>]>,
         span: (usize, usize),
     },
 
@@ -164,7 +164,7 @@ pub enum Statements<'s> {
     /// `extern "EXT_TYPE" pub/NOTHING fn IDENTIFIER ( TYPE, TYPE, ... ) TYPE/NOTHING`
     ExternStatement {
         identifier: &'s str,
-        arguments: Vec<Type<'s>>,
+        arguments: Box<[Type<'s>]>,
         return_type: Type<'s>,
         extern_type: &'s str,
         is_var_args: bool,
@@ -198,7 +198,7 @@ pub enum Statements<'s> {
 
     /// `{ STATEMENTS }`
     ScopeStatement {
-        block: Vec<Statements<'s>>,
+        block: Box<[Statements<'s>]>,
         span: (usize, usize),
     },
 
@@ -416,7 +416,7 @@ impl<'s> Parser<'s> {
                     self.skip_eos();
                     return Statements::IfStatement {
                         condition,
-                        then_block,
+                        then_block: then_block.into_boxed_slice(),
                         else_block: None,
                         span: (span_start, span_end),
                     };
@@ -446,8 +446,8 @@ impl<'s> Parser<'s> {
                         let span_end = self.current().span.1;
                         return Statements::IfStatement {
                             condition,
-                            then_block,
-                            else_block: Some(vec![stmt]),
+                            then_block: then_block.into_boxed_slice(),
+                            else_block: Some(vec![stmt].into_boxed_slice()),
                             span: (span_start, span_end),
                         };
                     }
@@ -493,8 +493,8 @@ impl<'s> Parser<'s> {
                 self.skip_eos();
                 Statements::IfStatement {
                     condition,
-                    then_block,
-                    else_block: Some(else_block),
+                    then_block: then_block.into_boxed_slice(),
+                    else_block: Some(else_block.into_boxed_slice()),
                     span: (span_start, span_end),
                 }
             }
@@ -503,7 +503,7 @@ impl<'s> Parser<'s> {
                 self.skip_eos();
                 Statements::IfStatement {
                     condition,
-                    then_block,
+                    then_block: then_block.into_boxed_slice(),
                     else_block: None,
                     span: (span_start, span_end),
                 }
@@ -557,7 +557,7 @@ impl<'s> Parser<'s> {
         self.skip_eos();
         Statements::WhileStatement {
             condition,
-            block,
+            block: block.into_boxed_slice(),
             span: (span_start, self.current().span.1),
         }
     }
@@ -625,7 +625,7 @@ impl<'s> Parser<'s> {
         Statements::ForStatement {
             binding,
             iterator,
-            block,
+            block: block.into_boxed_slice(),
             span: (span_start, span_end),
         }
     }
@@ -642,7 +642,7 @@ impl<'s> Parser<'s> {
         let arguments =
             self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma);
 
-        let arguments_tuples = arguments
+        let arguments_tuples: Vec<(&str, Type)> = arguments
             .iter()
             .map(|arg| {
                 if let Expressions::Argument {
@@ -676,7 +676,7 @@ impl<'s> Parser<'s> {
                     ("", Type::Void)
                 }
             })
-            .collect::<Vec<(&str, Type)>>();
+            .collect();
 
         let mut datatype = Type::Void;
         if !self.expect(TokenType::LBrace) {
@@ -880,7 +880,7 @@ impl<'s> Parser<'s> {
 
         Statements::FunctionCallStatement {
             name: id,
-            arguments,
+            arguments: arguments.into_boxed_slice(),
             span: (span.0, span_end),
         }
     }
@@ -903,7 +903,7 @@ impl<'s> Parser<'s> {
 
         Statements::MacroCallStatement {
             name: id,
-            arguments,
+            arguments: arguments.into_boxed_slice(),
             span: (span.0, span_end),
         }
     }
@@ -1190,7 +1190,7 @@ impl<'s> Parser<'s> {
 
         Statements::EnumDefineStatement {
             name,
-            fields,
+            fields: fields.into_boxed_slice(),
             functions,
             public: false,
             span: (span_start, self.current().span.1),
@@ -1399,7 +1399,7 @@ impl<'s> Parser<'s> {
 
         Statements::ExternStatement {
             identifier,
-            arguments,
+            arguments: arguments.into_boxed_slice(),
             return_type,
             extern_type,
             public,
