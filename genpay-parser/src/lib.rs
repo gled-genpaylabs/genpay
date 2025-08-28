@@ -525,7 +525,7 @@ impl<'s> Parser<'s> {
                 }
 
                 Expressions::Scope {
-                    block,
+                    block: block.into_boxed_slice(),
                     span: (span_start, span_end),
                 }
             }

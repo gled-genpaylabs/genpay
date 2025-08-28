@@ -112,7 +112,7 @@ pub enum Expressions<'s> {
     },
     /// `{ STATEMENTS }`
     Scope {
-        block: Vec<Statements<'s>>,
+        block: Box<[Statements<'s>]>,
         span: (usize, usize),
     },
 
