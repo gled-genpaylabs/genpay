@@ -608,7 +608,7 @@ impl<'ctx> CodeGen<'ctx> {
                 arguments,
                 span: _,
             } => {
-                self.build_macro_call(name, arguments);
+                self.build_macro_call(name, arguments.to_vec());
             }
 
             Statements::StructDefineStatement {
@@ -1397,7 +1397,7 @@ impl<'ctx> CodeGen<'ctx> {
                 // little hack cuz i dont wanna add `is_var_args` argument to function structure
                 // and fix the whole code for the only one usage
 
-                let mut arguments = arguments;
+                let mut arguments = arguments.to_vec();
                 arguments.push(Type::Void);
                 arguments.push(Type::Void);
 
