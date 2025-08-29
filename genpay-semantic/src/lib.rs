@@ -720,6 +720,7 @@ impl<'s> Analyzer<'s> {
                         *name,
                         Type::Function(
                             arguments
+                                .to_vec()
                                 .iter()
                                 .map(|arg| arg.1.clone())
                                 .collect::<Vec<Type>>(),
@@ -1029,7 +1030,7 @@ impl<'s> Analyzer<'s> {
                 public,
                 span,
             } => {
-                let pre_type = Type::Enum(fields.clone(), BTreeMap::new());
+                let pre_type = Type::Enum(fields.to_vec(), BTreeMap::new());
                 self.scope.enums.insert(
                     *name,
                     element::ScopeElement {
@@ -1062,7 +1063,7 @@ impl<'s> Analyzer<'s> {
                 let _ = self.scope.enums.remove(name);
 
                 let enum_type = Type::Enum(
-                    fields.clone(),
+                    fields.to_vec(),
                     functions_signatures
                         .into_iter()
                         .map(|x| (x.0, x.1.datatype))
@@ -1868,7 +1869,7 @@ impl<'s> Analyzer<'s> {
                     .add_fn(
                         *identifier,
                         Type::Function(
-                            arguments.clone(),
+                            arguments.to_vec(),
                             Box::new(return_type.clone()),
                             *is_var_args,
                         ),
