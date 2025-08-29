@@ -95,7 +95,7 @@ pub enum Expressions<'s> {
     },
     /// `(EXPRESSION, EXPRESSION, ...)`
     Tuple {
-        values: Vec<Expressions<'s>>,
+        values: Box<[Expressions<'s>]>,
         span: (usize, usize),
     },
     /// `OBJECT[EXPRESSION]`
@@ -112,7 +112,7 @@ pub enum Expressions<'s> {
     },
     /// `{ STATEMENTS }`
     Scope {
-        block: Vec<Statements<'s>>,
+        block: Box<[Statements<'s>]>,
         span: (usize, usize),
     },
 
