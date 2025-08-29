@@ -1,5 +1,5 @@
 //! # Expressions
-//! Each expression in Deen has its own syntax (such as Statements). <br/>
+//! Each expression in Genpay has its own syntax (such as Statements). <br/>
 //! _To see syntax rules for every Expression, check the [`Expressions`] enum_
 //!
 //! **Expression** is a syntactic entity in programming language that combines types and values
