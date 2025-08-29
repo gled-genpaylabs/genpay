@@ -1,5 +1,5 @@
 //! # Statements
-//! Each statement in Deen has it's own syntax. <br/>
+//! Each statement in Genpay has it's own syntax. <br/>
 //! _To see syntax rules for every Statement, check the [`Statements`] enum_
 //!
 //! **Statement** is a syntactic unit of programming language that describes program actions. <br/>
