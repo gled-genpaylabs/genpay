@@ -9,7 +9,7 @@
 //! use genpay_lexer::{Lexer, token_type::TokenType};
 //!
 //! let input = "1 + 1";
-//! let mut lexer = Lexer::new(input, "test.gen");
+//! let mut lexer = Lexer::new(input, "test.genpay");
 //!
 //! let tokens: Vec<_> = lexer.collect();
 //!
