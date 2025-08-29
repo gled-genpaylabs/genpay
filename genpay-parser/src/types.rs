@@ -1,6 +1,6 @@
 //! # Types
 //! **Types** is a designation of data size and it's avaible toolchain. <br/>
-//! Deen has 14 basic types: 4 signed and 5 unsigned integers, 2 floats, char, bool and void types.
+//! Genpay has 14 basic types: 4 signed and 5 unsigned integers, 2 floats, char, bool and void types.
 //! <br/>
 //! Other types is _advanced_ (pointers, arrays, structs and etc.)
 
