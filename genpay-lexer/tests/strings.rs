@@ -11,7 +11,7 @@ fn assert_tokens(lexer: &mut Lexer, expected: &[Token]) {
 
 #[test]
 fn basic_string() {
-    let mut lexer = Lexer::new("\"hello\"", "test.gen");
+    let mut lexer = Lexer::new("\"hello\"", "test.genpay");
     let expected = vec![
         Token::new("hello", TokenType::String, (0, 7)),
     ];
@@ -21,7 +21,7 @@ fn basic_string() {
 #[test]
 fn big_string() {
     let mut lexer = Lexer::new(
-        "\"Hello, World! Here's an interesting thing: first LLVM initial release was in 2003 year. The original authors of core was Chris Lattner and Vikram Adve\"", "test.gen"
+        "\"Hello, World! Here's an interesting thing: first LLVM initial release was in 2003 year. The original authors of core was Chris Lattner and Vikram Adve\"", "test.genpay"
     );
     let expected = vec![
         Token::new(
@@ -35,7 +35,7 @@ fn big_string() {
 
 #[test]
 fn advanced_string() {
-    let mut lexer = Lexer::new("\"¿?👉👈🤠👀\"", "test.gen");
+    let mut lexer = Lexer::new("\"¿?👉👈🤠👀\"", "test.genpay");
     let expected = vec![
         Token::new("¿?👉👈🤠👀", TokenType::String, (0, 21)),
     ];
@@ -44,7 +44,7 @@ fn advanced_string() {
 
 #[test]
 fn basic_char() {
-    let mut lexer = Lexer::new("'a'", "test.gen");
+    let mut lexer = Lexer::new("'a'", "test.genpay");
     let expected = vec![
         Token::new("a", TokenType::Char, (0, 3)),
     ];
@@ -53,7 +53,7 @@ fn basic_char() {
 
 #[test]
 fn advanced_char() {
-    let mut lexer = Lexer::new("'👀'", "test.gen");
+    let mut lexer = Lexer::new("'👀'", "test.genpay");
     let expected = vec![
         Token::new("👀", TokenType::Char, (0, 5)),
     ];
