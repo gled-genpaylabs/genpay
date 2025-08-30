@@ -11,7 +11,7 @@ fn assert_tokens(lexer: &mut Lexer, expected: &[Token]) {
 
 #[test]
 fn binary_symbols() {
-    let mut lexer = Lexer::new("+-*/", "test.gen");
+    let mut lexer = Lexer::new("+-*/", "test.genpay");
     let expected = vec![
         Token::new("+", TokenType::Plus, (0, 1)),
         Token::new("-", TokenType::Minus, (1, 2)),
@@ -23,7 +23,7 @@ fn binary_symbols() {
 
 #[test]
 fn boolean_symbols() {
-    let mut lexer = Lexer::new("> < ! && || == !=", "test.gen");
+    let mut lexer = Lexer::new("> < ! && || == !=", "test.genpay");
     let expected = vec![
         Token::new(">", TokenType::Bt, (0, 1)),
         Token::new("<", TokenType::Lt, (2, 3)),
@@ -38,7 +38,7 @@ fn boolean_symbols() {
 
 #[test]
 fn bitwise_symbols() {
-    let mut lexer = Lexer::new(">> << ^", "test.gen");
+    let mut lexer = Lexer::new(">> << ^", "test.genpay");
     let expected = vec![
         Token::new(">>", TokenType::RShift, (0, 2)),
         Token::new("<<", TokenType::LShift, (3, 5)),
@@ -49,7 +49,7 @@ fn bitwise_symbols() {
 
 #[test]
 fn parentheses_symbols() {
-    let mut lexer = Lexer::new("(){}[]", "test.gen");
+    let mut lexer = Lexer::new("(){}[]", "test.genpay");
     let expected = vec![
         Token::new("(", TokenType::LParen, (0, 1)),
         Token::new(")", TokenType::RParen, (1, 2)),
@@ -63,7 +63,7 @@ fn parentheses_symbols() {
 
 #[test]
 fn other_symbols() {
-    let mut lexer = Lexer::new("& ref : ; & | _ . , =", "test.gen");
+    let mut lexer = Lexer::new("& ref : ; & | _ . , =", "test.genpay");
     let expected = vec![
         Token::new("&", TokenType::Ampersand, (0, 1)),
         Token::new("ref", TokenType::Identifier, (2, 5)),
