@@ -5,7 +5,7 @@ use genpay_parser::{
 #[test]
 fn binary_expression() {
     const SRC: &str = "let a = 5 + 2;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -45,7 +45,7 @@ fn binary_expression() {
 #[test]
 fn binary_advanced_expression() {
     const SRC: &str = "let a = 2 + 2 * 2;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -136,7 +136,7 @@ fn unary_negative_expression() {
 #[test]
 fn unary_not_expression() {
     const SRC: &str = "let a = !2;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -171,7 +171,7 @@ fn unary_not_expression() {
 #[test]
 fn boolean_eq_expression() {
     const SRC: &str = "let a = 1 == 1;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -211,7 +211,7 @@ fn boolean_eq_expression() {
 #[test]
 fn boolean_ne_expression() {
     const SRC: &str = "let a = 1 != 1;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -251,7 +251,7 @@ fn boolean_ne_expression() {
 #[test]
 fn boolean_bt_expression() {
     const SRC: &str = "let a = 1 > 1;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -291,7 +291,7 @@ fn boolean_bt_expression() {
 #[test]
 fn boolean_lt_expression() {
     const SRC: &str = "let a = 1 < 1;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -331,7 +331,7 @@ fn boolean_lt_expression() {
 #[test]
 fn boolean_advanced_expression() {
     const SRC: &str = "let a = 1 == 1 && 0 != 5;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -404,7 +404,7 @@ fn boolean_advanced_expression() {
 #[test]
 fn bitwise_expression() {
     const SRC: &str = "let a = 5 << 2;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -444,7 +444,7 @@ fn bitwise_expression() {
 #[test]
 fn argument_expression() {
     const SRC: &str = "let a = some_arg: i32";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -475,7 +475,7 @@ fn argument_expression() {
 #[test]
 fn argument_advanced_expression() {
     const SRC: &str = "let a = some_arg: *[i32; 5]";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -509,7 +509,7 @@ fn argument_advanced_expression() {
 #[test]
 fn subelement_expression() {
     const SRC: &str = "let a = some_struct.field";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -550,7 +550,7 @@ fn subelement_expression() {
 #[test]
 fn subelement_advanced_expression() {
     const SRC: &str = "let a = some_struct.field.method()";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.enpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -605,7 +605,7 @@ fn subelement_advanced_expression() {
 #[test]
 fn fncall_expression() {
     const SRC: &str = "let a = call_me()";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -636,7 +636,7 @@ fn fncall_expression() {
 #[test]
 fn fncall_advanced_expression() {
     const SRC: &str = "let a = call_me(1, id, 1.0)";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -684,7 +684,7 @@ fn fncall_advanced_expression() {
 #[test]
 fn reference_expression() {
     const SRC: &str = "let a = &b";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -714,7 +714,7 @@ fn reference_expression() {
 #[test]
 fn reference_advanced_expression() {
     const SRC: &str = "let a = &(b)";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -744,7 +744,7 @@ fn reference_advanced_expression() {
 #[test]
 fn dereference_expression() {
     const SRC: &str = "let a = *b";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -774,7 +774,7 @@ fn dereference_expression() {
 #[test]
 fn dereference_advanced_expression() {
     const SRC: &str = "let a = **b";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -808,7 +808,7 @@ fn dereference_advanced_expression() {
 #[test]
 fn array_expression() {
     const SRC: &str = "let a = [1, 2, 3]";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -852,7 +852,7 @@ fn array_expression() {
 #[test]
 fn tuple_expression() {
     const SRC: &str = "let a = (1, 5, 4)";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -892,7 +892,7 @@ fn tuple_expression() {
 #[test]
 fn tuple_advanced_expression() {
     const SRC: &str = "let a = (1, 2.0, \"hello\")";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -933,7 +933,7 @@ fn tuple_advanced_expression() {
 #[test]
 fn slice_expression() {
     const SRC: &str = "let a = b[0]";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
@@ -969,7 +969,7 @@ fn slice_expression() {
 #[test]
 fn struct_expression() {
     const SRC: &str = "let a = Person { .age = 32, .name = \"John\", .money = 333.12 };";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
