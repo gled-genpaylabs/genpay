@@ -3,7 +3,7 @@ use genpay_parser::{Parser, expressions::Expressions, statements::Statements, va
 #[test]
 fn basic_values() {
     const SRC: &str = "123; 5.0; 'a'; \"some\"; true";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
     let (ast, _) = parser.parse().unwrap();
