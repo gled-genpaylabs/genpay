@@ -26,7 +26,7 @@ See official documentation here: [Genpay Documentation](https://genpay-site.verc
 *  **Simplicity**. The language syntax is easy to read and write.
 *  **Fast**. The compiler uses LLVM as a backend for the best performance.
 *  **Clean**. Nothing superfluous - just basic tools for everything.
-*  **Modern**. Syntax and mechanics are inspired by Rust and Zig.
+*  **Modern**. Syntax and mechanics are inspired by Rust.
 *  **Strict**. Analyzers and checkers will prevent most compile-time errors.
 *  **Open Source**. You can always participate in the project's development.
 
