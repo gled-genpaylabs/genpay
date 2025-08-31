@@ -19,8 +19,7 @@
 </div>
 
 ## Description
-**Genpay** - a statically-typed compiling programming language inspired by languages like C, C++, Zig, and Rust. <br><br>
-It provides tools for system programming, including: structures, C-like enums with supported functions, type definitions, backward compatibility with C, pointers, recursion, and more. <br/>
+**Genpay** - a statically-typed compiling programming language for smart contracts and system tools. <br><br>
 See official documentation here: [Genpay Documentation](https://genpay-site.vercel.app/)
 
 ##  Features
