@@ -7,7 +7,6 @@ use crate::{
 };
 use genpay_lexer::token_type::TokenType;
 use std::collections::BTreeMap;
-use typed_arena::Arena;
 
 #[derive(Debug, Clone)]
 pub enum Statements<'a> {
@@ -498,8 +497,10 @@ impl<'a> Parser<'a> {
     }
 }
 
+use bumpalo::Bump;
+
 impl<'a> Parser<'a> {
-    pub fn annotation_statement(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn annotation_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
 
         if self.current().value == "let" {
@@ -565,7 +566,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn import_statement(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn import_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.current().token_type == TokenType::Keyword {
             let _ = self.next();
@@ -595,7 +596,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn include_statement(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn include_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.current().token_type == TokenType::Keyword {
             let _ = self.next();
@@ -623,7 +624,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn if_statement(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn if_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.current().token_type == TokenType::Keyword {
             let _ = self.next();
@@ -770,7 +771,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn while_statement(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn while_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -821,7 +822,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn for_statement(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn for_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -889,7 +890,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn fn_statement(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn fn_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -992,7 +993,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn return_statement(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn return_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1012,7 +1013,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn break_statement(&mut self, _expr_arena: &'a Arena<Expressions<'a>>, _stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn break_statement(&mut self, _expr_arena: &'a Bump, _stmt_arena: &'a Bump) -> Statements<'a> {
         let span = self.current().span;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1023,7 +1024,7 @@ impl<'a> Parser<'a> {
         Statements::BreakStatements { span }
     }
 
-    pub fn assign_statement(&mut self, object: Expressions<'a>, span: (usize, usize), expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn assign_statement(&mut self, object: Expressions<'a>, span: (usize, usize), expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         if self.expect(TokenType::Equal) {
             let _ = self.next();
         }
@@ -1044,8 +1045,8 @@ impl<'a> Parser<'a> {
         object: Expressions<'a>,
         op: &'a str,
         span: (usize, usize),
-        expr_arena: &'a Arena<Expressions<'a>>,
-        stmt_arena: &'a Arena<Statements<'a>>,
+        expr_arena: &'a Bump,
+        stmt_arena: &'a Bump,
     ) -> Statements<'a> {
         if self.expect(TokenType::Equal) {
             let _ = self.next();
@@ -1067,8 +1068,8 @@ impl<'a> Parser<'a> {
         &mut self,
         object: Expressions<'a>,
         span: (usize, usize),
-        expr_arena: &'a Arena<Expressions<'a>>,
-        stmt_arena: &'a Arena<Statements<'a>>,
+        expr_arena: &'a Bump,
+        stmt_arena: &'a Bump,
     ) -> Statements<'a> {
         if !self.expect(TokenType::LBrack) {
             // This should be an error, but for now we assume it's there
@@ -1112,7 +1113,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn call_statement(&mut self, id: &'a str, span: (usize, usize), expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn call_statement(&mut self, id: &'a str, span: (usize, usize), expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         match self.current().token_type {
             TokenType::Identifier => {
                 let _ = self.next();
@@ -1148,7 +1149,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn macrocall_statement(&mut self, id: &'a str, span: (usize, usize), expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn macrocall_statement(&mut self, id: &'a str, span: (usize, usize), expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         if self.expect(TokenType::Not) {
             let _ = self.next();
         }
@@ -1171,7 +1172,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn struct_statement(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn struct_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -1342,7 +1343,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn enum_statement(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn enum_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -1460,7 +1461,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn typedef_statement(&mut self, _expr_arena: &'a Arena<Expressions<'a>>, _stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn typedef_statement(&mut self, _expr_arena: &'a Bump, _stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1489,7 +1490,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn extern_declare_statement(&mut self, _expr_arena: &'a Arena<Expressions<'a>>, _stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn extern_declare_statement(&mut self, _expr_arena: &'a Bump, _stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1521,7 +1522,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn link_c_statement(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn link_c_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1550,7 +1551,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn extern_statement(&mut self, _expr_arena: &'a Arena<Expressions<'a>>, _stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    pub fn extern_statement(&mut self, _expr_arena: &'a Bump, _stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();

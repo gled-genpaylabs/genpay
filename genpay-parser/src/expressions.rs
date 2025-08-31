@@ -298,15 +298,15 @@ impl<'a> Parser<'a> {
     }
 }
 
-use typed_arena::Arena;
+use bumpalo::Bump;
 
 impl<'a> Parser<'a> {
     pub fn subelement_expression(
         &mut self,
         head: Expressions<'a>,
         separator: TokenType,
-        expr_arena: &'a Arena<Expressions<'a>>,
-        stmt_arena: &'a Arena<Statements<'a>>,
+        expr_arena: &'a Bump,
+        stmt_arena: &'a Bump,
     ) -> Expressions<'a> {
         let head_span = Self::get_span_expression(&head);
         let head = expr_arena.alloc(head);
@@ -331,7 +331,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn binary_expression(&mut self, node: Expressions<'a>, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Expressions<'a> {
+    pub fn binary_expression(&mut self, node: Expressions<'a>, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         let node_span = Self::get_span_expression(&node);
         let current = self.current();
 
@@ -384,7 +384,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn boolean_expression(&mut self, node: Expressions<'a>, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Expressions<'a> {
+    pub fn boolean_expression(&mut self, node: Expressions<'a>, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         // FIXME: Expressions like `true || false` returns error "Undefined term found"
 
         let node_span = Self::get_span_expression(&node);
@@ -430,7 +430,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn bitwise_expression(&mut self, node: Expressions<'a>, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Expressions<'a> {
+    pub fn bitwise_expression(&mut self, node: Expressions<'a>, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         let node_span = Self::get_span_expression(&node);
         let current = self.current();
 
@@ -453,7 +453,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn call_expression(&mut self, fname: &'a str, span: (usize, usize), expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Expressions<'a> {
+    pub fn call_expression(&mut self, fname: &'a str, span: (usize, usize), expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         match self.current().token_type {
             TokenType::Identifier => {
                 let _ = self.next();
@@ -487,7 +487,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn macrocall_expression(&mut self, name: &'a str, span: (usize, usize), expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Expressions<'a> {
+    pub fn macrocall_expression(&mut self, name: &'a str, span: (usize, usize), expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         if self.expect(TokenType::Not) {
             let _ = self.next();
         }
@@ -508,7 +508,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn slice_expression(&mut self, expr: Expressions<'a>, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Expressions<'a> {
+    pub fn slice_expression(&mut self, expr: Expressions<'a>, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         if let TokenType::LBrack = self.current().token_type {
             let _ = self.next();
         }
@@ -539,7 +539,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn struct_expression(&mut self, name: &'a str, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Expressions<'a> {
+    pub fn struct_expression(&mut self, name: &'a str, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Identifier) {
             let _ = self.next();
@@ -655,8 +655,8 @@ impl<'a> Parser<'a> {
         start: TokenType,
         end: TokenType,
         separator: TokenType,
-        expr_arena: &'a Arena<Expressions<'a>>,
-        stmt_arena: &'a Arena<Statements<'a>>,
+        expr_arena: &'a Bump,
+        stmt_arena: &'a Bump,
     ) -> Vec<Expressions<'a>> {
         if self.expect(start) {
             let _ = self.next();

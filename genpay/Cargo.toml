@@ -19,4 +19,5 @@ genpay-lexer = { path = "../genpay-lexer" }
 genpay-parser = { path = "../genpay-parser" }
 genpay-semantic = { path = "../genpay-semantic" }
 genpay-codegen = { path = "../genpay-codegen" }
+bumpalo = { version = "3.16.0", features = ["collections"] }
 genpay-linker = { path = "../genpay-linker" }

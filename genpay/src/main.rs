@@ -116,8 +116,8 @@ fn main() {
     // Syntax Analyzer initialization.
     // It takes full ownership for tokens vector (because we don't need them anymore)
     let mut parser = genpay_parser::Parser::new_with_lexer(lexer, &src, fname);
-    let expr_arena = typed_arena::Arena::new();
-    let stmt_arena = typed_arena::Arena::new();
+    let expr_arena = bumpalo::Bump::new();
+    let stmt_arena = bumpalo::Bump::new();
     let (ast, warns) = match parser.parse(&expr_arena, &stmt_arena) {
         Ok(ast) => ast,
         Err(e) => {
@@ -175,7 +175,7 @@ fn main() {
     //
     // Analyzer takes only reference to AST (because we only provide checking)
     let mut analyzer = genpay_semantic::Analyzer::new(&src, fname, true);
-    let (symtable, warns) = match analyzer.analyze(&ast) {
+    let (symtable, warns) = match analyzer.analyze(&ast, &expr_arena, &stmt_arena) {
         Ok(res) => res,
         Err((errors, warns)) => {
             errors.iter().for_each(|e| {

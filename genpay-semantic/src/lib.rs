@@ -3,13 +3,17 @@ use crate::{
     macros::{CastMacro, FormatMacro, PanicMacro, PrintMacro, PrintlnMacro, SizeofMacro},
     macros::{CompilerMacros, MacroObject},
     scope::Scope,
-    symtable::{Include, SymbolTable},
+    symtable::SymbolTable,
 };
+use bumpalo::Bump;
 use genpay_parser::{
     expressions::Expressions, statements::Statements, types::Type, value::Value, Parser,
 };
 use miette::NamedSource;
-use std::{collections::{BTreeMap, HashMap}, ffi::OsStr, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+};
 
 mod element;
 mod error;
@@ -23,8 +27,9 @@ pub type SemanticErr<'s> = (Vec<SemanticError>, Vec<SemanticWarning>);
 
 const STANDARD_LIBRARY_VAR: &str = "GENPAY_LIB";
 
+use std::fmt;
+
 /// Main Analyzer Struct
-#[derive(Debug)]
 pub struct Analyzer<'s> {
     scope: Scope<'s>,
     source: NamedSource<String>,
@@ -34,6 +39,19 @@ pub struct Analyzer<'s> {
 
     symtable: SymbolTable<'s>,
     compiler_macros: HashMap<&'s str, CompilerMacros>,
+}
+
+impl<'s> fmt::Debug for Analyzer<'s> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Analyzer")
+            .field("scope", &self.scope)
+            .field("source", &self.source)
+            .field("errors", &self.errors)
+            .field("warnings", &self.warnings)
+            .field("symtable", &self.symtable)
+            .field("compiler_macros", &self.compiler_macros)
+            .finish()
+    }
 }
 
 impl<'s> Analyzer<'s> {
@@ -63,7 +81,12 @@ impl<'s> Analyzer<'s> {
         }
     }
 
-    pub fn analyze(&mut self, ast: &[Statements<'s>]) -> Result<SemanticOk<'s>, SemanticErr<'s>> {
+    pub fn analyze(
+        &mut self,
+        ast: &[Statements<'s>],
+        expr_arena: &'s Bump,
+        stmt_arena: &'s Bump,
+    ) -> Result<SemanticOk<'s>, SemanticErr<'s>> {
         // let pre_statements = ast
         //     .iter()
         //     .filter(|stmt| {
@@ -104,12 +127,13 @@ impl<'s> Analyzer<'s> {
         // pre_statements
         //     .clone()
         //     .into_iter()
-        //     .for_each(|stmt| self.visit_statement(stmt));
+        //     .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
         // after_statements
         //     .into_iter()
-        //     .for_each(|stmt| self.visit_statement(stmt));
+        //     .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
 
-        ast.iter().for_each(|stmt| self.visit_statement(stmt));
+        ast.iter()
+            .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
 
         if self.scope.get_fn("main").is_none() && self.scope.is_main {
             let err = SemanticError::GlobalError {
@@ -151,7 +175,12 @@ impl<'s> Analyzer<'s> {
 }
 
 impl<'s> Analyzer<'s> {
-    fn visit_statement(&mut self, statement: &Statements<'s>) {
+    fn visit_statement(
+        &mut self,
+        statement: &Statements<'s>,
+        expr_arena: &'s Bump,
+        stmt_arena: &'s Bump,
+    ) {
         // checking for allowed global scope statements
         if self.scope.parent.is_none() {
             match statement {
@@ -227,8 +256,12 @@ impl<'s> Analyzer<'s> {
             } => {
                 if let Expressions::Value(Value::Identifier(identifier), _) = object {
                     if let Some(variable) = self.scope.get_var(identifier) {
-                        let value_type =
-                            self.visit_expression(value, Some(variable.datatype.clone()));
+                        let value_type = self.visit_expression(
+                            value,
+                            Some(variable.datatype.clone()),
+                            expr_arena,
+                            stmt_arena,
+                        );
 
                         if variable.datatype != value_type {
                             self.error(SemanticError::TypesMismatch {
@@ -274,28 +307,37 @@ impl<'s> Analyzer<'s> {
                 value,
                 span,
             } => {
-                self.visit_statement(&Statements::AssignStatement {
-                    object: object.clone(),
-                    span: *span,
-                    value: Expressions::Binary {
-                        operand: *operand,
-                        lhs: Box::new(object.clone()),
-                        rhs: Box::new(value.clone()),
+                self.visit_statement(
+                    &Statements::AssignStatement {
+                        object: object.clone(),
                         span: *span,
+                        value: Expressions::Binary {
+                            operand: *operand,
+                            lhs: expr_arena.alloc(object.clone()),
+                            rhs: expr_arena.alloc(value.clone()),
+                            span: *span,
+                        },
                     },
-                });
+                    expr_arena,
+                    stmt_arena,
+                );
             }
             Statements::DerefAssignStatement {
                 object,
                 value,
                 span,
             } => {
-                let instance =
-                    self.visit_expression(object, Some(Type::Pointer(Box::new(Type::Void))));
+                let instance = self.visit_expression(
+                    object,
+                    Some(Type::Pointer(Box::new(Type::Void))),
+                    expr_arena,
+                    stmt_arena,
+                );
 
                 match instance {
                     Type::Pointer(ptr_type) => {
-                        let value_type = self.visit_expression(value, Some(*ptr_type.clone()));
+                        let value_type =
+                            self.visit_expression(value, Some(*ptr_type.clone()), expr_arena, stmt_arena);
 
                         if value_type != *ptr_type {
                             self.error(SemanticError::TypesMismatch {
@@ -349,8 +391,12 @@ impl<'s> Analyzer<'s> {
                                 }
 
                                 let expected_value = args.get(1).unwrap();
-                                let value_type =
-                                    self.visit_expression(value, Some(expected_value.clone()));
+                                let value_type = self.visit_expression(
+                                    value,
+                                    Some(expected_value.clone()),
+                                    expr_arena,
+                                    stmt_arena,
+                                );
 
                                 if *expected_value != value_type {
                                     self.error(
@@ -395,14 +441,15 @@ impl<'s> Analyzer<'s> {
                 value,
                 span,
             } => {
-                let instance = self.visit_expression(object, None);
+                let instance = self.visit_expression(object, None, expr_arena, stmt_arena);
                 match instance {
                     Type::Array(typ, _) => {
                         // i could spent some time to implement evaluating expressions for
                         // checking index out of bounds, but it will be like in Rust: panics at
                         // the runtime
 
-                        let index_type = self.visit_expression(index, Some(Type::USIZE));
+                        let index_type =
+                            self.visit_expression(index, Some(Type::USIZE), expr_arena, stmt_arena);
 
                         if index_type != Type::USIZE {
                             self.error(SemanticError::TypesMismatch {
@@ -418,7 +465,8 @@ impl<'s> Analyzer<'s> {
                             });
                         }
 
-                        let value_type = self.visit_expression(value, Some(*typ.clone()));
+                        let value_type =
+                            self.visit_expression(value, Some(*typ.clone()), expr_arena, stmt_arena);
 
                         if value_type != *typ {
                             self.error(SemanticError::TypesMismatch {
@@ -457,7 +505,8 @@ impl<'s> Analyzer<'s> {
                         // }
                     }
                     Type::Pointer(ptr_type) => {
-                        let value_type = self.visit_expression(value, Some(*ptr_type.clone()));
+                        let value_type =
+                            self.visit_expression(value, Some(*ptr_type.clone()), expr_arena, stmt_arena);
 
                         if value_type != *ptr_type {
                             self.error(SemanticError::TypesMismatch {
@@ -556,7 +605,7 @@ impl<'s> Analyzer<'s> {
                     return;
                 }
 
-                let object_type = self.visit_expression(object, None);
+                let object_type = self.visit_expression(object, None, expr_arena, stmt_arena);
                 let unwrapped_object_type = self.unwrap_alias(&object_type).unwrap_or_else(|err| {
                     self.error(SemanticError::UnresolvedName {
                         exception: err,
@@ -571,7 +620,12 @@ impl<'s> Analyzer<'s> {
                     return;
                 };
 
-                let value_type = self.visit_expression(value, Some(unwrapped_object_type.clone()));
+                let value_type = self.visit_expression(
+                    value,
+                    Some(unwrapped_object_type.clone()),
+                    expr_arena,
+                    stmt_arena,
+                );
                 if object_type != value_type {
                     self.error(SemanticError::TypesMismatch {
                         exception: format!(
@@ -598,7 +652,8 @@ impl<'s> Analyzer<'s> {
                 match (datatype, value) {
                     (Some(datatype), Some(value)) => {
                         let value_span = Parser::get_span_expression(value);
-                        let value_type = self.visit_expression(value, Some(datatype.clone()));
+                        let value_type =
+                            self.visit_expression(value, Some(datatype.clone()), expr_arena, stmt_arena);
 
                         if &value_type != datatype {
                             let unwrapped_datatype =
@@ -643,7 +698,7 @@ impl<'s> Analyzer<'s> {
                         self.scope.add_var(*identifier, datatype.clone(), false, *span);
                     }
                     (None, Some(value)) => {
-                        let value_type = self.visit_expression(value, None);
+                        let value_type = self.visit_expression(value, None, expr_arena, stmt_arena);
                         self.scope.add_var(*identifier, value_type, true, *span);
                     }
                     (None, None) => {
@@ -718,7 +773,9 @@ impl<'s> Analyzer<'s> {
                     .for_each(|arg| function_scope.add_var(arg.0, arg.1.clone(), true, *header_span));
                 self.scope = function_scope;
 
-                block.iter().for_each(|stmt| self.visit_statement(stmt));
+                block
+                    .iter()
+                    .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
                 let exp = self
                     .unwrap_alias(&self.scope.expected)
                     .unwrap_or_else(|err| {
@@ -807,7 +864,7 @@ impl<'s> Analyzer<'s> {
                     let call_args = arguments
                         .iter()
                         .zip(expected_args)
-                        .map(|(arg, exp)| self.visit_expression(arg, Some(exp)))
+                        .map(|(arg, exp)| self.visit_expression(arg, Some(exp), expr_arena, stmt_arena))
                         .collect::<Vec<Type>>();
 
                     if call_args.len() != func_args.len() {
@@ -880,14 +937,14 @@ impl<'s> Analyzer<'s> {
                 arguments,
                 span,
             } => {
-                let _ = self.verify_macrocall(name, arguments, span);
+                let _ = self.verify_macrocall(name, arguments, span, expr_arena, stmt_arena);
             }
 
             Statements::StructDefineStatement {
                 name,
                 functions,
                 fields,
-                public,
+                public: _,
                 span,
             } => {
                 let pre_type = Type::Struct(fields.clone(), BTreeMap::new());
@@ -898,7 +955,6 @@ impl<'s> Analyzer<'s> {
                         *name,
                         element::ScopeElement {
                             datatype: pre_type,
-                            public: *public,
                         },
                     )
                     .is_some()
@@ -965,7 +1021,7 @@ impl<'s> Analyzer<'s> {
                         }
                     }
 
-                    self.visit_statement(&wrapped_statement);
+                    self.visit_statement(&wrapped_statement, expr_arena, stmt_arena);
                     let signature = self.scope.get_fn(fn_name).unwrap();
                     let struct_ptr = self.scope.get_mut_struct(name).unwrap();
 
@@ -1006,7 +1062,7 @@ impl<'s> Analyzer<'s> {
                 name,
                 fields,
                 functions,
-                public,
+                public: _,
                 span,
             } => {
                 let pre_type = Type::Enum(fields.to_vec(), BTreeMap::new());
@@ -1014,7 +1070,6 @@ impl<'s> Analyzer<'s> {
                     *name,
                     element::ScopeElement {
                         datatype: pre_type,
-                        public: *public,
                     },
                 );
 
@@ -1050,7 +1105,7 @@ impl<'s> Analyzer<'s> {
                 );
 
                 self.scope
-                    .add_enum(*name, enum_type.clone(), *public)
+                    .add_enum(*name, enum_type.clone(), true)
                     .unwrap_or_else(|err| {
                         self.error(SemanticError::UnresolvedName {
                             exception: err,
@@ -1094,7 +1149,8 @@ impl<'s> Analyzer<'s> {
                 else_block,
                 span,
             } => {
-                let condition_type = self.visit_expression(condition, None);
+                let condition_type =
+                    self.visit_expression(condition, None, expr_arena, stmt_arena);
 
                 if condition_type != Type::Bool {
                     self.error(SemanticError::TypesMismatch {
@@ -1113,7 +1169,7 @@ impl<'s> Analyzer<'s> {
 
                 then_block
                     .iter()
-                    .for_each(|stmt| self.visit_statement(stmt));
+                    .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
 
                 let then_block_type = self.scope.returned.clone();
 
@@ -1157,7 +1213,7 @@ impl<'s> Analyzer<'s> {
 
                     else_block
                         .iter()
-                        .for_each(|stmt| self.visit_statement(stmt));
+                        .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
 
                     let else_block_type = self.scope.returned.clone();
 
@@ -1191,7 +1247,8 @@ impl<'s> Analyzer<'s> {
                 block,
                 span,
             } => {
-                let condition_type = self.visit_expression(condition, None);
+                let condition_type =
+                    self.visit_expression(condition, None, expr_arena, stmt_arena);
 
                 if condition_type != Type::Bool {
                     self.error(SemanticError::TypesMismatch {
@@ -1211,7 +1268,9 @@ impl<'s> Analyzer<'s> {
                 new_scope.is_loop = true;
                 self.scope = new_scope;
 
-                block.iter().for_each(|stmt| self.visit_statement(stmt));
+                block
+                    .iter()
+                    .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
 
                 let block_type = self.scope.returned.clone();
 
@@ -1262,7 +1321,7 @@ impl<'s> Analyzer<'s> {
                     Type::USIZE,
                 ];
 
-                let iterator_type = self.visit_expression(iterator, None);
+                let iterator_type = self.visit_expression(iterator, None, expr_arena, stmt_arena);
                 let mut binding_type = iterator_type.clone();
 
                 match iterator_type.clone() {
@@ -1361,7 +1420,9 @@ impl<'s> Analyzer<'s> {
                 new_scope.add_var(*binding, binding_type, true, *span);
                 self.scope = new_scope;
 
-                block.iter().for_each(|stmt| self.visit_statement(stmt));
+                block
+                    .iter()
+                    .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
 
                 let block_type = self.scope.returned.clone();
 
@@ -1546,7 +1607,7 @@ impl<'s> Analyzer<'s> {
                 // }
             }
 
-            Statements::IncludeStatement { path, span } => {
+            Statements::IncludeStatement { path, span: _ } => {
                 let (import_path, path_span) =
                     if let Expressions::Value(Value::String(path), span) = path {
                         (path, span)
@@ -1561,7 +1622,6 @@ impl<'s> Analyzer<'s> {
                         src: self.source.clone(),
                         span: error::position_to_span(*path_span),
                     });
-
                     return;
                 }
 
@@ -1573,7 +1633,6 @@ impl<'s> Analyzer<'s> {
                             src: self.source.clone(),
                             span: error::position_to_span(*path_span),
                         });
-
                         PathBuf::new()
                     });
 
@@ -1581,7 +1640,13 @@ impl<'s> Analyzer<'s> {
                     return;
                 };
 
-                // Reading source code
+                let static_fname: &'static str = Box::leak(included_path.to_str().unwrap().to_string().into_boxed_str());
+
+                if self.symtable.included.contains(static_fname) {
+                    return;
+                }
+                self.symtable.included.insert(static_fname);
+
                 let src = std::fs::read_to_string(&included_path).unwrap_or_else(|err| {
                     self.error(SemanticError::IoError {
                         exception: format!("unable to read source code: {err}"),
@@ -1589,60 +1654,19 @@ impl<'s> Analyzer<'s> {
                         src: self.source.clone(),
                         span: error::position_to_span(*path_span),
                     });
-
                     String::new()
                 });
 
-                // Getting file name
-                let fname = included_path
-                    .file_name()
-                    .unwrap_or_else(|| {
-                        self.error(SemanticError::IoError {
-                            exception: "unable to resolve provided path".to_string(),
-                            help: Some("PathBuf returned None value on `file_name()`".to_string()),
-                            src: self.source.clone(),
-                            span: error::position_to_span(*path_span),
-                        });
-                        OsStr::new("")
-                    })
-                    .to_str()
-                    .unwrap_or_else(|| {
-                        self.error(SemanticError::IoError {
-                            exception: "unable to resolve provided path".to_string(),
-                            help: Some("OsStr returned None value on `to_str()`".to_string()),
-                            src: self.source.clone(),
-                            span: error::position_to_span(*path_span),
-                        });
-                        ""
-                    });
-
-                if fname.is_empty() {
-                    return;
-                };
                 if src.is_empty() {
                     return;
                 };
+
                 let static_src: &'static str = Box::leak(src.into_boxed_str());
-                let static_fname: &'static str = Box::leak(fname.to_string().into_boxed_str());
 
-                let module_name = static_fname
-                    .split('.')
-                    .next()
-                    .unwrap_or(static_fname)
-                    .to_string();
-                let static_module_name: &'static str =
-                    Box::leak(module_name.clone().into_boxed_str());
-
-                if self.symtable.included.contains_key(static_module_name) {
-                    return;
-                }
-
-                // Lexical & Syntax Analyzers
                 let lexer = genpay_lexer::Lexer::new(static_src, static_fname);
                 let mut parser = Parser::new_with_lexer(lexer, static_src, static_fname);
-                let expr_arena = typed_arena::Arena::new();
-                let stmt_arena = typed_arena::Arena::new();
-                let (ast, _) = match parser.parse(&expr_arena, &stmt_arena) {
+
+                let (ast, _) = match parser.parse(expr_arena, stmt_arena) {
                     Ok(ast) => ast,
                     Err((errors, _)) => {
                         errors
@@ -1652,71 +1676,7 @@ impl<'s> Analyzer<'s> {
                     }
                 };
 
-                // Semantical Analyzer
-                let mut analyzer = Analyzer::new(static_src, static_fname, false);
-                let (symtable, _) = match analyzer.analyze(&ast) {
-                    Ok(res) => res,
-                    Err((errors, _)) => {
-                        errors.into_iter().for_each(|err| self.errors.push(err));
-                        return;
-                    }
-                };
-
-                analyzer.scope.functions.into_iter().for_each(|func| {
-                    if func.1.public && self.scope.get_fn(func.0).is_none() {
-                        self.scope
-                            .add_fn(func.0, func.1.datatype, true)
-                            .unwrap_or_else(|err| {
-                                self.error(SemanticError::UnresolvedName {
-                                    exception: err,
-                                    help: None,
-                                    src: self.source.clone(),
-                                    span: error::position_to_span(*span),
-                                });
-                            });
-                    }
-                });
-
-                analyzer.scope.structures.into_iter().for_each(|structure| {
-                    if structure.1.public && self.scope.get_struct(structure.0).is_none() {
-                        self.scope
-                            .add_struct(structure.0, structure.1.datatype, true)
-                            .unwrap_or_else(|err| {
-                                self.error(SemanticError::UnresolvedName {
-                                    exception: err,
-                                    help: None,
-                                    src: self.source.clone(),
-                                    span: error::position_to_span(*span),
-                                });
-                            });
-                    }
-                });
-
-                analyzer.scope.enums.into_iter().for_each(|enumeration| {
-                    if enumeration.1.public && self.scope.get_enum(enumeration.0).is_none() {
-                        self.scope
-                            .add_enum(enumeration.0, enumeration.1.datatype, true)
-                            .unwrap_or_else(|err| {
-                                self.error(SemanticError::UnresolvedName {
-                                    exception: err,
-                                    help: None,
-                                    src: self.source.clone(),
-                                    span: error::position_to_span(*span),
-                                });
-                            });
-                    }
-                });
-
-                let include = Include { ast };
-                self.symtable.included.insert(static_module_name, include);
-
-                symtable.included.into_iter().for_each(|inc| {
-                    let _ = self.symtable.included.insert(inc.0, inc.1);
-                });
-
-                symtable.linked.into_iter().for_each(|link| {
-                    let _ = self.symtable.linked.insert(link);
-                })
+                ast.iter().for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
             }
 
             Statements::ExternDeclareStatement {
@@ -1877,7 +1837,8 @@ impl<'s> Analyzer<'s> {
                 }
             }
             Statements::ReturnStatement { value, span: _ } => {
-                let value_type = self.visit_expression(value, Some(self.scope.expected.clone()));
+                let value_type =
+                    self.visit_expression(value, Some(self.scope.expected.clone()), expr_arena, stmt_arena);
 
                 if Self::is_integer(&value_type)
                     && Self::is_integer(&self.scope.expected)
@@ -1902,7 +1863,9 @@ impl<'s> Analyzer<'s> {
                 new_scope.parent = Some(Box::new(self.scope.clone()));
                 self.scope = new_scope;
 
-                block.iter().for_each(|stmt| self.visit_statement(stmt));
+                block
+                    .iter()
+                    .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
 
                 if let Some(unused) = self.scope.check_unused_variables() {
                     unused.iter().for_each(|var| {
@@ -1918,7 +1881,7 @@ impl<'s> Analyzer<'s> {
             }
 
             Statements::Expression(expr) => {
-                let expr_type = self.visit_expression(expr, None);
+                let expr_type = self.visit_expression(expr, None, expr_arena, stmt_arena);
                 if expr_type != Type::Void {
                     self.warning(SemanticWarning::UnusedResult {
                         message: format!("unused result with type `{expr_type}`"),
@@ -1931,7 +1894,13 @@ impl<'s> Analyzer<'s> {
         }
     }
 
-    fn visit_expression(&mut self, expr: &Expressions<'s>, expected: Option<Type<'s>>) -> Type<'s> {
+    fn visit_expression(
+        &mut self,
+        expr: &Expressions<'s>,
+        expected: Option<Type<'s>>,
+        expr_arena: &'s Bump,
+        stmt_arena: &'s Bump,
+    ) -> Type<'s> {
         match expr {
             Expressions::Binary {
                 operand,
@@ -1939,8 +1908,8 @@ impl<'s> Analyzer<'s> {
                 rhs,
                 span,
             } => {
-                let left = self.visit_expression(lhs, expected.clone());
-                let right = self.visit_expression(rhs, Some(left.clone()));
+                let left = self.visit_expression(lhs, expected.clone(), expr_arena, stmt_arena);
+                let right = self.visit_expression(rhs, Some(left.clone()), expr_arena, stmt_arena);
 
                 match (left.clone(), right.clone()) {
                     (l, r) if Self::is_integer(&l) && Self::is_integer(&r) => {
@@ -2085,7 +2054,7 @@ impl<'s> Analyzer<'s> {
                 object,
                 span,
             } => {
-                let obj = self.visit_expression(object, expected.clone());
+                let obj = self.visit_expression(object, expected.clone(), expr_arena, stmt_arena);
 
                 match (&obj, *operand) {
                     (typ, "-") if Self::is_integer(typ) => {
@@ -2171,8 +2140,8 @@ impl<'s> Analyzer<'s> {
             } => {
                 const SUPPORTED_EXTRA_TYPES: [Type; 3] = [Type::Bool, Type::Char, Type::Null];
 
-                let left = self.visit_expression(lhs, expected.clone());
-                let right = self.visit_expression(rhs, Some(left.clone()));
+                let left = self.visit_expression(lhs, expected.clone(), expr_arena, stmt_arena);
+                let right = self.visit_expression(rhs, Some(left.clone()), expr_arena, stmt_arena);
 
                 match (left.clone(), right.clone()) {
                     (l, r)
@@ -2305,8 +2274,8 @@ impl<'s> Analyzer<'s> {
                 rhs,
                 span,
             } => {
-                let left = self.visit_expression(lhs, expected.clone());
-                let right = self.visit_expression(rhs, Some(Type::U8));
+                let left = self.visit_expression(lhs, expected.clone(), expr_arena, stmt_arena);
+                let right = self.visit_expression(rhs, Some(Type::U8), expr_arena, stmt_arena);
 
                 if !Self::is_integer(&left) || !Self::is_integer(&right) {
                     self.error(SemanticError::OperatorException {
@@ -2355,7 +2324,7 @@ impl<'s> Analyzer<'s> {
                 subelements,
                 span,
             } => {
-                let head_type = self.visit_expression(head, expected.clone());
+                let head_type = self.visit_expression(head, expected.clone(), expr_arena, stmt_arena);
 
                 let mut prev_type_display = head_type.clone();
                 let mut prev_type = self.unwrap_alias(&head_type).unwrap_or_else(|err| {
@@ -2367,7 +2336,7 @@ impl<'s> Analyzer<'s> {
                     });
                     Type::Void
                 });
-                let mut prev_expr = *head.clone();
+                let mut prev_expr: &'s Expressions<'s> = head;
                 if prev_type == Type::Void {
                     return expected.unwrap_or(head_type);
                 };
@@ -2410,7 +2379,7 @@ impl<'s> Analyzer<'s> {
                                         prev_type = Type::Pointer(Box::new(prev_type.clone()));
                                     }
 
-                                    prev_expr = sub.clone();
+                                    prev_expr = &*expr_arena.alloc(sub.clone());
                                 }
                                 Type::Enum(fields, _) => {
                                     let opt = fields.iter().find(|&x| x == field);
@@ -2423,7 +2392,7 @@ impl<'s> Analyzer<'s> {
                                         });
                                     }
 
-                                    prev_expr = Expressions::SubElement { head: Box::new(prev_expr.clone()), subelements: vec![], span: *field_span }
+                                    prev_expr = &*expr_arena.alloc(Expressions::SubElement { head: expr_arena.alloc(prev_expr.clone()), subelements: vec![], span: *field_span });
                                 },
                                 _ => {
                                     self.error(SemanticError::UnsupportedType {
@@ -2465,7 +2434,7 @@ impl<'s> Analyzer<'s> {
                                     } else if let Some(Type::Pointer(_)) = expected.clone() {
                                         prev_type = Type::Pointer(Box::new(prev_type.clone()));
                                     }
-                                    prev_expr = sub.clone();
+                                    prev_expr = &*expr_arena.alloc(sub.clone());
                                 },
                                 _ => {
                                     self.error(SemanticError::UnknownObject {
@@ -2509,7 +2478,7 @@ impl<'s> Analyzer<'s> {
                                                 let self_arg = if is_pointed_struct {
                                                     prev_expr.clone()
                                                 } else {
-                                                    Expressions::Reference { object: Box::new(prev_expr.clone()), span: (Parser::get_span_expression(&prev_expr)) }
+                                                    Expressions::Reference { object: expr_arena.alloc(prev_expr.clone()), span: (Parser::get_span_expression(&prev_expr)) }
                                                 };
 
                                                 arguments.push(self_arg);
@@ -2541,7 +2510,12 @@ impl<'s> Analyzer<'s> {
                                         }
 
                                         arguments.iter().enumerate().zip(args).for_each(|((index, expr), expected)| {
-                                            let raw_expr_type = self.visit_expression(expr, Some(expected.clone()));
+                                            let raw_expr_type = self.visit_expression(
+                                                expr,
+                                                Some(expected.clone()),
+                                                expr_arena,
+                                                stmt_arena,
+                                            );
                                             let expr_type = self.unwrap_alias(&raw_expr_type).unwrap_or_else(|err| {
                                                 self.error(SemanticError::UnresolvedName {
                                                     exception: err,
@@ -2608,7 +2582,12 @@ impl<'s> Analyzer<'s> {
                                         }
 
                                         arguments.iter().enumerate().zip(args).for_each(|((index, expr), expected)| {
-                                            let raw_expr_type = self.visit_expression(expr, Some(expected.clone()));
+                                            let raw_expr_type = self.visit_expression(
+                                                expr,
+                                                Some(expected.clone()),
+                                                expr_arena,
+                                                stmt_arena,
+                                            );
                                             let expr_type = self.unwrap_alias(&raw_expr_type).unwrap_or_else(|err| {
                                                 self.error(SemanticError::UnresolvedName {
                                                     exception: err,
@@ -2685,7 +2664,12 @@ impl<'s> Analyzer<'s> {
                                                     });
                                                     Type::Void
                                                 });
-                                                let provided_type = self.visit_expression(field.1, Some(field_type.clone()));
+                                                let provided_type = self.visit_expression(
+                                                    field.1,
+                                                    Some(field_type.clone()),
+                                                    expr_arena,
+                                                    stmt_arena,
+                                                );
 
                                                 if field_type != provided_type && field_type != Type::Void {
                                                     self.error(SemanticError::TypesMismatch {
@@ -2765,7 +2749,9 @@ impl<'s> Analyzer<'s> {
                     let call_args = arguments
                         .iter()
                         .zip(func_args.clone())
-                        .map(|(arg, exp)| self.visit_expression(arg, Some(exp)))
+                        .map(|(arg, exp)| {
+                            self.visit_expression(arg, Some(exp), expr_arena, stmt_arena)
+                        })
                         .collect::<Vec<Type>>();
 
                     if call_args.len() != func_args.len() {
@@ -2846,15 +2832,15 @@ impl<'s> Analyzer<'s> {
                 name,
                 arguments,
                 span,
-            } => self.verify_macrocall(name, arguments, span),
+            } => self.verify_macrocall(name, arguments, span, expr_arena, stmt_arena),
 
             Expressions::Reference { object, span: _ } => {
-                let obj = self.visit_expression(object, expected);
+                let obj = self.visit_expression(object, expected, expr_arena, stmt_arena);
 
                 Type::Pointer(Box::new(obj))
             }
             Expressions::Dereference { object, span } => {
-                let obj = self.visit_expression(object, expected.clone());
+                let obj = self.visit_expression(object, expected.clone(), expr_arena, stmt_arena);
 
                 match obj {
                     Type::Pointer(ptr_type) => *ptr_type,
@@ -2930,10 +2916,10 @@ impl<'s> Analyzer<'s> {
                     return Type::Void;
                 }
 
-                let arr_type = self.visit_expression(&values[0], None);
+                let arr_type = self.visit_expression(&values[0], None, expr_arena, stmt_arena);
 
                 values.iter().for_each(|val| {
-                    let val_type = self.visit_expression(val, None);
+                    let val_type = self.visit_expression(val, None, expr_arena, stmt_arena);
                     if val_type != arr_type {
                         self.error(SemanticError::TypesMismatch {
                             exception: format!(
@@ -2970,7 +2956,7 @@ impl<'s> Analyzer<'s> {
                 let types = values
                     .iter()
                     .zip(expected_types)
-                    .map(|(val, exp)| self.visit_expression(val, exp))
+                    .map(|(val, exp)| self.visit_expression(val, exp, expr_arena, stmt_arena))
                     .collect::<Vec<Type>>();
 
                 Type::Tuple(types)
@@ -2980,7 +2966,7 @@ impl<'s> Analyzer<'s> {
                 index,
                 span,
             } => {
-                let obj = self.visit_expression(object, expected.clone());
+                let obj = self.visit_expression(object, expected.clone(), expr_arena, stmt_arena);
 
                 match obj {
                     Type::Tuple(types) => {
@@ -3115,8 +3101,12 @@ impl<'s> Analyzer<'s> {
                             // });
 
                             let field_type = field_type.clone();
-                            let provided_type =
-                                self.visit_expression(field.1, Some(field_type.clone()));
+                            let provided_type = self.visit_expression(
+                                field.1,
+                                Some(field_type.clone()),
+                                expr_arena,
+                                stmt_arena,
+                            );
 
                             if field_type != provided_type && field_type != Type::Void {
                                 self.error(SemanticError::TypesMismatch {
@@ -3172,7 +3162,9 @@ impl<'s> Analyzer<'s> {
                 new_scope.expected = expected.unwrap_or(Type::Void);
                 self.scope = new_scope;
 
-                block.iter().for_each(|stmt| self.visit_statement(stmt));
+                block
+                    .iter()
+                    .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
 
                 let scope_type = self.scope.returned.clone();
 
@@ -3416,6 +3408,8 @@ impl<'s> Analyzer<'s> {
         name: &str,
         arguments: &[Expressions<'s>],
         span: &(usize, usize),
+        expr_arena: &'s Bump,
+        stmt_arena: &'s Bump,
     ) -> Type<'s> {
         let macro_object = self
             .compiler_macros
@@ -3432,7 +3426,7 @@ impl<'s> Analyzer<'s> {
                 CompilerMacros::None
             });
 
-        macro_object.verify_call(self, arguments, span)
+        macro_object.verify_call(self, arguments, span, expr_arena, stmt_arena)
     }
 
     fn verify_cast(&self, from: &Type<'s>, to: &Type<'s>) -> Result<(), String> {

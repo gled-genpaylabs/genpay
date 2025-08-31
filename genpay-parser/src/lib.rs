@@ -6,9 +6,9 @@ use crate::{
     types::Type,
     value::Value,
 };
+use bumpalo::Bump;
 use genpay_lexer::{token::Token, token_type::TokenType, Lexer};
 use miette::NamedSource;
-use typed_arena::Arena;
 
 /// Custom Defined Error Types
 pub mod error;
@@ -125,7 +125,11 @@ impl<'a> Parser<'a> {
 
     /// **Main Parser Function** <br/>
     /// Requires new created self instance. **Can be called only once!**
-    pub fn parse(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Result<ParserOk<'a>, ParserErr> {
+    pub fn parse(
+        &mut self,
+        expr_arena: &'a Bump,
+        stmt_arena: &'a Bump,
+    ) -> Result<ParserOk<'a>, ParserErr> {
         let mut output = Vec::new();
 
         while self.current().token_type != TokenType::EOF {
@@ -334,7 +338,7 @@ impl<'a> Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    fn term(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Expressions<'a> {
+    fn term(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         let current = self.current();
         let _ = self.next();
 
@@ -405,7 +409,7 @@ impl<'a> Parser<'a> {
                     }
 
                     return Expressions::Tuple {
-                        values: expr_arena.alloc_extend(values),
+                        values: expr_arena.alloc_slice_fill_iter(values),
                         span: (span_start, span_end),
                     };
                 }
@@ -519,7 +523,7 @@ impl<'a> Parser<'a> {
                 }
 
                 Expressions::Scope {
-                    block: stmt_arena.alloc_extend(block),
+                    block: stmt_arena.alloc_slice_fill_iter(block),
                     span: (span_start, span_end),
                 }
             }
@@ -546,7 +550,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn expression(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Expressions<'a> {
+    fn expression(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         let node = self.term(expr_arena, stmt_arena);
         let current = self.current();
 
@@ -595,7 +599,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn statement(&mut self, expr_arena: &'a Arena<Expressions<'a>>, stmt_arena: &'a Arena<Statements<'a>>) -> Statements<'a> {
+    fn statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         if self.current().token_type == TokenType::EOF {
             self.eof = true;
             return Statements::None;
@@ -1034,8 +1038,8 @@ fn binary_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1076,8 +1080,8 @@ fn binary_advanced_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1134,8 +1138,8 @@ fn unary_negative_expression() {
     const FILENAME: &str = "test.dn";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1171,8 +1175,8 @@ fn unary_not_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1208,8 +1212,8 @@ fn boolean_eq_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1250,8 +1254,8 @@ fn boolean_ne_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1292,8 +1296,8 @@ fn boolean_bt_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1334,8 +1338,8 @@ fn boolean_lt_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1376,8 +1380,8 @@ fn boolean_advanced_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1451,8 +1455,8 @@ fn bitwise_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1493,8 +1497,8 @@ fn argument_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1526,8 +1530,8 @@ fn argument_advanced_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1562,8 +1566,8 @@ fn subelement_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1605,8 +1609,8 @@ fn subelement_advanced_expression() {
     const FILENAME: &str = "test.enpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1662,8 +1666,8 @@ fn fncall_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1695,8 +1699,8 @@ fn fncall_advanced_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1745,8 +1749,8 @@ fn reference_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1777,8 +1781,8 @@ fn reference_advanced_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1809,8 +1813,8 @@ fn dereference_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1841,8 +1845,8 @@ fn dereference_advanced_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1877,8 +1881,8 @@ fn array_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1923,8 +1927,8 @@ fn tuple_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -1965,8 +1969,8 @@ fn tuple_advanced_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -2008,8 +2012,8 @@ fn slice_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -2046,8 +2050,8 @@ fn struct_expression() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     if let Some(Statements::AnnotationStatement {
@@ -2084,8 +2088,8 @@ fn assign_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2115,8 +2119,8 @@ fn binary_assign_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2147,8 +2151,8 @@ fn deref_assign_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2176,8 +2180,8 @@ fn slice_assign_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2210,8 +2214,8 @@ fn field_assign_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2254,8 +2258,8 @@ fn annotation_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2279,8 +2283,8 @@ fn annotation_statement_with_type() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2306,8 +2310,8 @@ fn annotation_statement_with_value() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2336,8 +2340,8 @@ fn annotation_statement_full() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2367,8 +2371,8 @@ fn function_define_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2397,8 +2401,8 @@ fn function_define_statement_with_type() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2427,8 +2431,8 @@ fn function_define_statement_with_args() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2471,8 +2475,8 @@ fn function_define_statement_with_block() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2524,8 +2528,8 @@ fn function_define_statement_public() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2577,8 +2581,8 @@ fn function_call_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2600,8 +2604,8 @@ fn function_call_advanced_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2632,8 +2636,8 @@ fn struct_define_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2668,8 +2672,8 @@ fn struct_define_with_fn_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2718,8 +2722,8 @@ fn struct_define_public_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2770,8 +2774,8 @@ fn enum_define_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2810,8 +2814,8 @@ fn enum_define_with_fn_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2866,8 +2870,8 @@ fn enum_define_pub_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2906,8 +2910,8 @@ fn typedef_statement() {
     const FILENAME: &str = "test.dn";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2929,8 +2933,8 @@ fn typedef_advanced_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2955,8 +2959,8 @@ fn if_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -2984,8 +2988,8 @@ fn if_else_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -3013,8 +3017,8 @@ fn while_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -3038,8 +3042,8 @@ fn for_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -3065,8 +3069,8 @@ fn import_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -3087,8 +3091,8 @@ fn break_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -3103,8 +3107,8 @@ fn return_statement() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     match ast.first() {
@@ -3127,8 +3131,8 @@ fn basic_values() {
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
-    let expr_arena = Arena::new();
-    let stmt_arena = Arena::new();
+    let expr_arena = Bump::new();
+    let stmt_arena = Bump::new();
     let (ast, _) = parser.parse(&expr_arena, &stmt_arena).unwrap();
 
     let mut ast_iter = ast.into_iter();

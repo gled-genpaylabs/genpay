@@ -1,5 +1,6 @@
 use super::MacroObject;
 use crate::Analyzer;
+use bumpalo::Bump;
 use genpay_parser::{expressions::Expressions, types::Type};
 
 /// **Calls panic exit with formatted message from program**
@@ -12,8 +13,10 @@ impl<'s> MacroObject<'s> for PanicMacro {
         analyzer: &mut Analyzer<'s>,
         arguments: &[Expressions<'s>],
         span: &(usize, usize),
+        expr_arena: &'s Bump,
+        stmt_arena: &'s Bump,
     ) -> Type<'s> {
-        let _ = super::FormatMacro.verify_call(analyzer, arguments, span);
+        let _ = super::FormatMacro.verify_call(analyzer, arguments, span, expr_arena, stmt_arena);
         analyzer.scope.returned = Type::Undefined;
 
         Type::Void

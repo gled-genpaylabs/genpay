@@ -15,12 +15,16 @@ mod print;
 mod println;
 mod sizeof;
 
+use bumpalo::Bump;
+
 pub trait MacroObject<'s>: std::fmt::Debug {
     fn verify_call(
         &self,
         analyzer: &mut Analyzer<'s>,
         arguments: &[Expressions<'s>],
         span: &(usize, usize),
+        expr_arena: &'s Bump,
+        stmt_arena: &'s Bump,
     ) -> Type<'s>;
 }
 
@@ -42,20 +46,28 @@ impl<'s> MacroObject<'s> for CompilerMacros {
         analyzer: &mut Analyzer<'s>,
         arguments: &[Expressions<'s>],
         span: &(usize, usize),
+        expr_arena: &'s Bump,
+        stmt_arena: &'s Bump,
     ) -> Type<'s> {
         match self {
-            CompilerMacros::PrintMacro(instance) => instance.verify_call(analyzer, arguments, span),
+            CompilerMacros::PrintMacro(instance) => {
+                instance.verify_call(analyzer, arguments, span, expr_arena, stmt_arena)
+            }
             CompilerMacros::PrintlnMacro(instance) => {
-                instance.verify_call(analyzer, arguments, span)
+                instance.verify_call(analyzer, arguments, span, expr_arena, stmt_arena)
             }
             CompilerMacros::FormatMacro(instance) => {
-                instance.verify_call(analyzer, arguments, span)
+                instance.verify_call(analyzer, arguments, span, expr_arena, stmt_arena)
             }
-            CompilerMacros::PanicMacro(instance) => instance.verify_call(analyzer, arguments, span),
+            CompilerMacros::PanicMacro(instance) => {
+                instance.verify_call(analyzer, arguments, span, expr_arena, stmt_arena)
+            }
             CompilerMacros::SizeofMacro(instance) => {
-                instance.verify_call(analyzer, arguments, span)
+                instance.verify_call(analyzer, arguments, span, expr_arena, stmt_arena)
             }
-            CompilerMacros::CastMacro(instance) => instance.verify_call(analyzer, arguments, span),
+            CompilerMacros::CastMacro(instance) => {
+                instance.verify_call(analyzer, arguments, span, expr_arena, stmt_arena)
+            }
             CompilerMacros::None => Type::Void,
         }
     }
