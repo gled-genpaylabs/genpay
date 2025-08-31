@@ -8,7 +8,7 @@
 
   <div>
     <h1>Genpay Programming Language</h1>
-    <i>A language for efficient payment solutions</i>
+    <i>A language for efficient payments</i>
   </div>
   <br/>
   <div>
