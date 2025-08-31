@@ -1,7 +1,3 @@
-//! # Symbol Table
-//! A data structure which contains intermediate units for compiler. <br/>
-//! Wikipedia Explanation: <https://en.wikipedia.org/wiki/Symbol_table>
-
 use genpay_parser::{statements::Statements, types::Type};
 use std::{
     collections::{HashMap, HashSet},
