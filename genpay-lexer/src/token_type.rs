@@ -1,16 +1,3 @@
-//! ## Token Type
-//! Public enumeration of all avaible in Lexical Analyzer types of token
-//!
-//! ## Example:
-//! ```rust
-//! use genpay_lexer::token_type::TokenType;
-//!
-//! let string_tty = TokenType::String;
-//! println!("{}", string_tty);
-//!
-//! assert!(string_tty.to_string() == "String");
-//! ```
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TokenType {
     Identifier, // abc
