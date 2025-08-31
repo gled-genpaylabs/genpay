@@ -10,4 +10,5 @@ license.workspace = true
 [dependencies]
 miette = { version = "7.5.0", features = ["fancy"] }
 thiserror = "2.0.12"
+typed-arena = "2.0.2"
 genpay-lexer = { path = "../genpay-lexer" }

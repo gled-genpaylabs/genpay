@@ -1640,7 +1640,9 @@ impl<'s> Analyzer<'s> {
                 // Lexical & Syntax Analyzers
                 let lexer = genpay_lexer::Lexer::new(static_src, static_fname);
                 let mut parser = Parser::new_with_lexer(lexer, static_src, static_fname);
-                let (ast, _) = match parser.parse() {
+                let expr_arena = typed_arena::Arena::new();
+                let stmt_arena = typed_arena::Arena::new();
+                let (ast, _) = match parser.parse(&expr_arena, &stmt_arena) {
                     Ok(ast) => ast,
                     Err((errors, _)) => {
                         errors

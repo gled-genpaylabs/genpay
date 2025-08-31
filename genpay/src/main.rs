@@ -116,7 +116,9 @@ fn main() {
     // Syntax Analyzer initialization.
     // It takes full ownership for tokens vector (because we don't need them anymore)
     let mut parser = genpay_parser::Parser::new_with_lexer(lexer, &src, fname);
-    let (ast, warns) = match parser.parse() {
+    let expr_arena = typed_arena::Arena::new();
+    let stmt_arena = typed_arena::Arena::new();
+    let (ast, warns) = match parser.parse(&expr_arena, &stmt_arena) {
         Ok(ast) => ast,
         Err(e) => {
             let (errors, warns) = e;
