@@ -1,23 +1,3 @@
-//! # Genpay Lexical Analyzer
-//! Tools to convert user's source code into abstracted data structures - tokens. <br/>
-//! Wikipedia Explanation: <https://en.wikipedia.org/wiki/Lexical_analysis> <br/>
-//!
-//! Main tool here is the [`Lexer`] structure (you can also check examples there)
-//!
-//! ## Usage
-//! ```rust
-//! use genpay_lexer::{Lexer, token_type::TokenType};
-//!
-//! let input = "1 + 1";
-//! let mut lexer = Lexer::new(input, "test.genpay");
-//!
-//! let tokens: Vec<_> = lexer.collect();
-//!
-//! assert!(tokens.len() == 3);
-//!
-//! println!("{:?}", tokens);
-//! ```
-
 use crate::{
     error::LexerError,
     token::Token,
