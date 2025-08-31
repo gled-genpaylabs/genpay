@@ -3,6 +3,7 @@ use crate::{
     Analyzer,
     error::{self, SemanticError},
 };
+use bumpalo::Bump;
 use genpay_parser::{expressions::Expressions, types::Type};
 
 /// **Returns size of provided type / expression**
@@ -16,6 +17,8 @@ impl<'s> MacroObject<'s> for SizeofMacro {
         analyzer: &mut Analyzer<'s>,
         arguments: &[Expressions<'s>],
         span: &(usize, usize),
+        _expr_arena: &'s Bump,
+        _stmt_arena: &'s Bump,
     ) -> Type<'s> {
         const MINIMUM_ARGUMENTS_LEN: usize = 1;
         const RETURN_TYPE: Type = Type::USIZE;

@@ -10,4 +10,5 @@ license.workspace = true
 [dependencies]
 miette = { version = "7.5.0", features = ["fancy"] }
 thiserror = "2.0.12"
+bumpalo = { version = "3.16.0", features = ["collections"] }
 genpay-lexer = { path = "../genpay-lexer" }

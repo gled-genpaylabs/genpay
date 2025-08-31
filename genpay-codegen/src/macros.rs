@@ -33,7 +33,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                 let compiled_args = arguments
                     .iter()
                     .skip(1)
-                    .map(|expr| self.compile_expression(expr.clone(), None))
+                    .map(|expr| self.compile_expression(expr, None))
                     .collect::<Vec<(Type<'ctx>, BasicValueEnum<'ctx>)>>();
 
                 let format_specifiers = compiled_args
@@ -145,7 +145,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                 let compiled_args = arguments
                     .iter()
                     .skip(1)
-                    .map(|expr| self.compile_expression(expr.clone(), None))
+                    .map(|expr| self.compile_expression(expr, None))
                     .collect::<Vec<(Type<'ctx>, BasicValueEnum<'ctx>)>>();
 
                 let format_specifiers = compiled_args
@@ -303,7 +303,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                 let compiled_args = arguments
                     .iter()
                     .skip(1)
-                    .map(|expr| self.compile_expression(expr.clone(), None))
+                    .map(|expr| self.compile_expression(expr, None))
                     .collect::<Vec<(Type<'ctx>, BasicValueEnum<'ctx>)>>();
 
                 let format_specifiers = compiled_args
@@ -378,15 +378,15 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     {
                         self.get_basic_type(r#type.clone())
                     } else {
-                        self.compile_expression(instance.clone(), None).1.get_type()
+                        self.compile_expression(instance, None).1.get_type()
                     }
                 };
 
                 (Type::USIZE, basic_type.size_of().unwrap().into())
             }
             "cast" => {
-                let from = arguments.first().unwrap().clone();
-                let to = arguments.get(1).unwrap().clone();
+                let from = arguments.first().unwrap();
+                let to = arguments.get(1).unwrap();
 
                 let from_value = self.compile_expression(from, None);
                 let to_type = self.compile_expression(to, None);

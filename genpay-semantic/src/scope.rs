@@ -138,7 +138,7 @@ impl<'s> Scope<'s> {
         &mut self,
         name: &'s str,
         return_type: Type<'s>,
-        public: bool,
+        _public: bool,
     ) -> Result<(), String> {
         if self.functions.contains_key(name) {
             return Err(format!("function `{name}` already declared"));
@@ -147,7 +147,6 @@ impl<'s> Scope<'s> {
             name,
             ScopeElement {
                 datatype: return_type,
-                public,
             },
         );
         Ok(())
@@ -167,7 +166,7 @@ impl<'s> Scope<'s> {
         &mut self,
         name: &'s str,
         struct_type: Type<'s>,
-        public: bool,
+        _public: bool,
     ) -> Result<(), String> {
         if self.structures.contains_key(name) {
             return Err(format!("structure `{name}` already declared"));
@@ -176,7 +175,6 @@ impl<'s> Scope<'s> {
             name,
             ScopeElement {
                 datatype: struct_type,
-                public,
             },
         );
         Ok(())
@@ -208,7 +206,7 @@ impl<'s> Scope<'s> {
         &mut self,
         name: &'s str,
         enum_type: Type<'s>,
-        public: bool,
+        _public: bool,
     ) -> Result<(), String> {
         if self.enums.contains_key(name) {
             return Err(format!("enum `{name}` already declared"));
@@ -217,7 +215,6 @@ impl<'s> Scope<'s> {
             name,
             ScopeElement {
                 datatype: enum_type,
-                public,
             },
         );
         Ok(())

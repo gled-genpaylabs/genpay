@@ -8,7 +8,7 @@ use std::{
 #[derive(Debug, Clone, Default)]
 pub struct SymbolTable<'s> {
     pub imports: HashMap<&'s str, Import<'s>>,
-    pub included: HashMap<&'s str, Include<'s>>,
+    pub included: HashSet<&'s str>,
     pub linked: HashSet<PathBuf>,
 }
 
@@ -36,12 +36,6 @@ pub struct Import<'s> {
 
     pub embedded_symtable: SymbolTable<'s>,
     pub source: &'s str,
-    pub ast: Vec<Statements<'s>>,
-}
-
-/// User Include Instance
-#[derive(Debug, Clone)]
-pub struct Include<'s> {
     pub ast: Vec<Statements<'s>>,
 }
 

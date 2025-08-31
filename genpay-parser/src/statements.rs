@@ -8,74 +8,74 @@ use crate::{
 use genpay_lexer::token_type::TokenType;
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Statements<'s> {
+#[derive(Debug, Clone)]
+pub enum Statements<'a> {
     /// `OBJECT = EXPRESSION`
     AssignStatement {
-        object: Expressions<'s>,
-        value: Expressions<'s>,
+        object: Expressions<'a>,
+        value: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `OBJECT BINOP= EXPRESSION`
     BinaryAssignStatement {
-        object: Expressions<'s>,
-        operand: &'s str,
-        value: Expressions<'s>,
+        object: Expressions<'a>,
+        operand: &'a str,
+        value: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `*OBJECT = EXPRESSION`
     DerefAssignStatement {
-        object: Expressions<'s>,
-        value: Expressions<'s>,
+        object: Expressions<'a>,
+        value: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `OBJECT[EXPRESSION] = EXPRESSION`
     SliceAssignStatement {
-        object: Expressions<'s>,
-        index: Expressions<'s>,
-        value: Expressions<'s>,
+        object: Expressions<'a>,
+        index: Expressions<'a>,
+        value: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `OBJECT.FIELD= EXPRESSION`
     FieldAssignStatement {
-        object: Expressions<'s>,
-        value: Expressions<'s>,
+        object: Expressions<'a>,
+        value: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `let IDENTIFIER = EXPRESSION`
     AnnotationStatement {
-        identifier: &'s str,
-        datatype: Option<Type<'s>>,
-        value: Option<Expressions<'s>>,
+        identifier: &'a str,
+        datatype: Option<Type<'a>>,
+        value: Option<Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `pub/NOTHING fn IDENTIFIER ( IDENTIFIER: TYPE, IDENTIFIER: TYPE, ... ) TYPE/NOTHING { STATEMENTS }`
     FunctionDefineStatement {
-        name: &'s str,
-        datatype: Type<'s>,
-        arguments: Box<[(&'s str, Type<'s>)]>,
-        block: Box<[Statements<'s>]>,
+        name: &'a str,
+        datatype: Type<'a>,
+        arguments: Vec<(&'a str, Type<'a>)>,
+        block: Vec<Statements<'a>>,
         public: bool,
         span: (usize, usize),
         header_span: (usize, usize),
     },
     /// `NAME ( EXPRESSION, EXPRESSION, ... )`
     FunctionCallStatement {
-        name: &'s str,
-        arguments: Box<[Expressions<'s>]>,
+        name: &'a str,
+        arguments: Vec<Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `MACRONAME! ( EXPRESSION, EXPRESSION, ... )`
     MacroCallStatement {
-        name: &'s str,
-        arguments: Box<[Expressions<'s>]>,
+        name: &'a str,
+        arguments: Vec<Expressions<'a>>,
         span: (usize, usize),
     },
 
@@ -88,9 +88,9 @@ pub enum Statements<'s> {
     /// }
     /// ```
     StructDefineStatement {
-        name: &'s str,
-        fields: BTreeMap<&'s str, Type<'s>>,
-        functions: BTreeMap<&'s str, Statements<'s>>,
+        name: &'a str,
+        fields: BTreeMap<&'a str, Type<'a>>,
+        functions: BTreeMap<&'a str, Statements<'a>>,
         public: bool,
         span: (usize, usize),
     },
@@ -104,61 +104,61 @@ pub enum Statements<'s> {
     /// }
     /// ```
     EnumDefineStatement {
-        name: &'s str,
-        fields: Box<[&'s str]>,
-        functions: BTreeMap<&'s str, Statements<'s>>,
+        name: &'a str,
+        fields: Vec<&'a str>,
+        functions: BTreeMap<&'a str, Statements<'a>>,
         public: bool,
         span: (usize, usize),
     },
 
     /// `typedef IDENTIFIER TYPE`
     TypedefStatement {
-        alias: &'s str,
-        datatype: Type<'s>,
+        alias: &'a str,
+        datatype: Type<'a>,
         span: (usize, usize),
     },
 
     /// `if EXPRESSION { STATEMENTS } else { STATEMENTS }`
     IfStatement {
-        condition: Expressions<'s>,
-        then_block: Box<[Statements<'s>]>,
-        else_block: Option<Box<[Statements<'s>]>>,
+        condition: Expressions<'a>,
+        then_block: Vec<Statements<'a>>,
+        else_block: Option<Vec<Statements<'a>>>,
         span: (usize, usize),
     },
 
     /// `while EXPRESSION { STATEMENTS }`
     WhileStatement {
-        condition: Expressions<'s>,
-        block: Box<[Statements<'s>]>,
+        condition: Expressions<'a>,
+        block: Vec<Statements<'a>>,
         span: (usize, usize),
     },
 
     /// `for IDENTIFIER = OBJECT { STATEMENTS }`
     ForStatement {
-        binding: &'s str,
-        iterator: Expressions<'s>,
-        block: Box<[Statements<'s>]>,
+        binding: &'a str,
+        iterator: Expressions<'a>,
+        block: Vec<Statements<'a>>,
         span: (usize, usize),
     },
 
     /// `import "PATH"`
     ImportStatement {
-        path: Expressions<'s>,
+        path: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `include "PATH"`
     IncludeStatement {
-        path: Expressions<'s>,
+        path: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `extern "EXT_TYPE" pub/NOTHING fn IDENTIFIER ( TYPE, TYPE, ... ) TYPE/NOTHING`
     ExternStatement {
-        identifier: &'s str,
-        arguments: Box<[Type<'s>]>,
-        return_type: Type<'s>,
-        extern_type: &'s str,
+        identifier: &'a str,
+        arguments: Vec<Type<'a>>,
+        return_type: Type<'a>,
+        extern_type: &'a str,
         is_var_args: bool,
         public: bool,
         span: (usize, usize),
@@ -166,14 +166,14 @@ pub enum Statements<'s> {
 
     /// `_extern_declare IDENTIFIER EXPRESSION`
     ExternDeclareStatement {
-        identifier: &'s str,
-        datatype: Type<'s>,
+        identifier: &'a str,
+        datatype: Type<'a>,
         span: (usize, usize),
     },
 
     /// `_link_c "PATH"`
     LinkCStatement {
-        path: Expressions<'s>,
+        path: Expressions<'a>,
         span: (usize, usize),
     },
 
@@ -184,23 +184,289 @@ pub enum Statements<'s> {
 
     /// `return EXPRESSION`
     ReturnStatement {
-        value: Expressions<'s>,
+        value: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `{ STATEMENTS }`
     ScopeStatement {
-        block: Box<[Statements<'s>]>,
+        block: Vec<Statements<'a>>,
         span: (usize, usize),
     },
 
-    Expression(Expressions<'s>),
+    Expression(Expressions<'a>),
     None,
 }
 
-impl<'s> Parser<'s> {
+impl<'a> PartialEq for Statements<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Statements::AssignStatement {
+                    object: o1,
+                    value: v1,
+                    ..
+                },
+                Statements::AssignStatement {
+                    object: o2,
+                    value: v2,
+                    ..
+                },
+            ) => o1 == o2 && v1 == v2,
+            (
+                Statements::BinaryAssignStatement {
+                    object: o1,
+                    operand: op1,
+                    value: v1,
+                    ..
+                },
+                Statements::BinaryAssignStatement {
+                    object: o2,
+                    operand: op2,
+                    value: v2,
+                    ..
+                },
+            ) => o1 == o2 && op1 == op2 && v1 == v2,
+            (
+                Statements::DerefAssignStatement {
+                    object: o1,
+                    value: v1,
+                    ..
+                },
+                Statements::DerefAssignStatement {
+                    object: o2,
+                    value: v2,
+                    ..
+                },
+            ) => o1 == o2 && v1 == v2,
+            (
+                Statements::SliceAssignStatement {
+                    object: o1,
+                    index: i1,
+                    value: v1,
+                    ..
+                },
+                Statements::SliceAssignStatement {
+                    object: o2,
+                    index: i2,
+                    value: v2,
+                    ..
+                },
+            ) => o1 == o2 && i1 == i2 && v1 == v2,
+            (
+                Statements::FieldAssignStatement {
+                    object: o1,
+                    value: v1,
+                    ..
+                },
+                Statements::FieldAssignStatement {
+                    object: o2,
+                    value: v2,
+                    ..
+                },
+            ) => o1 == o2 && v1 == v2,
+            (
+                Statements::AnnotationStatement {
+                    identifier: i1,
+                    datatype: d1,
+                    value: v1,
+                    ..
+                },
+                Statements::AnnotationStatement {
+                    identifier: i2,
+                    datatype: d2,
+                    value: v2,
+                    ..
+                },
+            ) => i1 == i2 && d1 == d2 && v1 == v2,
+            (
+                Statements::FunctionDefineStatement {
+                    name: n1,
+                    datatype: d1,
+                    arguments: a1,
+                    block: b1,
+                    public: p1,
+                    ..
+                },
+                Statements::FunctionDefineStatement {
+                    name: n2,
+                    datatype: d2,
+                    arguments: a2,
+                    block: b2,
+                    public: p2,
+                    ..
+                },
+            ) => n1 == n2 && d1 == d2 && a1 == a2 && b1 == b2 && p1 == p2,
+            (
+                Statements::FunctionCallStatement {
+                    name: n1,
+                    arguments: a1,
+                    ..
+                },
+                Statements::FunctionCallStatement {
+                    name: n2,
+                    arguments: a2,
+                    ..
+                },
+            ) => n1 == n2 && a1 == a2,
+            (
+                Statements::MacroCallStatement {
+                    name: n1,
+                    arguments: a1,
+                    ..
+                },
+                Statements::MacroCallStatement {
+                    name: n2,
+                    arguments: a2,
+                    ..
+                },
+            ) => n1 == n2 && a1 == a2,
+            (
+                Statements::StructDefineStatement {
+                    name: n1,
+                    fields: f1,
+                    functions: func1,
+                    public: p1,
+                    ..
+                },
+                Statements::StructDefineStatement {
+                    name: n2,
+                    fields: f2,
+                    functions: func2,
+                    public: p2,
+                    ..
+                },
+            ) => n1 == n2 && f1 == f2 && func1 == func2 && p1 == p2,
+            (
+                Statements::EnumDefineStatement {
+                    name: n1,
+                    fields: f1,
+                    functions: func1,
+                    public: p1,
+                    ..
+                },
+                Statements::EnumDefineStatement {
+                    name: n2,
+                    fields: f2,
+                    functions: func2,
+                    public: p2,
+                    ..
+                },
+            ) => n1 == n2 && f1 == f2 && func1 == func2 && p1 == p2,
+            (
+                Statements::TypedefStatement {
+                    alias: a1,
+                    datatype: d1,
+                    ..
+                },
+                Statements::TypedefStatement {
+                    alias: a2,
+                    datatype: d2,
+                    ..
+                },
+            ) => a1 == a2 && d1 == d2,
+            (
+                Statements::IfStatement {
+                    condition: c1,
+                    then_block: t1,
+                    else_block: e1,
+                    ..
+                },
+                Statements::IfStatement {
+                    condition: c2,
+                    then_block: t2,
+                    else_block: e2,
+                    ..
+                },
+            ) => c1 == c2 && t1 == t2 && e1 == e2,
+            (
+                Statements::WhileStatement {
+                    condition: c1,
+                    block: b1,
+                    ..
+                },
+                Statements::WhileStatement {
+                    condition: c2,
+                    block: b2,
+                    ..
+                },
+            ) => c1 == c2 && b1 == b2,
+            (
+                Statements::ForStatement {
+                    binding: b1,
+                    iterator: i1,
+                    block: bl1,
+                    ..
+                },
+                Statements::ForStatement {
+                    binding: b2,
+                    iterator: i2,
+                    block: bl2,
+                    ..
+                },
+            ) => b1 == b2 && i1 == i2 && bl1 == bl2,
+            (Statements::ImportStatement { path: p1, .. }, Statements::ImportStatement { path: p2, .. }) => {
+                p1 == p2
+            }
+            (
+                Statements::IncludeStatement { path: p1, .. },
+                Statements::IncludeStatement { path: p2, .. },
+            ) => p1 == p2,
+            (
+                Statements::ExternStatement {
+                    identifier: i1,
+                    arguments: a1,
+                    return_type: r1,
+                    extern_type: e1,
+                    is_var_args: iv1,
+                    public: p1,
+                    ..
+                },
+                Statements::ExternStatement {
+                    identifier: i2,
+                    arguments: a2,
+                    return_type: r2,
+                    extern_type: e2,
+                    is_var_args: iv2,
+                    public: p2,
+                    ..
+                },
+            ) => {
+                i1 == i2 && a1 == a2 && r1 == r2 && e1 == e2 && iv1 == iv2 && p1 == p2
+            }
+            (
+                Statements::ExternDeclareStatement {
+                    identifier: i1,
+                    datatype: d1,
+                    ..
+                },
+                Statements::ExternDeclareStatement {
+                    identifier: i2,
+                    datatype: d2,
+                    ..
+                },
+            ) => i1 == i2 && d1 == d2,
+            (Statements::LinkCStatement { path: p1, .. }, Statements::LinkCStatement { path: p2, .. }) => {
+                p1 == p2
+            }
+            (Statements::BreakStatements { .. }, Statements::BreakStatements { .. }) => true,
+            (Statements::ReturnStatement { value: v1, .. }, Statements::ReturnStatement { value: v2, .. }) => {
+                v1 == v2
+            }
+            (
+                Statements::ScopeStatement { block: b1, .. },
+                Statements::ScopeStatement { block: b2, .. },
+            ) => b1 == b2,
+            (Statements::Expression(e1), Statements::Expression(e2)) => e1 == e2,
+            (Statements::None, Statements::None) => true,
+            _ => false,
+        }
+    }
+}
+
+impl<'a> Parser<'a> {
     #[inline]
-    pub fn get_span_statement(stmt: &Statements<'s>) -> (usize, usize) {
+    pub fn get_span_statement(stmt: &Statements<'a>) -> (usize, usize) {
         match stmt {
             Statements::AssignStatement { span, .. } => *span,
             Statements::BinaryAssignStatement { span, .. } => *span,
@@ -231,8 +497,10 @@ impl<'s> Parser<'s> {
     }
 }
 
-impl<'s> Parser<'s> {
-    pub fn annotation_statement(&mut self) -> Statements<'s> {
+use bumpalo::Bump;
+
+impl<'a> Parser<'a> {
+    pub fn annotation_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
 
         if self.current().value == "let" {
@@ -262,7 +530,7 @@ impl<'s> Parser<'s> {
         match self.current().token_type {
             TokenType::Equal => {
                 let _ = self.next();
-                let value = self.expression();
+                let value = self.expression(expr_arena, stmt_arena);
 
                 self.skip_eos();
 
@@ -270,7 +538,7 @@ impl<'s> Parser<'s> {
                     identifier: id,
                     datatype,
                     value: Some(value.clone()),
-                    span: (span_start, self.span_expression(value).1),
+                    span: (span_start, self.span_expression(&value).1),
                 }
             }
             END_STATEMENT => {
@@ -298,13 +566,13 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn import_statement(&mut self) -> Statements<'s> {
+    pub fn import_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.current().token_type == TokenType::Keyword {
             let _ = self.next();
         }
 
-        let path = self.expression();
+        let path = self.expression(expr_arena, stmt_arena);
         self.position -= 1;
 
         let span_end = self.current().span.1;
@@ -328,13 +596,13 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn include_statement(&mut self) -> Statements<'s> {
+    pub fn include_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.current().token_type == TokenType::Keyword {
             let _ = self.next();
         }
 
-        let path = self.expression();
+        let path = self.expression(expr_arena, stmt_arena);
         let span_end = Self::get_span_expression(&path).1;
 
         self.skip_eos();
@@ -356,13 +624,13 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn if_statement(&mut self) -> Statements<'s> {
+    pub fn if_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.current().token_type == TokenType::Keyword {
             let _ = self.next();
         }
 
-        let condition = self.expression();
+        let condition = self.expression(expr_arena, stmt_arena);
 
         if self.current().token_type != TokenType::LBrace {
             self.position -= 1;
@@ -393,7 +661,7 @@ impl<'s> Parser<'s> {
                 return Statements::None;
             }
 
-            then_block.push(self.statement());
+            then_block.push(self.statement(expr_arena, stmt_arena));
             span_block_start = self.current().span.0;
         }
 
@@ -408,7 +676,7 @@ impl<'s> Parser<'s> {
                     self.skip_eos();
                     return Statements::IfStatement {
                         condition,
-                        then_block: then_block.into_boxed_slice(),
+                        then_block,
                         else_block: None,
                         span: (span_start, span_end),
                     };
@@ -434,12 +702,12 @@ impl<'s> Parser<'s> {
                             return Statements::None;
                         }
 
-                        let stmt = self.if_statement();
+                        let stmt = self.if_statement(expr_arena, stmt_arena);
                         let span_end = self.current().span.1;
                         return Statements::IfStatement {
                             condition,
-                            then_block: then_block.into_boxed_slice(),
-                            else_block: Some(vec![stmt].into_boxed_slice()),
+                            then_block,
+                            else_block: Some(vec![stmt]),
                             span: (span_start, span_end),
                         };
                     }
@@ -473,7 +741,7 @@ impl<'s> Parser<'s> {
                         return Statements::None;
                     }
 
-                    else_block.push(self.statement());
+                    else_block.push(self.statement(expr_arena, stmt_arena));
                     else_span_start = self.current().span.0;
                 }
 
@@ -485,8 +753,8 @@ impl<'s> Parser<'s> {
                 self.skip_eos();
                 Statements::IfStatement {
                     condition,
-                    then_block: then_block.into_boxed_slice(),
-                    else_block: Some(else_block.into_boxed_slice()),
+                    then_block,
+                    else_block: Some(else_block),
                     span: (span_start, span_end),
                 }
             }
@@ -495,7 +763,7 @@ impl<'s> Parser<'s> {
                 self.skip_eos();
                 Statements::IfStatement {
                     condition,
-                    then_block: then_block.into_boxed_slice(),
+                    then_block,
                     else_block: None,
                     span: (span_start, span_end),
                 }
@@ -503,13 +771,13 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn while_statement(&mut self) -> Statements<'s> {
+    pub fn while_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
         }
 
-        let condition = self.expression();
+        let condition = self.expression(expr_arena, stmt_arena);
 
         if self.current().token_type != TokenType::LBrace {
             self.error(ParserError::SyntaxError {
@@ -538,7 +806,7 @@ impl<'s> Parser<'s> {
                 return Statements::None;
             }
 
-            block.push(self.statement());
+            block.push(self.statement(expr_arena, stmt_arena));
             span_block_start = self.current().span.0;
         }
 
@@ -549,12 +817,12 @@ impl<'s> Parser<'s> {
         self.skip_eos();
         Statements::WhileStatement {
             condition,
-            block: block.into_boxed_slice(),
+            block,
             span: (span_start, self.current().span.1),
         }
     }
 
-    pub fn for_statement(&mut self) -> Statements<'s> {
+    pub fn for_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -575,7 +843,7 @@ impl<'s> Parser<'s> {
         }
 
         let _ = self.next();
-        let iterator = self.expression();
+        let iterator = self.expression(expr_arena, stmt_arena);
 
         if self.current().token_type != TokenType::LBrace {
             self.error(ParserError::SyntaxError {
@@ -604,7 +872,7 @@ impl<'s> Parser<'s> {
                 return Statements::None;
             }
 
-            block.push(self.statement());
+            block.push(self.statement(expr_arena, stmt_arena));
             span_block_start = self.current().span.0;
         }
 
@@ -617,12 +885,12 @@ impl<'s> Parser<'s> {
         Statements::ForStatement {
             binding,
             iterator,
-            block: block.into_boxed_slice(),
+            block,
             span: (span_start, span_end),
         }
     }
 
-    pub fn fn_statement(&mut self) -> Statements<'s> {
+    pub fn fn_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -632,7 +900,7 @@ impl<'s> Parser<'s> {
 
         let _ = self.next();
         let arguments =
-            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma);
+            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma, expr_arena, stmt_arena);
 
         let arguments_tuples: Vec<(&str, Type)> = arguments
             .iter()
@@ -651,7 +919,7 @@ impl<'s> Parser<'s> {
                     // embedded boxed expressions blocks, so...
 
                     if let Expressions::Reference { object, span: _ } = arg {
-                        if let Expressions::Value(Value::Identifier(id), _) = *object.clone() {
+                        if let Expressions::Value(Value::Identifier(id), _) = **object {
                             if id == "self" {
                                 return ("self", Type::SelfRef);
                             }
@@ -662,7 +930,7 @@ impl<'s> Parser<'s> {
                         exception: "unexpected argument declaration found".to_string(),
                         help: "Use right arguments syntax: `identifier: type`".to_string(),
                         src: self.source.clone(),
-                        span: error::position_to_span(self.span_expression(arg.clone())),
+                        span: error::position_to_span(self.span_expression(&arg.clone())),
                     });
 
                     ("", Type::Void)
@@ -704,7 +972,7 @@ impl<'s> Parser<'s> {
                 return Statements::None;
             }
 
-            block.push(self.statement());
+            block.push(self.statement(expr_arena, stmt_arena));
             span_block_start = self.current().span.0;
         }
 
@@ -717,15 +985,15 @@ impl<'s> Parser<'s> {
         Statements::FunctionDefineStatement {
             name: identifier,
             datatype,
-            arguments: arguments_tuples.into_boxed_slice(),
-            block: block.into_boxed_slice(),
+            arguments: arguments_tuples,
+            block,
             public: false,
             span: (span_start, span_end),
             header_span,
         }
     }
 
-    pub fn return_statement(&mut self) -> Statements<'s> {
+    pub fn return_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -735,7 +1003,7 @@ impl<'s> Parser<'s> {
             let _ = self.next();
             Expressions::Value(Value::Void, self.current().span)
         } else {
-            self.expression()
+            self.expression(expr_arena, stmt_arena)
         };
 
         let end_span = Self::get_span_expression(&return_expr).1;
@@ -745,7 +1013,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn break_statement(&mut self) -> Statements<'s> {
+    pub fn break_statement(&mut self, _expr_arena: &'a Bump, _stmt_arena: &'a Bump) -> Statements<'a> {
         let span = self.current().span;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -756,12 +1024,12 @@ impl<'s> Parser<'s> {
         Statements::BreakStatements { span }
     }
 
-    pub fn assign_statement(&mut self, object: Expressions<'s>, span: (usize, usize)) -> Statements<'s> {
+    pub fn assign_statement(&mut self, object: Expressions<'a>, span: (usize, usize), expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         if self.expect(TokenType::Equal) {
             let _ = self.next();
         }
 
-        let value = self.expression();
+        let value = self.expression(expr_arena, stmt_arena);
         let end_span = Self::get_span_expression(&value).1;
         self.skip_eos();
 
@@ -774,15 +1042,17 @@ impl<'s> Parser<'s> {
 
     pub fn binary_assign_statement(
         &mut self,
-        object: Expressions<'s>,
-        op: &'s str,
+        object: Expressions<'a>,
+        op: &'a str,
         span: (usize, usize),
-    ) -> Statements<'s> {
+        expr_arena: &'a Bump,
+        stmt_arena: &'a Bump,
+    ) -> Statements<'a> {
         if self.expect(TokenType::Equal) {
             let _ = self.next();
         }
 
-        let value = self.expression();
+        let value = self.expression(expr_arena, stmt_arena);
         let end_span = Self::get_span_expression(&value).1;
         self.skip_eos();
 
@@ -796,15 +1066,17 @@ impl<'s> Parser<'s> {
 
     pub fn slice_assign_statement(
         &mut self,
-        object: Expressions<'s>,
+        object: Expressions<'a>,
         span: (usize, usize),
-    ) -> Statements<'s> {
+        expr_arena: &'a Bump,
+        stmt_arena: &'a Bump,
+    ) -> Statements<'a> {
         if !self.expect(TokenType::LBrack) {
             // This should be an error, but for now we assume it's there
         }
         let _ = self.next(); // consume '['
 
-        let index_expr = self.expression();
+        let index_expr = self.expression(expr_arena, stmt_arena);
 
         if !self.expect(TokenType::RBrack) {
             self.error(ParserError::UnclosedExpression {
@@ -829,7 +1101,7 @@ impl<'s> Parser<'s> {
         }
         let _ = self.next(); // consume '='
 
-        let value_expr = self.expression();
+        let value_expr = self.expression(expr_arena, stmt_arena);
         let end_span = Self::get_span_expression(&value_expr).1;
         self.skip_eos();
 
@@ -841,7 +1113,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn call_statement(&mut self, id: &'s str, span: (usize, usize)) -> Statements<'s> {
+    pub fn call_statement(&mut self, id: &'a str, span: (usize, usize), expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         match self.current().token_type {
             TokenType::Identifier => {
                 let _ = self.next();
@@ -860,7 +1132,7 @@ impl<'s> Parser<'s> {
         };
 
         let arguments =
-            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma);
+            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma, expr_arena, stmt_arena);
 
         let span_end = if let Some(last_arg) = arguments.last() {
             Self::get_span_expression(last_arg).1
@@ -872,18 +1144,18 @@ impl<'s> Parser<'s> {
 
         Statements::FunctionCallStatement {
             name: id,
-            arguments: arguments.into_boxed_slice(),
+            arguments,
             span: (span.0, span_end),
         }
     }
 
-    pub fn macrocall_statement(&mut self, id: &'s str, span: (usize, usize)) -> Statements<'s> {
+    pub fn macrocall_statement(&mut self, id: &'a str, span: (usize, usize), expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         if self.expect(TokenType::Not) {
             let _ = self.next();
         }
 
         let arguments =
-            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma);
+            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma, expr_arena, stmt_arena);
 
         let span_end = if let Some(last_arg) = arguments.last() {
             Self::get_span_expression(last_arg).1
@@ -895,12 +1167,12 @@ impl<'s> Parser<'s> {
 
         Statements::MacroCallStatement {
             name: id,
-            arguments: arguments.into_boxed_slice(),
+            arguments,
             span: (span.0, span_end),
         }
     }
 
-    pub fn struct_statement(&mut self) -> Statements<'s> {
+    pub fn struct_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -955,7 +1227,7 @@ impl<'s> Parser<'s> {
 
                     method_mode = true;
 
-                    let stmt = self.fn_statement();
+                    let stmt = self.fn_statement(expr_arena, stmt_arena);
 
                     if let Statements::FunctionDefineStatement {
                         name,
@@ -1071,7 +1343,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn enum_statement(&mut self) -> Statements<'s> {
+    pub fn enum_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -1121,7 +1393,7 @@ impl<'s> Parser<'s> {
                         return Statements::None;
                     }
 
-                    let stmt = self.fn_statement();
+                    let stmt = self.fn_statement(expr_arena, stmt_arena);
 
                     if let Statements::FunctionDefineStatement {
                         name,
@@ -1182,14 +1454,14 @@ impl<'s> Parser<'s> {
 
         Statements::EnumDefineStatement {
             name,
-            fields: fields.into_boxed_slice(),
+            fields,
             functions,
             public: false,
             span: (span_start, self.current().span.1),
         }
     }
 
-    pub fn typedef_statement(&mut self) -> Statements<'s> {
+    pub fn typedef_statement(&mut self, _expr_arena: &'a Bump, _stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1218,7 +1490,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn extern_declare_statement(&mut self) -> Statements<'s> {
+    pub fn extern_declare_statement(&mut self, _expr_arena: &'a Bump, _stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1250,13 +1522,13 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn link_c_statement(&mut self) -> Statements<'s> {
+    pub fn link_c_statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
         }
 
-        let path = self.expression();
+        let path = self.expression(expr_arena, stmt_arena);
         let span_end = Self::get_span_expression(&path).1;
 
         if let Expressions::Value(Value::String(_), _) = path {
@@ -1279,7 +1551,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn extern_statement(&mut self) -> Statements<'s> {
+    pub fn extern_statement(&mut self, _expr_arena: &'a Bump, _stmt_arena: &'a Bump) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1391,7 +1663,7 @@ impl<'s> Parser<'s> {
 
         Statements::ExternStatement {
             identifier,
-            arguments: arguments.into_boxed_slice(),
+            arguments,
             return_type,
             extern_type,
             public,

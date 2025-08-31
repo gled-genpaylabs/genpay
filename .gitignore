@@ -5,3 +5,4 @@ hello
 /genpay-linker/tests/hello.c
 /genpay-linker/tests/hello.o
 /genpay-linker/tests/hello
+/llvm_build/

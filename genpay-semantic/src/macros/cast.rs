@@ -3,6 +3,7 @@ use crate::{
     Analyzer,
     error::{self, SemanticError},
 };
+use bumpalo::Bump;
 use genpay_parser::{expressions::Expressions, types::Type};
 
 /// **Converts expression to provided type**
@@ -15,6 +16,8 @@ impl<'s> MacroObject<'s> for CastMacro {
         analyzer: &mut Analyzer<'s>,
         arguments: &[Expressions<'s>],
         span: &(usize, usize),
+        expr_arena: &'s Bump,
+        stmt_arena: &'s Bump,
     ) -> Type<'s> {
         const MINIMUM_ARGUMENTS_LEN: usize = 2;
 
@@ -54,8 +57,8 @@ impl<'s> MacroObject<'s> for CastMacro {
             });
         }
 
-        let from_type = analyzer.visit_expression(&arguments[0], None);
-        let target_type = analyzer.visit_expression(&arguments[1], None);
+        let from_type = analyzer.visit_expression(&arguments[0], None, expr_arena, stmt_arena);
+        let target_type = analyzer.visit_expression(&arguments[1], None, expr_arena, stmt_arena);
 
         analyzer
             .verify_cast(&from_type, &target_type)

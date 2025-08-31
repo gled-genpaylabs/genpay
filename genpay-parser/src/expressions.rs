@@ -9,111 +9,268 @@ use crate::{
 use genpay_lexer::token_type::TokenType;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Expressions<'s> {
+#[derive(Debug, Clone)]
+pub enum Expressions<'a> {
     /// `OBJECT BINOP EXPRESSION`
     Binary {
-        operand: &'s str,
-        lhs: Box<Expressions<'s>>,
-        rhs: Box<Expressions<'s>>,
+        operand: &'a str,
+        lhs: &'a Expressions<'a>,
+        rhs: &'a Expressions<'a>,
         span: (usize, usize),
     },
     /// `UNOP OBJECT`
     Unary {
-        operand: &'s str,
-        object: Box<Expressions<'s>>,
+        operand: &'a str,
+        object: &'a Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `OBJECT BOOLOP EXPRESSION`
     Boolean {
-        operand: &'s str,
-        lhs: Box<Expressions<'s>>,
-        rhs: Box<Expressions<'s>>,
+        operand: &'a str,
+        lhs: &'a Expressions<'a>,
+        rhs: &'a Expressions<'a>,
         span: (usize, usize),
     },
     /// `OBJECT BITOP EXPRESSION`
     Bitwise {
-        operand: &'s str,
-        lhs: Box<Expressions<'s>>,
-        rhs: Box<Expressions<'s>>,
+        operand: &'a str,
+        lhs: &'a Expressions<'a>,
+        rhs: &'a Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `IDENTIFIER: TYPE`
     Argument {
-        name: &'s str,
-        r#type: Type<'s>,
+        name: &'a str,
+        r#type: Type<'a>,
         span: (usize, usize),
     },
     /// `OBJECT.SUBELEMENT_1.SUBELEMENT_2`
     SubElement {
-        head: Box<Expressions<'s>>,
-        subelements: Vec<Expressions<'s>>,
+        head: &'a Expressions<'a>,
+        subelements: Vec<Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `IDENTIFIER ( EXPRESSION, EXPRESSION, ... )`
     FnCall {
-        name: &'s str,
-        arguments: Vec<Expressions<'s>>,
+        name: &'a str,
+        arguments: Vec<Expressions<'a>>,
         span: (usize, usize),
     },
     /// `IDENTIFIER! ( EXPRESSION, EXPRESSION, ... )`
     MacroCall {
-        name: &'s str,
-        arguments: Vec<Expressions<'s>>,
+        name: &'a str,
+        arguments: Vec<Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `&EXPRESSION`
     Reference {
-        object: Box<Expressions<'s>>,
+        object: &'a Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `*EXPRESSION`
     Dereference {
-        object: Box<Expressions<'s>>,
+        object: &'a Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `[EXPRESSION, EXPRESSION, ...]`
     Array {
-        values: Vec<Expressions<'s>>,
+        values: Vec<Expressions<'a>>,
         len: usize,
         span: (usize, usize),
     },
     /// `(EXPRESSION, EXPRESSION, ...)`
     Tuple {
-        values: Box<[Expressions<'s>]>,
+        values: &'a [Expressions<'a>],
         span: (usize, usize),
     },
     /// `OBJECT[EXPRESSION]`
     Slice {
-        object: Box<Expressions<'s>>,
-        index: Box<Expressions<'s>>,
+        object: &'a Expressions<'a>,
+        index: &'a Expressions<'a>,
         span: (usize, usize),
     },
     /// `IDENTIFIER { .IDENTIFIER = EXPRESSION, .IDENTIFIER = EXPRESSION }`
     Struct {
-        name: &'s str,
-        fields: HashMap<&'s str, Expressions<'s>>,
+        name: &'a str,
+        fields: HashMap<&'a str, Expressions<'a>>,
         span: (usize, usize),
     },
     /// `{ STATEMENTS }`
     Scope {
-        block: Box<[Statements<'s>]>,
+        block: &'a [Statements<'a>],
         span: (usize, usize),
     },
 
-    Value(Value<'s>, (usize, usize)),
+    Value(Value<'a>, (usize, usize)),
     None,
 }
 
-impl<'s> Parser<'s> {
+impl<'a> PartialEq for Expressions<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Expressions::Binary {
+                    operand: o1,
+                    lhs: lhs1,
+                    rhs: rhs1,
+                    ..
+                },
+                Expressions::Binary {
+                    operand: o2,
+                    lhs: lhs2,
+                    rhs: rhs2,
+                    ..
+                },
+            ) => o1 == o2 && lhs1 == lhs2 && rhs1 == rhs2,
+            (
+                Expressions::Unary {
+                    operand: o1,
+                    object: obj1,
+                    ..
+                },
+                Expressions::Unary {
+                    operand: o2,
+                    object: obj2,
+                    ..
+                },
+            ) => o1 == o2 && obj1 == obj2,
+            (
+                Expressions::Boolean {
+                    operand: o1,
+                    lhs: lhs1,
+                    rhs: rhs1,
+                    ..
+                },
+                Expressions::Boolean {
+                    operand: o2,
+                    lhs: lhs2,
+                    rhs: rhs2,
+                    ..
+                },
+            ) => o1 == o2 && lhs1 == lhs2 && rhs1 == rhs2,
+            (
+                Expressions::Bitwise {
+                    operand: o1,
+                    lhs: lhs1,
+                    rhs: rhs1,
+                    ..
+                },
+                Expressions::Bitwise {
+                    operand: o2,
+                    lhs: lhs2,
+                    rhs: rhs2,
+                    ..
+                },
+            ) => o1 == o2 && lhs1 == lhs2 && rhs1 == rhs2,
+            (
+                Expressions::Argument {
+                    name: n1,
+                    r#type: t1,
+                    ..
+                },
+                Expressions::Argument {
+                    name: n2,
+                    r#type: t2,
+                    ..
+                },
+            ) => n1 == n2 && t1 == t2,
+            (
+                Expressions::SubElement {
+                    head: h1,
+                    subelements: s1,
+                    ..
+                },
+                Expressions::SubElement {
+                    head: h2,
+                    subelements: s2,
+                    ..
+                },
+            ) => *h1 == *h2 && s1 == s2,
+            (
+                Expressions::FnCall {
+                    name: n1,
+                    arguments: a1,
+                    ..
+                },
+                Expressions::FnCall {
+                    name: n2,
+                    arguments: a2,
+                    ..
+                },
+            ) => n1 == n2 && a1 == a2,
+            (
+                Expressions::MacroCall {
+                    name: n1,
+                    arguments: a1,
+                    ..
+                },
+                Expressions::MacroCall {
+                    name: n2,
+                    arguments: a2,
+                    ..
+                },
+            ) => n1 == n2 && a1 == a2,
+            (Expressions::Reference { object: o1, .. }, Expressions::Reference { object: o2, .. }) => {
+                o1 == o2
+            }
+            (
+                Expressions::Dereference { object: o1, .. },
+                Expressions::Dereference { object: o2, .. },
+            ) => o1 == o2,
+            (
+                Expressions::Array {
+                    values: v1,
+                    len: l1,
+                    ..
+                },
+                Expressions::Array {
+                    values: v2,
+                    len: l2,
+                    ..
+                },
+            ) => l1 == l2 && v1 == v2,
+            (Expressions::Tuple { values: v1, .. }, Expressions::Tuple { values: v2, .. }) => v1 == v2,
+            (
+                Expressions::Slice {
+                    object: o1,
+                    index: i1,
+                    ..
+                },
+                Expressions::Slice {
+                    object: o2,
+                    index: i2,
+                    ..
+                },
+            ) => o1 == o2 && i1 == i2,
+            (
+                Expressions::Struct {
+                    name: n1,
+                    fields: f1,
+                    ..
+                },
+                Expressions::Struct {
+                    name: n2,
+                    fields: f2,
+                    ..
+                },
+            ) => n1 == n2 && f1 == f2,
+            (Expressions::Scope { block: b1, .. }, Expressions::Scope { block: b2, .. }) => b1 == b2,
+            (Expressions::Value(v1, _), Expressions::Value(v2, _)) => v1 == v2,
+            (Expressions::None, Expressions::None) => true,
+            _ => false,
+        }
+    }
+}
+
+impl<'a> Parser<'a> {
     #[inline]
-    pub fn get_span_expression(expr: &Expressions<'s>) -> (usize, usize) {
+    pub fn get_span_expression(expr: &Expressions<'a>) -> (usize, usize) {
         match expr {
             Expressions::Binary { span, .. } => *span,
             Expressions::Boolean { span, .. } => *span,
@@ -136,19 +293,23 @@ impl<'s> Parser<'s> {
     }
 
     #[inline]
-    pub fn span_expression(&self, expr: Expressions<'s>) -> (usize, usize) {
-        Self::get_span_expression(&expr)
+    pub fn span_expression(&self, expr: &Expressions<'a>) -> (usize, usize) {
+        Self::get_span_expression(expr)
     }
 }
 
-impl<'s> Parser<'s> {
+use bumpalo::Bump;
+
+impl<'a> Parser<'a> {
     pub fn subelement_expression(
         &mut self,
-        head: Expressions<'s>,
+        head: Expressions<'a>,
         separator: TokenType,
-    ) -> Expressions<'s> {
+        expr_arena: &'a Bump,
+        stmt_arena: &'a Bump,
+    ) -> Expressions<'a> {
         let head_span = Self::get_span_expression(&head);
-        let head = Box::new(head);
+        let head = expr_arena.alloc(head);
         let mut subelements = Vec::new();
         let mut end_span = head_span.1;
 
@@ -158,7 +319,7 @@ impl<'s> Parser<'s> {
             }
             let _ = self.next();
 
-            let term = self.term();
+            let term = self.term(expr_arena, stmt_arena);
             end_span = Self::get_span_expression(&term).1;
             subelements.push(term);
         }
@@ -170,7 +331,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn binary_expression(&mut self, node: Expressions<'s>) -> Expressions<'s> {
+    pub fn binary_expression(&mut self, node: Expressions<'a>, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         let node_span = Self::get_span_expression(&node);
         let current = self.current();
 
@@ -179,7 +340,7 @@ impl<'s> Parser<'s> {
                 let _ = self.next();
 
                 let lhs = node;
-                let rhs = self.expression();
+                let rhs = self.expression(expr_arena, stmt_arena);
                 let span_end = Self::get_span_expression(&rhs).1;
 
                 if PRIORITY_BINARY_OPERATORS.contains(&tty) {
@@ -193,7 +354,7 @@ impl<'s> Parser<'s> {
                         span,
                     } = new_node
                     {
-                        let lhs_new = Box::new(old_lhs);
+                        let lhs_new = expr_arena.alloc(old_lhs);
                         let rhs_new = lhs;
 
                         let priority_node = Expressions::Binary {
@@ -205,7 +366,7 @@ impl<'s> Parser<'s> {
 
                         return Expressions::Binary {
                             operand,
-                            lhs: Box::new(priority_node),
+                            lhs: expr_arena.alloc(priority_node),
                             rhs,
                             span: (node_span.0, span_end),
                         };
@@ -214,8 +375,8 @@ impl<'s> Parser<'s> {
 
                 Expressions::Binary {
                     operand: current.value,
-                    lhs: Box::new(lhs),
-                    rhs: Box::new(rhs),
+                    lhs: expr_arena.alloc(lhs),
+                    rhs: expr_arena.alloc(rhs),
                     span: (node_span.0, span_end),
                 }
             }
@@ -223,7 +384,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn boolean_expression(&mut self, node: Expressions<'s>) -> Expressions<'s> {
+    pub fn boolean_expression(&mut self, node: Expressions<'a>, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         // FIXME: Expressions like `true || false` returns error "Undefined term found"
 
         let node_span = Self::get_span_expression(&node);
@@ -235,33 +396,33 @@ impl<'s> Parser<'s> {
                 let _ = self.next();
 
                 let lhs = node.clone();
-                let rhs = self.expression();
+                let rhs = self.expression(expr_arena, stmt_arena);
                 let span_end = Self::get_span_expression(&rhs).1;
 
                 if PRIORITY_BOOLEAN_OPERATORS.contains(&self.current().token_type) {
                     let operand = self.current().value;
                     let lhs_node = Expressions::Boolean {
                         operand: current.value,
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
+                        lhs: expr_arena.alloc(lhs),
+                        rhs: expr_arena.alloc(rhs),
                         span: (current.span.0, self.current().span.1),
                     };
 
                     let _ = self.next();
-                    let rhs_node = self.expression();
+                    let rhs_node = self.expression(expr_arena, stmt_arena);
 
                     return Expressions::Boolean {
                         operand,
-                        lhs: Box::new(lhs_node),
-                        rhs: Box::new(rhs_node),
+                        lhs: expr_arena.alloc(lhs_node),
+                        rhs: expr_arena.alloc(rhs_node),
                         span: (node_span.0, span_end),
                     };
                 }
 
                 Expressions::Boolean {
                     operand: current.value,
-                    lhs: Box::new(lhs),
-                    rhs: Box::new(rhs),
+                    lhs: expr_arena.alloc(lhs),
+                    rhs: expr_arena.alloc(rhs),
                     span: (node_span.0, span_end),
                 }
             }
@@ -269,7 +430,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn bitwise_expression(&mut self, node: Expressions<'s>) -> Expressions<'s> {
+    pub fn bitwise_expression(&mut self, node: Expressions<'a>, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         let node_span = Self::get_span_expression(&node);
         let current = self.current();
 
@@ -277,8 +438,8 @@ impl<'s> Parser<'s> {
             tty if BITWISE_OPERATORS.contains(&tty) => {
                 let _ = self.next();
 
-                let lhs = Box::new(node);
-                let rhs = Box::new(self.expression());
+                let lhs = expr_arena.alloc(node);
+                let rhs = expr_arena.alloc(self.expression(expr_arena, stmt_arena));
                 let span_end = Self::get_span_expression(&rhs).1;
 
                 Expressions::Bitwise {
@@ -292,7 +453,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn call_expression(&mut self, fname: &'s str, span: (usize, usize)) -> Expressions<'s> {
+    pub fn call_expression(&mut self, fname: &'a str, span: (usize, usize), expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         match self.current().token_type {
             TokenType::Identifier => {
                 let _ = self.next();
@@ -311,7 +472,7 @@ impl<'s> Parser<'s> {
         };
 
         let arguments =
-            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma);
+            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma, expr_arena, stmt_arena);
 
         let span_end = if let Some(last_arg) = arguments.last() {
             Self::get_span_expression(last_arg).1
@@ -326,13 +487,13 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn macrocall_expression(&mut self, name: &'s str, span: (usize, usize)) -> Expressions<'s> {
+    pub fn macrocall_expression(&mut self, name: &'a str, span: (usize, usize), expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         if self.expect(TokenType::Not) {
             let _ = self.next();
         }
 
         let arguments =
-            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma);
+            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma, expr_arena, stmt_arena);
 
         let span_end = if let Some(last_arg) = arguments.last() {
             Self::get_span_expression(last_arg).1
@@ -347,13 +508,13 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn slice_expression(&mut self, expr: Expressions<'s>) -> Expressions<'s> {
+    pub fn slice_expression(&mut self, expr: Expressions<'a>, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         if let TokenType::LBrack = self.current().token_type {
             let _ = self.next();
         }
 
-        let object = Box::new(expr.clone());
-        let index = Box::new(self.expression());
+        let object = expr_arena.alloc(expr.clone());
+        let index = expr_arena.alloc(self.expression(expr_arena, stmt_arena));
 
         if self.current().token_type != TokenType::RBrack {
             self.error(ParserError::UnclosedExpression {
@@ -361,7 +522,7 @@ impl<'s> Parser<'s> {
                 help: "Close slice index with brackets".to_string(),
                 src: self.source.clone(),
                 span: error::position_to_span((
-                    self.span_expression(expr).0,
+                    self.span_expression(&expr).0,
                     self.current().span.1,
                 )),
             });
@@ -374,11 +535,11 @@ impl<'s> Parser<'s> {
         Expressions::Slice {
             object,
             index,
-            span: (self.span_expression(expr).0, span_end),
+            span: (self.span_expression(&expr).0, span_end),
         }
     }
 
-    pub fn struct_expression(&mut self, name: &'s str) -> Expressions<'s> {
+    pub fn struct_expression(&mut self, name: &'a str, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Identifier) {
             let _ = self.next();
@@ -456,7 +617,7 @@ impl<'s> Parser<'s> {
             }
 
             let _ = self.next();
-            let value = self.expression();
+            let value = self.expression(expr_arena, stmt_arena);
 
             if !self.expect(TokenType::Comma) && !self.expect(TokenType::RBrace) {
                 self.error(ParserError::SyntaxError {
@@ -494,7 +655,9 @@ impl<'s> Parser<'s> {
         start: TokenType,
         end: TokenType,
         separator: TokenType,
-    ) -> Vec<Expressions<'s>> {
+        expr_arena: &'a Bump,
+        stmt_arena: &'a Bump,
+    ) -> Vec<Expressions<'a>> {
         if self.expect(start) {
             let _ = self.next();
         } else if self.expect(end.clone()) {
@@ -509,7 +672,7 @@ impl<'s> Parser<'s> {
                 break;
             }
 
-            output.push(self.expression());
+            output.push(self.expression(expr_arena, stmt_arena));
 
             if self.expect(separator.clone()) {
                 let _ = self.next();
