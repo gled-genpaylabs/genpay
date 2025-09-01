@@ -33,7 +33,7 @@ See official documentation here: [Genpay Documentation](https://genpay-site.verc
 ## Technical Details
 - **Language:** Rust
 - **Build Systems:** Cargo, Make
-- **Backend:** inkwell (LLVM 1.18.6^)
+- **Backend:** inkwell (LLVM)
 - **Errors:** thiserror
 - **Error Reporting:** miette, colored
 - **Command Line Interface:** clap
