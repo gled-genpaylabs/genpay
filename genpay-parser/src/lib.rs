@@ -1,7 +1,7 @@
 
 use crate::{
     error::{ParserError, ParserWarning},
-    expressions::{Expressions, Spannable},
+    expressions::Expressions,
     statements::Statements,
     types::Type,
     value::Value,
@@ -9,6 +9,9 @@ use crate::{
 use bumpalo::Bump;
 use genpay_lexer::{token::Token, token_type::TokenType, Lexer};
 use miette::NamedSource;
+
+pub use crate::expressions::Spannable;
+pub use genpay_lexer::token_type;
 
 /// Custom Defined Error Types
 pub mod error;
@@ -1002,7 +1005,6 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expressions::Spannable;
 
     #[test]
     fn get_basic_type_test() {
