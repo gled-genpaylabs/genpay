@@ -45,9 +45,9 @@ fn main() {
 
                 eprintln!();
                 eprintln!("{}", "🎓 Examples of usage:".bold().cyan());
-                eprintln!("  genpay example.genpay output");
-                eprintln!("  genpay example.genpay output --no-warns");
-                eprintln!("  genpay example.genpay output --include foo.c");
+                eprintln!("  genpay source.genpay output");
+                eprintln!("  genpay source.genpay output --no-warns");
+                eprintln!("  genpay source.genpay output --include foo.c");
 
                 // Checking for the error kind (if just --help flag returning without error)
                 if e.kind() == clap::error::ErrorKind::DisplayHelp {
