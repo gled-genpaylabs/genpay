@@ -31,8 +31,6 @@ impl ObjectLinker {
             return Err(error_message);
         }
 
-        std::fs::remove_file(obj_file).expect("Unable to delete object file");
-
         Ok("clang".to_string())
     }
 }
