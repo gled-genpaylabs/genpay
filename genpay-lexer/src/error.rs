@@ -58,13 +58,46 @@ pub enum LexerError {
     },
 
     #[error("Unknown character found: '{character}'")]
-    #[diagnostic(severity(Error), code(genpay::lexer::unknown))]
+    #[diagnostic(
+        severity(Error),
+        code(genpay::lexer::unknown),
+        help("Context: ...{context}...")
+    )]
     UnknownCharacter {
         character: char,
+        context: String,
 
         #[source_code]
         src: NamedSource<String>,
         #[label("unsupported character")]
+        span: SourceSpan,
+    },
+
+    #[error("Unterminated string literal")]
+    #[diagnostic(severity(Error), code(genpay::lexer::unterminated_string))]
+    UnterminatedString {
+        #[source_code]
+        src: NamedSource<String>,
+        #[label("string starts here but is not closed")]
+        span: SourceSpan,
+    },
+
+    #[error("Unterminated block comment")]
+    #[diagnostic(severity(Error), code(genpay::lexer::unterminated_block_comment))]
+    UnterminatedBlockComment {
+        #[source_code]
+        src: NamedSource<String>,
+        #[label("comment starts here but is not closed")]
+        span: SourceSpan,
+    },
+
+    #[error("Invalid number format: {message}")]
+    #[diagnostic(severity(Error), code(genpay::lexer::invalid_number_format))]
+    InvalidNumberFormat {
+        message: String,
+        #[source_code]
+        src: NamedSource<String>,
+        #[label("{message}")]
         span: SourceSpan,
     },
 }

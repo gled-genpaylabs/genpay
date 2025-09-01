@@ -5,6 +5,12 @@ use crate::{
 };
 use miette::NamedSource;
 
+include!(concat!(env!("OUT_DIR"), "/keywords.rs"));
+
+fn is_valid_escape(b: u8) -> bool {
+    matches!(b, b'n' | b't' | b'r' | b'\\' | b'\'' | b'"' | b'0')
+}
+
 /// Error Handling Module
 pub mod error;
 /// Token Object and Implementations
@@ -34,6 +40,9 @@ impl<'s> Lexer<'s> {
     fn peek(&self) -> Option<u8> {
         self.src.as_bytes().get(self.cursor).copied()
     }
+    fn peek_next(&self) -> Option<u8> {
+        self.src.as_bytes().get(self.cursor + 1).copied()
+    }
     fn bump(&mut self) {
         self.cursor += 1;
     }
@@ -55,11 +64,6 @@ impl<'s> Lexer<'s> {
     {
         let start = self.cursor;
         while let Some(b) = self.peek() {
-            if b == b'\\' {
-                self.bump();
-                self.bump();
-                continue;
-            }
             if f(b) {
                 self.bump();
             } else {
@@ -69,7 +73,7 @@ impl<'s> Lexer<'s> {
         self.slice(start)
     }
 
-    fn eat_while_radix<F>(&mut self, _radix: u32, mut f: F) -> &'s str
+    fn eat_while_radix<F>(&mut self, mut f: F) -> &'s str
     where
         F: FnMut(u8) -> bool,
     {
@@ -92,83 +96,139 @@ impl<'s> Lexer<'s> {
             None => Ok(Token::new("", TokenType::EOF, (start, start))),
             Some(b'a'..=b'z' | b'A'..=b'Z' | b'_') => {
                 let ident = self.eat_while(|b| b.is_ascii_alphanumeric() || b == b'_');
-                let token_type = match ident {
-                    "let" => TokenType::Keyword,
-                    "pub" => TokenType::Keyword,
-                    "fn" => TokenType::Keyword,
-                    "import" => TokenType::Keyword,
-                    "include" => TokenType::Keyword,
-                    "extern" => TokenType::Keyword,
-                    "return" => TokenType::Keyword,
-                    "struct" => TokenType::Keyword,
-                    "enum" => TokenType::Keyword,
-                    "typedef" => TokenType::Keyword,
-                    "if" => TokenType::Keyword,
-                    "else" => TokenType::Keyword,
-                    "while" => TokenType::Keyword,
-                    "for" => TokenType::Keyword,
-                    "break" => TokenType::Keyword,
-                    "true" => TokenType::Boolean,
-                    "false" => TokenType::Boolean,
-                    "NULL" => TokenType::Null,
-                    "i8" => TokenType::Type,
-                    "i16" => TokenType::Type,
-                    "i32" => TokenType::Type,
-                    "i64" => TokenType::Type,
-                    "u8" => TokenType::Type,
-                    "u16" => TokenType::Type,
-                    "u32" => TokenType::Type,
-                    "u64" => TokenType::Type,
-                    "usize" => TokenType::Type,
-                    "f32" => TokenType::Type,
-                    "f64" => TokenType::Type,
-                    "bool" => TokenType::Type,
-                    "char" => TokenType::Type,
-                    "void" => TokenType::Type,
-                    _ => TokenType::Identifier,
-                };
+                let token_type = KEYWORDS.get(ident).cloned().unwrap_or(TokenType::Identifier);
                 Ok(Token::new(ident, token_type, (start, self.cursor)))
             }
             Some(b'0'..=b'9') => {
-                let num = self.eat_while_radix(10, |b| b.is_ascii_digit());
-                if self.peek() == Some(b'.') {
-                    self.bump();
-                    let frac = self.eat_while_radix(10, |b| b.is_ascii_digit());
-                    let mut value = String::from(num);
-                    value.push('.');
-                    value.push_str(frac);
-                    Ok(Token::new(
-                        self.slice(start),
-                        TokenType::FloatNumber,
-                        (start, self.cursor),
-                    ))
-                } else if self.peek() == Some(b'x') {
-                    self.bump();
-                    let _num = self.eat_while_radix(16, |b| b.is_ascii_hexdigit());
-                    Ok(Token::new(self.slice(start), TokenType::Number, (start, self.cursor)))
-                } else if self.peek() == Some(b'b') {
-                    self.bump();
-                    let _num = self.eat_while_radix(2, |b| b == b'0' || b == b'1');
-                    Ok(Token::new(self.slice(start), TokenType::Number, (start, self.cursor)))
-                } else {
-                    Ok(Token::new(num, TokenType::Number, (start, self.cursor)))
+                // Handle hex and binary first.
+                if self.src.as_bytes()[self.cursor] == b'0' {
+                    if self.peek_next() == Some(b'x') {
+                        self.bump(); // 0
+                        self.bump(); // x
+                        self.eat_while_radix(|b| b.is_ascii_hexdigit());
+                        return Ok(Token::new(self.slice(start), TokenType::Number, (start, self.cursor)));
+                    }
+                    if self.peek_next() == Some(b'b') {
+                        self.bump(); // 0
+                        self.bump(); // b
+                        self.eat_while_radix(|b| b == b'0' || b == b'1');
+                        return Ok(Token::new(self.slice(start), TokenType::Number, (start, self.cursor)));
+                    }
                 }
+
+                // Now decimal numbers (int or float)
+                self.eat_while_radix(|b| b.is_ascii_digit());
+                let mut is_float = false;
+
+                if self.peek() == Some(b'.') {
+                    // check that it's not `.` followed by a non-digit
+                    if self.src.as_bytes().get(self.cursor + 1).map_or(false, |c| c.is_ascii_digit()) {
+                        is_float = true;
+                        self.bump(); // consume '.'
+                        self.eat_while_radix(|b| b.is_ascii_digit());
+                    }
+                }
+
+                if self.peek() == Some(b'e') || self.peek() == Some(b'E') {
+                    is_float = true;
+                    self.bump(); // consume 'e' or 'E'
+                    if self.peek() == Some(b'+') || self.peek() == Some(b'-') {
+                        self.bump(); // consume sign
+                    }
+                    let exponent_digits = self.eat_while_radix(|b| b.is_ascii_digit());
+                    if exponent_digits.is_empty() {
+                        return Err(LexerError::InvalidNumberFormat {
+                            message: "Missing exponent digits".to_string(),
+                            src: NamedSource::new(self.filename, self.src.to_string()),
+                            span: (self.cursor, 1).into(),
+                        });
+                    }
+                }
+
+                let token_type = if is_float { TokenType::FloatNumber } else { TokenType::Number };
+                Ok(Token::new(self.slice(start), token_type, (start, self.cursor)))
             }
             Some(b'"') => {
                 self.bump(); // opening quote
-                let lit = self.eat_while(|b| b != b'"');
-                if self.peek() == Some(b'"') {
-                    self.bump();
+                let content_start = self.cursor;
+                loop {
+                    match self.peek() {
+                        Some(b'\\') => {
+                            self.bump(); // consume '\'
+                            if let Some(b) = self.peek() {
+                                if is_valid_escape(b) {
+                                    self.bump();
+                                } else {
+                                    return Err(LexerError::UnknownCharacterEscape {
+                                        escape: (b as char).to_string(),
+                                        src: NamedSource::new(self.filename, self.src.to_string()),
+                                        span: (self.cursor, 1).into(),
+                                    });
+                                }
+                            } else {
+                                return Err(LexerError::UnterminatedString {
+                                    src: NamedSource::new(self.filename, self.src.to_string()),
+                                    span: (start, self.cursor - start).into(),
+                                });
+                            }
+                        }
+                        Some(b'"') => {
+                            let content = &self.src[content_start..self.cursor];
+                            self.bump(); // closing quote
+                            return Ok(Token::new(content, TokenType::String, (start, self.cursor)));
+                        }
+                        Some(_) => {
+                            self.bump();
+                        }
+                        None => {
+                            return Err(LexerError::UnterminatedString {
+                                src: NamedSource::new(self.filename, self.src.to_string()),
+                                span: (start, self.cursor - start).into(),
+                            });
+                        }
+                    }
                 }
-                Ok(Token::new(lit, TokenType::String, (start, self.cursor)))
             }
             Some(b'\'') => {
                 self.bump(); // opening quote
-                let lit = self.eat_while(|b| b != b'\'');
-                if self.peek() == Some(b'\'') {
-                    self.bump();
+                let content_start = self.cursor;
+                loop {
+                    match self.peek() {
+                        Some(b'\\') => {
+                            self.bump(); // consume '\'
+                            if let Some(b) = self.peek() {
+                                if is_valid_escape(b) {
+                                    self.bump();
+                                } else {
+                                    return Err(LexerError::UnknownCharacterEscape {
+                                        escape: (b as char).to_string(),
+                                        src: NamedSource::new(self.filename, self.src.to_string()),
+                                        span: (self.cursor, 1).into(),
+                                    });
+                                }
+                            } else {
+                                return Err(LexerError::UnterminatedString {
+                                    src: NamedSource::new(self.filename, self.src.to_string()),
+                                    span: (start, self.cursor - start).into(),
+                                });
+                            }
+                        }
+                        Some(b'\'') => {
+                            let content = &self.src[content_start..self.cursor];
+                            self.bump(); // closing quote
+                            return Ok(Token::new(content, TokenType::Char, (start, self.cursor)));
+                        }
+                        Some(_) => {
+                            self.bump();
+                        }
+                        None => {
+                            return Err(LexerError::UnterminatedString {
+                                src: NamedSource::new(self.filename, self.src.to_string()),
+                                span: (start, self.cursor - start).into(),
+                            });
+                        }
+                    }
                 }
-                Ok(Token::new(lit, TokenType::Char, (start, self.cursor)))
             }
             Some(b'+') => {
                 self.bump();
@@ -185,7 +245,40 @@ impl<'s> Lexer<'s> {
             Some(b'/') => {
                 self.bump();
                 if self.peek() == Some(b'/') {
+                    // Single line comment
                     self.eat_while(|b| b != b'\n');
+                    self.next_token()
+                } else if self.peek() == Some(b'*') {
+                    // Block comment
+                    self.bump(); // consume '*'
+                    let mut depth = 1;
+                    while depth > 0 {
+                        match self.peek() {
+                            Some(b'*') => {
+                                self.bump();
+                                if self.peek() == Some(b'/') {
+                                    self.bump();
+                                    depth -= 1;
+                                }
+                            }
+                            Some(b'/') => {
+                                self.bump();
+                                if self.peek() == Some(b'*') {
+                                    self.bump();
+                                    depth += 1;
+                                }
+                            }
+                            Some(_) => {
+                                self.bump();
+                            }
+                            None => {
+                                return Err(LexerError::UnterminatedBlockComment {
+                                    src: NamedSource::new(self.filename, self.src.to_string()),
+                                    span: (start, self.cursor - start).into(),
+                                });
+                            }
+                        }
+                    }
                     self.next_token()
                 } else {
                     Ok(Token::new("/", TokenType::Divide, (start, self.cursor)))
@@ -301,8 +394,12 @@ impl<'s> Lexer<'s> {
             }
             Some(c) => {
                 self.bump();
+                let context_start = start.saturating_sub(20);
+                let context_end = (start + 20).min(self.src.len());
+                let context = self.src[context_start..context_end].to_string();
                 Err(LexerError::UnknownCharacter {
                     character: c as char,
+                    context,
                     src: NamedSource::new(self.filename, self.src.to_string()),
                     span: (start, 1).into(),
                 })
@@ -313,7 +410,7 @@ impl<'s> Lexer<'s> {
 
 #[cfg(test)]
 mod tests {
-    use super::{token::Token, token_type::TokenType, Lexer};
+    use super::{token::Token, token_type::TokenType, Lexer, error::LexerError};
 
     fn assert_tokens(lexer: &mut Lexer, expected: &[Token]) {
         for expected_token in expected {
@@ -582,6 +679,72 @@ mod tests {
             Token::new("=", TokenType::Equal, (20, 21)),
         ];
         assert_tokens(&mut lexer, &expected);
+    }
+
+    #[test]
+    fn block_comment() {
+        let input = "/* this is a block comment */ 123";
+        let mut lexer = Lexer::new(input, "test.genpay");
+        let expected = vec![
+            Token::new("123", TokenType::Number, (28, 31)),
+        ];
+        assert_tokens(&mut lexer, &expected);
+    }
+
+    #[test]
+    fn nested_block_comment() {
+        let input = "/* nested /* comment */ */ 123";
+        let mut lexer = Lexer::new(input, "test.genpay");
+        let expected = vec![
+            Token::new("123", TokenType::Number, (27, 30)),
+        ];
+        assert_tokens(&mut lexer, &expected);
+    }
+
+    #[test]
+    fn unterminated_block_comment_error() {
+        let input = "/* hello";
+        let mut lexer = Lexer::new(input, "test.genpay");
+        let result = lexer.next().unwrap();
+        assert!(matches!(result, Err(LexerError::UnterminatedBlockComment { .. })));
+    }
+
+    #[test]
+    fn exponent_numbers() {
+        let input = "1e5 1.23e4 1.23e+4 1.23E-4 1e-5";
+        let mut lexer = Lexer::new(input, "test.genpay");
+        let expected = vec![
+            Token::new("1e5", TokenType::FloatNumber, (0, 3)),
+            Token::new("1.23e4", TokenType::FloatNumber, (4, 10)),
+            Token::new("1.23e+4", TokenType::FloatNumber, (11, 18)),
+            Token::new("1.23E-4", TokenType::FloatNumber, (19, 26)),
+            Token::new("1e-5", TokenType::FloatNumber, (27, 31)),
+        ];
+        assert_tokens(&mut lexer, &expected);
+    }
+
+    #[test]
+    fn invalid_exponent_error() {
+        let input = "1e";
+        let mut lexer = Lexer::new(input, "test.genpay");
+        let result = lexer.next().unwrap();
+        assert!(matches!(result, Err(LexerError::InvalidNumberFormat { .. })));
+    }
+
+    #[test]
+    fn unterminated_string_error() {
+        let input = "\"hello";
+        let mut lexer = Lexer::new(input, "test.genpay");
+        let result = lexer.next().unwrap();
+        assert!(matches!(result, Err(LexerError::UnterminatedString { .. })));
+    }
+
+    #[test]
+    fn invalid_escape_sequence_error() {
+        let input = "\"\\z\"";
+        let mut lexer = Lexer::new(input, "test.genpay");
+        let result = lexer.next().unwrap();
+        assert!(matches!(result, Err(LexerError::UnknownCharacterEscape { .. })));
     }
 }
 
