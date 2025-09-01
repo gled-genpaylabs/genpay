@@ -37,6 +37,7 @@ See official documentation here: [Genpay Documentation](https://genpay-site.verc
 - **Errors:** thiserror
 - **Error Reporting:** miette, colored
 - **Command Line Interface:** clap
+- **Arena Allocation:** bumpalo
 
 #### Structure
 The project is divided into submodules using a virtual workspace environment:
