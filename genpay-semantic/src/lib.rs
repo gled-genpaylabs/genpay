@@ -7,7 +7,13 @@ use crate::{
 };
 use bumpalo::Bump;
 use genpay_parser::{
-    expressions::Expressions, statements::Statements, types::Type, value::Value, Parser,
+    expressions::Expressions,
+    statements::Statements,
+    token_type::TokenType,
+    types::Type,
+    value::Value,
+    Parser,
+    Spannable,
 };
 use miette::NamedSource;
 use std::{
@@ -87,51 +93,6 @@ impl<'s> Analyzer<'s> {
         expr_arena: &'s Bump,
         stmt_arena: &'s Bump,
     ) -> Result<SemanticOk<'s>, SemanticErr<'s>> {
-        // let pre_statements = ast
-        //     .iter()
-        //     .filter(|stmt| {
-        //         matches!(
-        //             stmt,
-        //             Statements::StructDefineStatement {
-        //                 name: _,
-        //                 fields: _,
-        //                 functions: _,
-        //                 public: _,
-        //                 span: _
-        //             } | Statements::EnumDefineStatement {
-        //                 name: _,
-        //                 fields: _,
-        //                 functions: _,
-        //                 public: _,
-        //                 span: _
-        //             } | Statements::TypedefStatement {
-        //                 alias: _,
-        //                 datatype: _,
-        //                 span: _
-        //             } | Statements::ImportStatement { path: _, span: _ }
-        //                 | Statements::ExternStatement {
-        //                     identifier: _,
-        //                     arguments: _,
-        //                     return_type: _,
-        //                     extern_type: _,
-        //                     is_var_args: _,
-        //                     public: _,
-        //                     span: _
-        //                 }
-        //         )
-        //     })
-        //     .collect::<Vec<&Statements>>();
-        //
-        // let after_statements = ast.iter().filter(|stmt| !pre_statements.contains(stmt));
-        //
-        // pre_statements
-        //     .clone()
-        //     .into_iter()
-        //     .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
-        // after_statements
-        //     .into_iter()
-        //     .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
-
         ast.iter()
             .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
 
@@ -230,17 +191,11 @@ impl<'s> Analyzer<'s> {
                 } => {}
                 Statements::LinkCStatement { path: _, span: _ } => {}
                 _ => {
-                    // if let Some(err) = self.errors.last() {
-                    //     if err.span == (255, 0).into() {
-                    //         return;
-                    //     };
-                    // }
-
                     self.error(SemanticError::SemanticalError {
                         exception: "This item is not allowed in global scope".to_string(),
                         help: Some("Consider removing this item from global scope".to_string()),
                         src: self.source.clone(),
-                        span: error::position_to_span(Parser::get_span_statement(statement)),
+                        span: error::position_to_span(statement.span()),
                     });
 
                     return;
@@ -444,10 +399,6 @@ impl<'s> Analyzer<'s> {
                 let instance = self.visit_expression(object, None, expr_arena, stmt_arena);
                 match instance {
                     Type::Array(typ, _) => {
-                        // i could spent some time to implement evaluating expressions for
-                        // checking index out of bounds, but it will be like in Rust: panics at
-                        // the runtime
-
                         let index_type =
                             self.visit_expression(index, Some(Type::USIZE), expr_arena, stmt_arena);
 
@@ -480,29 +431,7 @@ impl<'s> Analyzer<'s> {
                         }
                     }
                     Type::DynamicArray(_) => {
-                        // TODO: Remove dynamic array type
-
                         unreachable!()
-
-                        // let index_type = self.visit_expression(index, Some(Type::USIZE));
-                        //
-                        // if index_type != Type::USIZE {
-                        //     self.error(
-                        //         format!(
-                        //             "Expected index with type `usize`, but found `{index_type}`"
-                        //         ),
-                        //         *span,
-                        //     );
-                        // }
-                        //
-                        // let value_type = self.visit_expression(value, Some(*typ.clone()));
-                        //
-                        // if value_type != *typ {
-                        //     self.error(
-                        //         format!("Array has type `{typ}`, but found `{value_type}`"),
-                        //         *span,
-                        //     );
-                        // }
                     }
                     Type::Pointer(ptr_type) => {
                         let value_type =
@@ -651,7 +580,7 @@ impl<'s> Analyzer<'s> {
 
                 match (datatype, value) {
                     (Some(datatype), Some(value)) => {
-                        let value_span = Parser::get_span_expression(value);
+                        let value_span = value.span();
                         let value_type =
                             self.visit_expression(value, Some(datatype.clone()), expr_arena, stmt_arena);
 
@@ -912,9 +841,7 @@ impl<'s> Analyzer<'s> {
                                     ),
                                     help: Some("Consider verifying provided argument".to_string()),
                                     src: self.source.clone(),
-                                    span: error::position_to_span(Parser::get_span_expression(
-                                        &arguments[ind],
-                                    )),
+                                    span: error::position_to_span(arguments[ind].span()),
                                 });
                             }
                         },
@@ -1032,31 +959,7 @@ impl<'s> Analyzer<'s> {
                     }
                 });
 
-                // let functions_signatures = self.scope.functions.clone();
                 self.scope = *self.scope.parent.clone().unwrap();
-
-                // let _ = self.scope.structures.remove(name);
-
-                // let struct_type = Type::Struct(
-                //     fields.clone(),
-                //     functions_signatures
-                //         .into_iter()
-                //         .map(|x| (
-                //             x.0.replace("@!", ""),
-                //             x.1.datatype
-                //         ))
-                //         .collect(),
-                // );
-                // self.scope
-                //     .add_struct(name.clone(), struct_type.clone(), *public)
-                //     .unwrap_or_else(|err| {
-                //         self.error(err, *span);
-                //     });
-                // self.scope
-                //     .add_typedef(name.clone(), struct_type)
-                //     .unwrap_or_else(|err| {
-                //         self.error(err, *span);
-                //     })
             }
             Statements::EnumDefineStatement {
                 name,
@@ -1077,7 +980,6 @@ impl<'s> Analyzer<'s> {
                 enum_scope.parent = Some(Box::new(self.scope.clone()));
                 self.scope = enum_scope;
 
-                // WARN: Methods in enums are currently disabled
                 if !functions.is_empty() {
                     self.error(SemanticError::DisabledFeature {
                         exception: "methods in enums are currently disabled".to_string(),
@@ -1087,10 +989,6 @@ impl<'s> Analyzer<'s> {
                     });
                 }
 
-                // functions.iter().for_each(|func| {
-                //     self.visit_statement(func.1);
-                // });
-                //
                 let functions_signatures = self.scope.functions.clone();
                 self.scope = *self.scope.parent.clone().unwrap();
 
@@ -1462,149 +1360,6 @@ impl<'s> Analyzer<'s> {
                     src: self.source.clone(),
                     span: error::position_to_span(*span),
                 });
-
-                // match path {
-                //     Expressions::Value(Value::String(path), _) => {
-                //         let fname = std::path::Path::new(path)
-                //             .file_name()
-                //             .map(|fname| fname.to_str().unwrap_or("$NONE"));
-                //
-                //         match fname {
-                //             Some(fname) => {
-                //                 if fname == "$NONE" {
-                //                     self.error(format!("Unable to get module name: `{}`", path), *span);
-                //                     return;
-                //                 }
-                //
-                //                 let src = std::fs::read_to_string(fname).unwrap_or_else(|err| {
-                //                     self.error(format!("Unable to read `{}`: {}", fname, err), *span);
-                //                     String::new()
-                //                 });
-                //
-                //                 if src.is_empty() {
-                //                     return;
-                //                 };
-                //
-                //                 let mut lexer = genpay_lexer::Lexer::new(&src, fname);
-                //                 let (tokens, warns) = match lexer.tokenize() {
-                //                     Ok(res) => res,
-                //                     Err((errors, warns)) => {
-                //                         errors
-                //                             .iter()
-                //                             .for_each(|err| self.errors.push(err.clone().into()));
-                //                         warns
-                //                             .iter()
-                //                             .for_each(|warn| self.warnings.push(warn.clone().into()));
-                //                         return;
-                //                     }
-                //                 };
-                //                 warns
-                //                     .iter()
-                //                     .for_each(|warn| self.warnings.push(warn.clone().into()));
-                //
-                //                 let mut parser = genpay_parser::Parser::new(tokens, &src, fname);
-                //                 let (ast, warns) = match parser.parse() {
-                //                     Ok(res) => res,
-                //                     Err((errors, warns)) => {
-                //                         errors
-                //                             .iter()
-                //                             .for_each(|err| self.errors.push(err.clone().into()));
-                //                         warns
-                //                             .iter()
-                //                             .for_each(|warn| self.warnings.push(warn.clone().into()));
-                //                         return;
-                //                     }
-                //                 };
-                //                 warns
-                //                     .iter()
-                //                     .for_each(|warn| self.warnings.push(warn.clone().into()));
-                //
-                //                 let mut mutual_import = false;
-                //                 ast.iter().for_each(|stmt| {
-                //                     if let Statements::ImportStatement {
-                //                         path: Expressions::Value(Value::String(path), _),
-                //                         span,
-                //                     } = stmt
-                //                     {
-                //                         let imp_name = std::path::Path::new(path)
-                //                             .file_name()
-                //                             .map(|fname| fname.to_str().unwrap_or("$NONE"));
-                //
-                //                         if imp_name == Some(self.source.name()) {
-                //                             self.error(
-                //                                 format!(
-                //                                     "Mutual import found: `{}` from `{}`",
-                //                                     imp_name.unwrap(),
-                //                                     fname
-                //                                 ),
-                //                                 *span,
-                //                             );
-                //                             mutual_import = true;
-                //                         }
-                //                     }
-                //                 });
-                //
-                //                 if mutual_import {
-                //                     return;
-                //                 };
-                //
-                //                 let mut analyzer = Self::new(&src, fname, false);
-                //                 let (embedded_symtable, warns) = match analyzer.analyze(&ast) {
-                //                     Ok(warns) => warns,
-                //                     Err((errors, warns)) => {
-                //                         errors.iter().for_each(|err| self.errors.push(err.clone()));
-                //                         warns
-                //                             .iter()
-                //                             .for_each(|warn| self.warnings.push(warn.clone()));
-                //                         return;
-                //                     }
-                //                 };
-                //                 warns
-                //                     .iter()
-                //                     .for_each(|warn| self.warnings.push(warn.clone()));
-                //
-                //                 let module_name = fname
-                //                     .split(".")
-                //                     .nth(0)
-                //                     .map(|n| n.to_string())
-                //                     .unwrap_or(fname.replace(".dn", ""));
-                //
-                //                 let mut import = Import::new(ast, &src);
-                //
-                //                 analyzer.scope.functions.into_iter().for_each(|func| {
-                //                     if func.1.public {
-                //                         import.add_fn(func.0.to_string(), func.1.datatype);
-                //                     }
-                //                 });
-                //
-                //                 analyzer.scope.structures.into_iter().for_each(|structure| {
-                //                     if structure.1.public {
-                //                         import
-                //                             .add_struct(structure.0.to_string(), structure.1.datatype);
-                //                     }
-                //                 });
-                //
-                //                 analyzer.scope.enums.into_iter().for_each(|enumeration| {
-                //                     if enumeration.1.public {
-                //                         import.add_enum(
-                //                             enumeration.0.to_string(),
-                //                             enumeration.1.datatype,
-                //                         );
-                //                     }
-                //                 });
-                //
-                //                 import.embedded_symtable = embedded_symtable;
-                //                 self.symtable.imports.insert(module_name, import);
-                //             }
-                //             None => {
-                //                 self.error(format!("Unable to find: `{}`", path), *span);
-                //             }
-                //         }
-                //     }
-                //     _ => {
-                //         self.error(String::from("Import must be string constant"), *span);
-                //     }
-                // }
             }
 
             Statements::IncludeStatement { path, span: _ } => {
@@ -1697,8 +1452,6 @@ impl<'s> Analyzer<'s> {
 
                 self.scope
                     .add_var(identifier, datatype.clone(), true, (0, 0));
-
-                // making variable `used`
                 let _ = self.scope.get_var(identifier);
             }
 
@@ -1886,7 +1639,7 @@ impl<'s> Analyzer<'s> {
                     self.warning(SemanticWarning::UnusedResult {
                         message: format!("unused result with type `{expr_type}`"),
                         src: self.source.clone(),
-                        span: error::position_to_span(Parser::get_span_expression(expr)),
+                        span: error::position_to_span(expr.span()),
                     });
                 }
             }
@@ -1936,7 +1689,7 @@ impl<'s> Analyzer<'s> {
                     }
 
                     (Type::Pointer(_), r) if Self::is_integer(&r) => {
-                        if *operand != "+" && *operand != "-" {
+                        if *operand != TokenType::Plus && *operand != TokenType::Minus {
                             self.error(SemanticError::OperatorException {
                                 exception: "unsupported binary operator for pointer".to_string(),
                                 help: Some(
@@ -1951,7 +1704,7 @@ impl<'s> Analyzer<'s> {
                     }
 
                     (Type::Pointer(_), Type::Pointer(_)) => {
-                        if *operand != "+" && *operand != "-" {
+                        if *operand != TokenType::Plus && *operand != TokenType::Minus {
                             self.error(SemanticError::OperatorException {
                                 exception: "unsupported binary operator for pointer".to_string(),
                                 help: Some(
@@ -2057,15 +1810,15 @@ impl<'s> Analyzer<'s> {
                 let obj = self.visit_expression(object, expected.clone(), expr_arena, stmt_arena);
 
                 match (&obj, *operand) {
-                    (typ, "-") if Self::is_integer(typ) => {
+                    (typ, TokenType::Minus) if Self::is_integer(typ) => {
                         if Self::is_unsigned_integer(typ) {
                             return Self::unsigned_to_signed_integer(typ).unwrap();
                         }
                         obj
                     }
-                    (typ, "-") if Self::is_float(typ) => obj,
-                    (typ, "!") if Self::is_integer(typ) => obj,
-                    (Type::Bool, "!") => obj,
+                    (typ, TokenType::Minus) if Self::is_float(typ) => obj,
+                    (typ, TokenType::Not) if Self::is_integer(typ) => obj,
+                    (Type::Bool, TokenType::Not) => obj,
 
                     (Type::Alias(alias), _) => {
                         let implementation_format =
@@ -2148,7 +1901,7 @@ impl<'s> Analyzer<'s> {
                         if (matches!(l, Type::Pointer(_)) && r == Type::Null)
                             || (matches!(r, Type::Pointer(_)) && l == Type::Null) =>
                     {
-                        if !matches!(*operand, "==" | "!=") {
+                        if !matches!(*operand, TokenType::Eq | TokenType::Ne) {
                             self.error(SemanticError::OperatorException {
                                 exception: "null checker only supports: `==` / `!=`".to_string(),
                                 help: None,
@@ -2290,7 +2043,9 @@ impl<'s> Analyzer<'s> {
                     return expected.unwrap_or(left);
                 };
 
-                if [">>", "<<"].contains(operand) && !Self::is_unsigned_integer(&right) {
+                if [TokenType::RShift, TokenType::LShift].contains(operand)
+                    && !Self::is_unsigned_integer(&right)
+                {
                     self.error(SemanticError::TypesMismatch {
                         exception: "shift index must be unsigned integer".to_string(),
                         help: None,
@@ -2478,7 +2233,7 @@ impl<'s> Analyzer<'s> {
                                                 let self_arg = if is_pointed_struct {
                                                     prev_expr.clone()
                                                 } else {
-                                                    Expressions::Reference { object: expr_arena.alloc(prev_expr.clone()), span: (Parser::get_span_expression(&prev_expr)) }
+                                                    Expressions::Reference { object: expr_arena.alloc(prev_expr.clone()), span: (prev_expr.span()) }
                                                 };
 
                                                 arguments.push(self_arg);
@@ -2545,7 +2300,7 @@ impl<'s> Analyzer<'s> {
                                                     exception: format!("argument #{} has type `{}`, but found `{}`", index + 1, raw_expected, raw_expr_type),
                                                     help: None,
                                                     src: self.source.clone(),
-                                                    span: error::position_to_span(Parser::get_span_expression(expr))
+                                                    span: error::position_to_span(expr.span())
                                                 });
                                             }
                                         });
@@ -2614,19 +2369,14 @@ impl<'s> Analyzer<'s> {
                                                     exception: format!("argument #{} has type `{}`, but found `{}`", index + 1, expected, expr_type),
                                                     help: None,
                                                     src: self.source.clone(),
-                                                    span: error::position_to_span(Parser::get_span_expression(expr))
+                                                    span: error::position_to_span(expr.span())
                                                 });
                                             }
                                         });
                                     } else {
                                         unreachable!()
-                                        // self.error(
-                                        //     format!("Import `{imp}` has no functions named `{name}()`"),
-                                        //     *span
-                                        // );
                                     };
                                 }
-                                // Type::Enum(_, functions) => {},
                                 _ => {
                                     self.error(SemanticError::UnsupportedType {
                                         exception: format!("type `{prev_type}` isn't supported for method calls"),
@@ -2690,16 +2440,6 @@ impl<'s> Analyzer<'s> {
                                                 });
                                             }
                                         });
-
-                                        // let unassigned = assigned_fields.iter().filter(|x| !x.1).map(|x| x.0.to_owned().to_owned()).collect::<Vec<String>>();
-                                        // if !unassigned.is_empty() {
-                                        //     let fmt = format!("`{}`", unassigned.join("` , `"));
-                                        //     self.error(
-                                        //         format!("Missing structure fields: {fmt}"),
-                                        //         *span
-                                        //     );
-                                        // }
-
                                         prev_type_display = Type::Alias(static_name);
                                         prev_type = import.structs.get(static_name).unwrap().clone();
                                     }
@@ -2795,15 +2535,12 @@ impl<'s> Analyzer<'s> {
                                     ),
                                     help: None,
                                     src: self.source.clone(),
-                                    span: error::position_to_span(Parser::get_span_expression(
-                                        &arguments[ind].clone(),
-                                    )),
+                                    span: error::position_to_span(arguments[ind].span()),
                                 });
                             }
                         },
                     );
 
-                    // yeah, i know this looks like a shit, but i need it
                     if let Type::Pointer(func_ptr_type) = *func_type.clone() {
                         if let (Some(Type::Pointer(expected_ptr_type)), true) =
                             (expected.clone(), *func_ptr_type == Type::Void)
@@ -2927,7 +2664,7 @@ impl<'s> Analyzer<'s> {
                             ),
                             help: None,
                             src: self.source.clone(),
-                            span: error::position_to_span(Parser::get_span_expression(val)),
+                            span: error::position_to_span(val.span()),
                         });
                     }
                 });
@@ -2976,9 +2713,7 @@ impl<'s> Analyzer<'s> {
                                     exception: "tuple index must be unsigned".to_string(),
                                     help: None,
                                     src: self.source.clone(),
-                                    span: error::position_to_span(Parser::get_span_expression(
-                                        index,
-                                    )),
+                                    span: error::position_to_span(index.span()),
                                 });
 
                                 return expected.unwrap_or(Type::Void);
@@ -2993,7 +2728,7 @@ impl<'s> Analyzer<'s> {
                                         .to_string(),
                                 ),
                                 src: self.source.clone(),
-                                span: error::position_to_span(Parser::get_span_expression(index)),
+                                span: error::position_to_span(index.span()),
                             });
 
                             expected.unwrap_or(Type::Void)
@@ -3095,11 +2830,6 @@ impl<'s> Analyzer<'s> {
                     fields.iter().for_each(|field| {
                         let struct_field = struct_fields.get(field.0);
                         if let Some(field_type) = struct_field {
-                            // let field_type = self.unwrap_alias(field_type).unwrap_or_else(|err| {
-                            //     self.error(err, *span);
-                            //     Type::Void
-                            // });
-
                             let field_type = field_type.clone();
                             let provided_type = self.visit_expression(
                                 field.1,
@@ -3614,8 +3344,6 @@ impl<'s> Analyzer<'s> {
         let path = path.as_ref();
 
         if path.starts_with('@') {
-            // standard library path
-
             let genpaylib_env = std::env::var(STANDARD_LIBRARY_VAR)?;
             let expanded_stdlib_path = shellexpand::full(&genpaylib_env)?;
             let mut path_buffer = PathBuf::from(expanded_stdlib_path.as_ref());
@@ -3633,7 +3361,6 @@ impl<'s> Analyzer<'s> {
             path_buffer.push(module_path);
             Ok(path_buffer)
         } else {
-            // relative library path
             Ok(PathBuf::from(path))
         }
     }

@@ -10,6 +10,9 @@ use bumpalo::Bump;
 use genpay_lexer::{token::Token, token_type::TokenType, Lexer};
 use miette::NamedSource;
 
+pub use crate::expressions::Spannable;
+pub use genpay_lexer::token_type;
+
 /// Custom Defined Error Types
 pub mod error;
 /// Expressions Enum
@@ -364,10 +367,10 @@ impl<'a> Parser<'a> {
 
             TokenType::Minus | TokenType::Not => {
                 let object = self.term(expr_arena, stmt_arena);
-                let span = (current.span.0, self.span_expression(&object).1);
+                let span = (current.span.0, object.span().1);
 
                 Expressions::Unary {
-                    operand: current.value,
+                    operand: current.token_type,
                     object: expr_arena.alloc(object),
                     span,
                 }
@@ -857,7 +860,7 @@ impl<'a> Parser<'a> {
                             | TokenType::Minus
                             | TokenType::Multiply
                             | TokenType::Divide => {
-                                let operand = self.current().value;
+                                let operand = self.current().token_type;
                                 let _ = self.next();
 
                                 if !self.expect(TokenType::Equal) {
@@ -916,10 +919,10 @@ impl<'a> Parser<'a> {
                         stmt_arena,
                     ),
 
-                    tty if BINARY_OPERATORS.contains(&tty) => match self.next().token_type {
+                    ref tty if BINARY_OPERATORS.contains(&tty) => match self.next().token_type {
                         TokenType::Equal => self.binary_assign_statement(
                             Expressions::Value(Value::Identifier(current.value), current.span),
-                            next.value,
+                            next.token_type,
                             current.span,
                             expr_arena,
                             stmt_arena,
@@ -927,7 +930,7 @@ impl<'a> Parser<'a> {
                         TokenType::Plus | TokenType::Minus => {
                             let span_start = next.span.0;
                             let span_end = self.current().span.1;
-                            let (op1, op2) = (next.value, self.current().value);
+                            let (op1, op2) = (next.token_type, self.current().token_type);
 
                             if op1 != op2 {
                                 self.error(ParserError::UnknownExpression {
@@ -1056,7 +1059,7 @@ fn binary_expression() {
                 rhs,
                 span: _,
             } => {
-                assert_eq!(operand, "+");
+                assert_eq!(operand, TokenType::Plus);
 
                 if let Expressions::Value(Value::Integer(5), _) = *lhs {
                 } else {
@@ -1098,7 +1101,7 @@ fn binary_advanced_expression() {
                 rhs,
                 span: _,
             } => {
-                assert_eq!(operand, "+");
+                assert_eq!(operand, TokenType::Plus);
 
                 if let Expressions::Value(Value::Integer(2), _) = *lhs {
                 } else {
@@ -1111,7 +1114,7 @@ fn binary_advanced_expression() {
                     span: _,
                 } = *rhs
                 {
-                    assert_eq!(operand, "*");
+                    assert_eq!(operand, TokenType::Multiply);
 
                     if let Expressions::Value(Value::Integer(2), _) = *lhs {
                     } else {
@@ -1155,7 +1158,7 @@ fn unary_negative_expression() {
                 object,
                 span: _,
             } => {
-                assert_eq!(operand, "-");
+                assert_eq!(operand, TokenType::Minus);
 
                 if let Expressions::Value(Value::Integer(2), _) = *object {
                 } else {
@@ -1192,7 +1195,7 @@ fn unary_not_expression() {
                 object,
                 span: _,
             } => {
-                assert_eq!(operand, "!");
+                assert_eq!(operand, TokenType::Not);
 
                 if let Expressions::Value(Value::Integer(2), _) = *object {
                 } else {
@@ -1230,7 +1233,7 @@ fn boolean_eq_expression() {
                 rhs,
                 span: _,
             } => {
-                assert_eq!(operand, "==");
+                assert_eq!(operand, TokenType::Eq);
 
                 if let Expressions::Value(Value::Integer(1), _) = *lhs {
                 } else {
@@ -1272,7 +1275,7 @@ fn boolean_ne_expression() {
                 rhs,
                 span: _,
             } => {
-                assert_eq!(operand, "!=");
+                assert_eq!(operand, TokenType::Ne);
 
                 if let Expressions::Value(Value::Integer(1), _) = *lhs {
                 } else {
@@ -1314,7 +1317,7 @@ fn boolean_bt_expression() {
                 rhs,
                 span: _,
             } => {
-                assert_eq!(operand, ">");
+                assert_eq!(operand, TokenType::Bt);
 
                 if let Expressions::Value(Value::Integer(1), _) = *lhs {
                 } else {
@@ -1356,7 +1359,7 @@ fn boolean_lt_expression() {
                 rhs,
                 span: _,
             } => {
-                assert_eq!(operand, "<");
+                assert_eq!(operand, TokenType::Lt);
 
                 if let Expressions::Value(Value::Integer(1), _) = *lhs {
                 } else {
@@ -1398,7 +1401,7 @@ fn boolean_advanced_expression() {
                 rhs,
                 span: _,
             } => {
-                assert_eq!(operand, "&&");
+                assert_eq!(operand, TokenType::And);
 
                 if let Expressions::Boolean {
                     operand,
@@ -1407,7 +1410,7 @@ fn boolean_advanced_expression() {
                     span: _,
                 } = *lhs
                 {
-                    assert_eq!(operand, "==");
+                    assert_eq!(operand, TokenType::Eq);
 
                     if let Expressions::Value(Value::Integer(1), _) = *lhs {
                     } else {
@@ -1428,7 +1431,7 @@ fn boolean_advanced_expression() {
                     span: _,
                 } = *rhs
                 {
-                    assert_eq!(operand, "!=");
+                    assert_eq!(operand, TokenType::Ne);
 
                     if let Expressions::Value(Value::Integer(0), _) = *lhs {
                     } else {
@@ -1473,7 +1476,7 @@ fn bitwise_expression() {
                 rhs,
                 span: _,
             } => {
-                assert_eq!(operand, "<<");
+                assert_eq!(operand, TokenType::LShift);
 
                 if let Expressions::Value(Value::Integer(5), _) = *lhs {
                 } else {
@@ -2134,7 +2137,7 @@ fn binary_assign_statement() {
                 assert_eq!(*identifier, "some_var");
             }
 
-            assert_eq!(*operand, "+");
+            assert_eq!(*operand, TokenType::Plus);
 
             if let Expressions::Value(Value::Integer(5), _) = value {
             } else {

@@ -6,15 +6,18 @@ use crate::{
     structure::{Field, Structure},
     variable::Variable,
 };
-use genpay_parser::{expressions::Expressions, statements::Statements, types::Type, value::Value};
+use genpay_parser::{
+    expressions::Expressions, statements::Statements, token_type::TokenType, types::Type,
+    value::Value,
+};
 use inkwell::{
-    AddressSpace,
     basic_block::BasicBlock,
     builder::Builder,
     context::Context,
     module::{Linkage, Module},
     types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType},
     values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue},
+    AddressSpace,
 };
 
 use genpay_semantic::symtable::SymbolTable;
@@ -108,9 +111,21 @@ impl<'ctx> CodeGen<'ctx> {
             .for_each(|stmt| self.compile_statement(stmt, prefix));
 
         let module_content = {
-            let functions = self.scope.stricted_functions().map(|(k, v)| (*k, v.clone())).collect();
-            let structures = self.scope.stricted_structs().map(|(k, v)| (*k, v.clone())).collect();
-            let enumerations = self.scope.stricted_enums().map(|(k, v)| (*k, v.clone())).collect();
+            let functions = self
+                .scope
+                .stricted_functions()
+                .map(|(k, v)| (*k, v.clone()))
+                .collect();
+            let structures = self
+                .scope
+                .stricted_structs()
+                .map(|(k, v)| (*k, v.clone()))
+                .collect();
+            let enumerations = self
+                .scope
+                .stricted_enums()
+                .map(|(k, v)| (*k, v.clone()))
+                .collect();
 
             ModuleContent {
                 functions,
@@ -137,8 +152,8 @@ impl<'ctx> CodeGen<'ctx> {
 
                     self.builder.build_store(var.ptr, compiled_value.1).unwrap();
                 } else {
-                    let ptr = self
-                        .compile_expression(&object, Some(Type::Pointer(Box::new(Type::Undefined))));
+                    let ptr =
+                        self.compile_expression(&object, Some(Type::Pointer(Box::new(Type::Undefined))));
                     let value = self.compile_expression(&value, None);
 
                     let _ = self
@@ -605,12 +620,10 @@ impl<'ctx> CodeGen<'ctx> {
                 public: _,
                 span: _,
             } => {
-                let name = Box::leak(format!("{}{}", prefix.unwrap_or_default(), raw_name).into_boxed_str());
-                let llvm_name = format!(
-                    "{}.{}",
-                    self.module.get_name().to_string_lossy(),
-                    name
-                );
+                let name =
+                    Box::leak(format!("{}{}", prefix.unwrap_or_default(), raw_name).into_boxed_str());
+                let llvm_name =
+                    format!("{}.{}", self.module.get_name().to_string_lossy(), name);
 
                 let struct_type = self.context.opaque_struct_type(&llvm_name);
                 let mut compiled_fields = Vec::new();
@@ -652,7 +665,12 @@ impl<'ctx> CodeGen<'ctx> {
                         Some(Box::leak(format!("struct_{}__", name).into_boxed_str())),
                     );
 
-                    let (function_id, mut function_value) = self.scope.stricted_functions().last().map(|(id, f)| (*id, f.clone())).unwrap();
+                    let (function_id, mut function_value) = self
+                        .scope
+                        .stricted_functions()
+                        .last()
+                        .map(|(id, f)| (*id, f.clone()))
+                        .unwrap();
                     self.exit_scope_raw();
 
                     if let Some(Type::SelfRef) = function_value.arguments.first() {
@@ -663,7 +681,8 @@ impl<'ctx> CodeGen<'ctx> {
                         .set_function(function_id, function_value.clone());
 
                     let prefix_to_strip = format!("struct_{}__", name);
-                    let function_id_in_struct = function_id.strip_prefix(&prefix_to_strip).unwrap();
+                    let function_id_in_struct =
+                        function_id.strip_prefix(&prefix_to_strip).unwrap();
                     self.scope
                         .get_mut_struct(name)
                         .unwrap()
@@ -678,7 +697,8 @@ impl<'ctx> CodeGen<'ctx> {
                 public: _,
                 span: _,
             } => {
-                let name = Box::leak(format!("{}{}", prefix.unwrap_or_default(), name).into_boxed_str());
+                let name =
+                    Box::leak(format!("{}{}", prefix.unwrap_or_default(), name).into_boxed_str());
                 self.scope.set_enum(
                     name,
                     Enumeration {
@@ -701,7 +721,12 @@ impl<'ctx> CodeGen<'ctx> {
                         Some(Box::leak(format!("enum_{name}__").into_boxed_str())),
                     );
 
-                    let (function_id, function_value) = self.scope.stricted_functions().last().map(|(id, f)| (*id, f.clone())).unwrap();
+                    let (function_id, function_value) = self
+                        .scope
+                        .stricted_functions()
+                        .last()
+                        .map(|(id, f)| (*id, f.clone()))
+                        .unwrap();
                     self.exit_scope_raw();
 
                     let prefix_to_strip = format!("enum_{}__", name);
@@ -729,9 +754,9 @@ impl<'ctx> CodeGen<'ctx> {
             } => {
                 let condition = self.compile_expression(&condition, None);
 
-                let then_basic_block = self
-                    .context
-                    .append_basic_block(self.function.unwrap(), "__if_then");
+                let then_basic_block =
+                    self.context
+                        .append_basic_block(self.function.unwrap(), "__if_then");
                 let else_basic_block = if else_block.is_some() {
                     Some(
                         self.context
@@ -740,9 +765,9 @@ impl<'ctx> CodeGen<'ctx> {
                 } else {
                     None
                 };
-                let after_basic_block = self
-                    .context
-                    .append_basic_block(self.function.unwrap(), "__if_after");
+                let after_basic_block =
+                    self.context
+                        .append_basic_block(self.function.unwrap(), "__if_after");
 
                 self.builder
                     .build_conditional_branch(
@@ -785,12 +810,12 @@ impl<'ctx> CodeGen<'ctx> {
                 let condition_block = self
                     .context
                     .append_basic_block(self.function.unwrap(), "__while_condition");
-                let statements_block = self
-                    .context
-                    .append_basic_block(self.function.unwrap(), "__while_block");
-                let after_block = self
-                    .context
-                    .append_basic_block(self.function.unwrap(), "__while_after");
+                let statements_block =
+                    self.context
+                        .append_basic_block(self.function.unwrap(), "__while_block");
+                let after_block =
+                    self.context
+                        .append_basic_block(self.function.unwrap(), "__while_after");
 
                 let _ = self
                     .builder
@@ -830,20 +855,20 @@ impl<'ctx> CodeGen<'ctx> {
                 span,
             } => {
                 // blocks definition
-                let iterator_block = self
-                    .context
-                    .append_basic_block(self.function.unwrap(), "for_iterator");
-                let statements_block = self
-                    .context
-                    .append_basic_block(self.function.unwrap(), "for_block");
-                let after_block = self
-                    .context
-                    .append_basic_block(self.function.unwrap(), "for_after");
+                let iterator_block =
+                    self.context
+                        .append_basic_block(self.function.unwrap(), "for_iterator");
+                let statements_block =
+                    self.context
+                        .append_basic_block(self.function.unwrap(), "for_block");
+                let after_block =
+                    self.context
+                        .append_basic_block(self.function.unwrap(), "for_after");
 
                 // binding initialization
 
-                let mut compiled_iterator = self
-                    .compile_expression(&iterator, Some(Type::Pointer(Box::new(Type::Undefined))));
+                let mut compiled_iterator =
+                    self.compile_expression(&iterator, Some(Type::Pointer(Box::new(Type::Undefined))));
 
                 if let Type::Pointer(ptr_type) = compiled_iterator.0 {
                     compiled_iterator.0 = *ptr_type.clone();
@@ -918,9 +943,9 @@ impl<'ctx> CodeGen<'ctx> {
                             let err_block = self
                                 .context
                                 .insert_basic_block_after(checker_block, "int_integer_panic");
-                            let ok_block = self
-                                .context
-                                .insert_basic_block_after(err_block, "int_checker_ok");
+                            let ok_block =
+                                self.context
+                                    .insert_basic_block_after(err_block, "int_checker_ok");
 
                             self.builder
                                 .build_unconditional_branch(checker_block)
@@ -989,7 +1014,8 @@ impl<'ctx> CodeGen<'ctx> {
                     Type::Alias(alias) => {
                         // allocating iterator status
                         let status_varname = format!("@genpay_iterator_status_{}", &binding);
-                        let static_status_varname = Box::leak(status_varname.clone().into_boxed_str());
+                        let static_status_varname =
+                            Box::leak(status_varname.clone().into_boxed_str());
 
                         let iterator_fn = self
                             .scope
@@ -1094,7 +1120,8 @@ impl<'ctx> CodeGen<'ctx> {
                         // allocating iterator position
                         let iterator_position_varname =
                             format!("@genpay_iterator_position_{}", &binding);
-                        let static_iterator_position_varname = Box::leak(iterator_position_varname.clone().into_boxed_str());
+                        let static_iterator_position_varname =
+                            Box::leak(iterator_position_varname.clone().into_boxed_str());
                         let iterator_position_alloca = self
                             .builder
                             .build_alloca(self.context.i64_type(), &iterator_position_varname)
@@ -1263,11 +1290,8 @@ impl<'ctx> CodeGen<'ctx> {
                         // incrementing iterator position
                         let iterator_position_varname =
                             format!("@genpay_iterator_position_{}", &binding);
-                        let iterator_position_ptr = self
-                            .scope
-                            .get_variable(&iterator_position_varname)
-                            .unwrap()
-                            .ptr;
+                        let iterator_position_ptr =
+                            self.scope.get_variable(&iterator_position_varname).unwrap().ptr;
 
                         let value = self
                             .builder
@@ -1502,11 +1526,7 @@ impl<'ctx> CodeGen<'ctx> {
                     .iter()
                     .zip(function.arguments.clone())
                     .for_each(|(arg, fn_expected)| {
-                        args.push(
-                            self.compile_expression(arg, Some(fn_expected))
-                                .1
-                                .into(),
-                        )
+                        args.push(self.compile_expression(arg, Some(fn_expected)).1.into())
                     });
 
                 let mut return_type = function.datatype.clone();
@@ -1551,19 +1571,14 @@ impl<'ctx> CodeGen<'ctx> {
                     if let Value::Identifier(id) = val {
                         let var = self.scope.get_variable(id).unwrap();
 
-                        (
-                            Type::Pointer(Box::new(var.datatype.clone())),
-                            var.ptr.into(),
-                        )
+                        (Type::Pointer(Box::new(var.datatype.clone())), var.ptr.into())
                     } else {
                         unreachable!()
                     }
                 }
                 _ => {
-                    let value = self.compile_expression(
-                        object,
-                        Some(Type::Pointer(Box::new(Type::Undefined))),
-                    );
+                    let value =
+                        self.compile_expression(object, Some(Type::Pointer(Box::new(Type::Undefined))));
                     let alloca = self.builder.build_alloca(value.1.get_type(), "").unwrap();
                     let _ = self.builder.build_store(alloca, value.1);
 
@@ -1636,10 +1651,16 @@ impl<'ctx> CodeGen<'ctx> {
                         alloca
                     };
 
+                    let operand_as_string = match operand {
+                        TokenType::Minus => "-",
+                        TokenType::Not => "!",
+                        _ => unreachable!(),
+                    };
+
                     let object_ptr: BasicMetadataValueEnum = object_ptr.into();
                     let operand: BasicMetadataValueEnum = self
                         .builder
-                        .build_global_string_ptr(operand, "@genpay_operand")
+                        .build_global_string_ptr(operand_as_string, "@genpay_operand")
                         .unwrap()
                         .as_pointer_value()
                         .into();
@@ -1659,8 +1680,8 @@ impl<'ctx> CodeGen<'ctx> {
                     return (unary_function.datatype.clone(), function_output);
                 }
 
-                match *operand {
-                    "-" => match object_value.0 {
+                match operand {
+                    TokenType::Minus => match object_value.0 {
                         Type::I8
                         | Type::I16
                         | Type::I32
@@ -1670,7 +1691,8 @@ impl<'ctx> CodeGen<'ctx> {
                         | Type::U32
                         | Type::U64
                         | Type::USIZE => (
-                            genpay_semantic::Analyzer::unsigned_to_signed_integer(&object_value.0).unwrap(),
+                            genpay_semantic::Analyzer::unsigned_to_signed_integer(&object_value.0)
+                                .unwrap(),
                             self.builder
                                 .build_int_neg(object_value.1.into_int_value(), "")
                                 .unwrap()
@@ -1688,7 +1710,7 @@ impl<'ctx> CodeGen<'ctx> {
                         _ => unreachable!(),
                     },
 
-                    "!" => (
+                    TokenType::Not => (
                         object_value.0,
                         self.builder
                             .build_not(object_value.1.into_int_value(), "")
@@ -1747,8 +1769,8 @@ impl<'ctx> CodeGen<'ctx> {
                 };
 
                 let output = match senior_type.clone() {
-                    typ if genpay_semantic::Analyzer::is_integer(&typ) => match *operand {
-                        "+" => {
+                    typ if genpay_semantic::Analyzer::is_integer(&typ) => match operand {
+                        TokenType::Plus => {
                             if genpay_semantic::Analyzer::is_unsigned_integer(&typ) {
                                 self.builder
                                     .build_int_nsw_add(
@@ -1769,7 +1791,7 @@ impl<'ctx> CodeGen<'ctx> {
                                     .as_basic_value_enum()
                             }
                         }
-                        "-" => {
+                        TokenType::Minus => {
                             if genpay_semantic::Analyzer::is_unsigned_integer(&typ) {
                                 self.builder
                                     .build_int_nsw_sub(
@@ -1790,7 +1812,7 @@ impl<'ctx> CodeGen<'ctx> {
                                     .as_basic_value_enum()
                             }
                         }
-                        "*" => {
+                        TokenType::Multiply => {
                             if genpay_semantic::Analyzer::is_unsigned_integer(&typ) {
                                 self.builder
                                     .build_int_nsw_mul(
@@ -1811,7 +1833,7 @@ impl<'ctx> CodeGen<'ctx> {
                                     .as_basic_value_enum()
                             }
                         }
-                        "/" => {
+                        TokenType::Divide => {
                             if genpay_semantic::Analyzer::is_unsigned_integer(&typ) {
                                 self.builder
                                     .build_int_unsigned_div(
@@ -1832,7 +1854,7 @@ impl<'ctx> CodeGen<'ctx> {
                                     .as_basic_value_enum()
                             }
                         }
-                        "%" => {
+                        TokenType::Modulus => {
                             if genpay_semantic::Analyzer::is_unsigned_integer(&typ) {
                                 self.builder
                                     .build_int_unsigned_rem(
@@ -1858,8 +1880,8 @@ impl<'ctx> CodeGen<'ctx> {
                             "Unsupported for codegen operator found! Please open issue on Github!"
                         ),
                     },
-                    typ if genpay_semantic::Analyzer::is_float(&typ) => match *operand {
-                        "+" => self
+                    typ if genpay_semantic::Analyzer::is_float(&typ) => match operand {
+                        TokenType::Plus => self
                             .builder
                             .build_float_add(
                                 lhs_value.1.into_float_value(),
@@ -1868,7 +1890,7 @@ impl<'ctx> CodeGen<'ctx> {
                             )
                             .unwrap()
                             .as_basic_value_enum(),
-                        "-" => self
+                        TokenType::Minus => self
                             .builder
                             .build_float_sub(
                                 lhs_value.1.into_float_value(),
@@ -1877,7 +1899,7 @@ impl<'ctx> CodeGen<'ctx> {
                             )
                             .unwrap()
                             .as_basic_value_enum(),
-                        "*" => self
+                        TokenType::Multiply => self
                             .builder
                             .build_float_mul(
                                 lhs_value.1.into_float_value(),
@@ -1886,7 +1908,7 @@ impl<'ctx> CodeGen<'ctx> {
                             )
                             .unwrap()
                             .as_basic_value_enum(),
-                        "/" => self
+                        TokenType::Divide => self
                             .builder
                             .build_float_div(
                                 lhs_value.1.into_float_value(),
@@ -1918,9 +1940,13 @@ impl<'ctx> CodeGen<'ctx> {
                                 )
                                 .unwrap();
 
-                            let mut value = match *operand {
-                                "+" => self.builder.build_int_add(lhs_int, rhs_int, "").unwrap(),
-                                "-" => self.builder.build_int_sub(lhs_int, rhs_int, "").unwrap(),
+                            let mut value = match operand {
+                                TokenType::Plus => {
+                                    self.builder.build_int_add(lhs_int, rhs_int, "").unwrap()
+                                }
+                                TokenType::Minus => {
+                                    self.builder.build_int_sub(lhs_int, rhs_int, "").unwrap()
+                                }
                                 _ => unreachable!(),
                             }
                             .as_basic_value_enum();
@@ -1954,31 +1980,30 @@ impl<'ctx> CodeGen<'ctx> {
                     }
 
                     Type::Alias(alias) => {
-                        // let exp = Some(Type::Pointer(Box::new(Type::Undefined)));
-                        // let lhs_value = self.compile_expression(*lhs, exp.clone());
-                        // let rhs_value = self.compile_expression(*rhs, exp);
-
                         let structure = self.scope.get_struct(&alias).unwrap();
                         let binary_function = structure.functions.get("binary").unwrap();
 
                         let left_ptr = self
-                            .compile_expression(
-                                lhs,
-                                Some(Type::Pointer(Box::new(Type::Undefined))),
-                            )
+                            .compile_expression(lhs, Some(Type::Pointer(Box::new(Type::Undefined))))
                             .1;
                         let right_ptr = self
-                            .compile_expression(
-                                rhs,
-                                Some(Type::Pointer(Box::new(Type::Undefined))),
-                            )
+                            .compile_expression(rhs, Some(Type::Pointer(Box::new(Type::Undefined))))
                             .1;
+
+                        let operand_as_string = match operand {
+                            TokenType::Plus => "+",
+                            TokenType::Minus => "-",
+                            TokenType::Multiply => "*",
+                            TokenType::Divide => "/",
+                            TokenType::Modulus => "%",
+                            _ => unreachable!(),
+                        };
 
                         let left_ptr: BasicMetadataValueEnum = left_ptr.into();
                         let right_ptr: BasicMetadataValueEnum = right_ptr.into();
                         let operand: BasicMetadataValueEnum = self
                             .builder
-                            .build_global_string_ptr(operand, "@genpay_operand")
+                            .build_global_string_ptr(operand_as_string, "@genpay_operand")
                             .unwrap()
                             .as_pointer_value()
                             .into();
@@ -2007,8 +2032,7 @@ impl<'ctx> CodeGen<'ctx> {
                 ..
             } => {
                 let mut lhs_value = self.compile_expression(lhs, expected.clone());
-                let mut rhs_value =
-                    self.compile_expression(rhs, Some(lhs_value.0.clone()));
+                let mut rhs_value = self.compile_expression(rhs, Some(lhs_value.0.clone()));
 
                 if let Type::Alias(left) = &lhs_value.0
                     && let Type::Alias(right) = &rhs_value.0
@@ -2019,8 +2043,8 @@ impl<'ctx> CodeGen<'ctx> {
                     rhs_value.0 = Type::U8;
                 }
 
-                match *operand {
-                    "&&" => {
+                match operand {
+                    TokenType::And => {
                         return (
                             Type::Bool,
                             self.builder
@@ -2033,7 +2057,7 @@ impl<'ctx> CodeGen<'ctx> {
                                 .as_basic_value_enum(),
                         );
                     }
-                    "||" => {
+                    TokenType::Or => {
                         return (
                             Type::Bool,
                             self.builder
@@ -2056,7 +2080,7 @@ impl<'ctx> CodeGen<'ctx> {
                         } else {
                             lhs_value.1
                         };
-                        let result_value = if *operand == "==" {
+                        let result_value = if *operand == TokenType::Eq {
                             self.builder
                                 .build_is_null(leading_value.into_pointer_value(), "")
                                 .unwrap()
@@ -2073,12 +2097,12 @@ impl<'ctx> CodeGen<'ctx> {
 
                     typ if genpay_semantic::Analyzer::is_integer(&typ) || typ == Type::Char => {
                         let predicate = match *operand {
-                            ">" => inkwell::IntPredicate::SGT,
-                            "<" => inkwell::IntPredicate::SLT,
-                            "<=" | "=<" => inkwell::IntPredicate::SLE,
-                            ">=" | "=>" => inkwell::IntPredicate::SGE,
-                            "==" => inkwell::IntPredicate::EQ,
-                            "!=" => inkwell::IntPredicate::NE,
+                            TokenType::Bt => inkwell::IntPredicate::SGT,
+                            TokenType::Lt => inkwell::IntPredicate::SLT,
+                            TokenType::Leq => inkwell::IntPredicate::SLE,
+                            TokenType::Beq => inkwell::IntPredicate::SGE,
+                            TokenType::Eq => inkwell::IntPredicate::EQ,
+                            TokenType::Ne => inkwell::IntPredicate::NE,
                             _ => unreachable!(),
                         };
 
@@ -2098,12 +2122,12 @@ impl<'ctx> CodeGen<'ctx> {
 
                     typ if genpay_semantic::Analyzer::is_float(&typ) => {
                         let predicate = match *operand {
-                            ">" => inkwell::FloatPredicate::OGT,
-                            "<" => inkwell::FloatPredicate::OLT,
-                            "<=" | "=<" => inkwell::FloatPredicate::OLE,
-                            ">=" | "=>" => inkwell::FloatPredicate::OGE,
-                            "==" => inkwell::FloatPredicate::OEQ,
-                            "!=" => inkwell::FloatPredicate::ONE,
+                            TokenType::Bt => inkwell::FloatPredicate::OGT,
+                            TokenType::Lt => inkwell::FloatPredicate::OLT,
+                            TokenType::Leq => inkwell::FloatPredicate::OLE,
+                            TokenType::Beq => inkwell::FloatPredicate::OGE,
+                            TokenType::Eq => inkwell::FloatPredicate::OEQ,
+                            TokenType::Ne => inkwell::FloatPredicate::ONE,
                             _ => unreachable!(),
                         };
 
@@ -2142,12 +2166,12 @@ impl<'ctx> CodeGen<'ctx> {
                             .unwrap();
 
                         let int_predicate = match *operand {
-                            ">" => inkwell::IntPredicate::SGT,
-                            "<" => inkwell::IntPredicate::SLT,
-                            "<=" | "=<" => inkwell::IntPredicate::SLE,
-                            ">=" | "=>" => inkwell::IntPredicate::SGE,
-                            "==" => inkwell::IntPredicate::EQ,
-                            "!=" => inkwell::IntPredicate::NE,
+                            TokenType::Bt => inkwell::IntPredicate::SGT,
+                            TokenType::Lt => inkwell::IntPredicate::SLT,
+                            TokenType::Leq => inkwell::IntPredicate::SLE,
+                            TokenType::Beq => inkwell::IntPredicate::SGE,
+                            TokenType::Eq => inkwell::IntPredicate::EQ,
+                            TokenType::Ne => inkwell::IntPredicate::NE,
                             _ => unreachable!(),
                         };
 
@@ -2171,16 +2195,10 @@ impl<'ctx> CodeGen<'ctx> {
                         let compare_function = structure.functions.get("compare").unwrap();
 
                         let left_ptr = self
-                            .compile_expression(
-                                lhs,
-                                Some(Type::Pointer(Box::new(Type::Undefined))),
-                            )
+                            .compile_expression(lhs, Some(Type::Pointer(Box::new(Type::Undefined))))
                             .1;
                         let right_ptr = self
-                            .compile_expression(
-                                rhs,
-                                Some(Type::Pointer(Box::new(Type::Undefined))),
-                            )
+                            .compile_expression(rhs, Some(Type::Pointer(Box::new(Type::Undefined))))
                             .1;
 
                         let left_ptr: BasicMetadataValueEnum = left_ptr.into();
@@ -2201,12 +2219,12 @@ impl<'ctx> CodeGen<'ctx> {
                         // comparing
 
                         let int_predicate = match *operand {
-                            ">" => inkwell::IntPredicate::SGT,
-                            "<" => inkwell::IntPredicate::SLT,
-                            "<=" | "=<" => inkwell::IntPredicate::SLE,
-                            ">=" | "=>" => inkwell::IntPredicate::SGE,
-                            "==" => inkwell::IntPredicate::EQ,
-                            "!=" => inkwell::IntPredicate::NE,
+                            TokenType::Bt => inkwell::IntPredicate::SGT,
+                            TokenType::Lt => inkwell::IntPredicate::SLT,
+                            TokenType::Leq => inkwell::IntPredicate::SLE,
+                            TokenType::Beq => inkwell::IntPredicate::SGE,
+                            TokenType::Eq => inkwell::IntPredicate::EQ,
+                            TokenType::Ne => inkwell::IntPredicate::NE,
                             _ => unreachable!(),
                         };
 
@@ -2250,12 +2268,12 @@ impl<'ctx> CodeGen<'ctx> {
 
                 let sign_extend = genpay_semantic::Analyzer::is_unsigned_integer(&left.0);
                 let basic_value = match *operand {
-                    "<<" => self
+                    TokenType::LShift => self
                         .builder
                         .build_left_shift(left.1.into_int_value(), right.1.into_int_value(), "")
                         .unwrap()
                         .as_basic_value_enum(),
-                    ">>" => self
+                    TokenType::RShift => self
                         .builder
                         .build_right_shift(
                             left.1.into_int_value(),
@@ -2265,17 +2283,17 @@ impl<'ctx> CodeGen<'ctx> {
                         )
                         .unwrap()
                         .as_basic_value_enum(),
-                    "&" => self
+                    TokenType::Ampersand => self
                         .builder
                         .build_and(left.1.into_int_value(), right.1.into_int_value(), "")
                         .unwrap()
                         .as_basic_value_enum(),
-                    "|" => self
+                    TokenType::Verbar => self
                         .builder
                         .build_or(left.1.into_int_value(), right.1.into_int_value(), "")
                         .unwrap()
                         .as_basic_value_enum(),
-                    "^" => self
+                    TokenType::Xor => self
                         .builder
                         .build_xor(left.1.into_int_value(), right.1.into_int_value(), "")
                         .unwrap()
@@ -2339,19 +2357,18 @@ impl<'ctx> CodeGen<'ctx> {
                                         )
                                         .unwrap();
 
-                                    let value = if let Some(Type::Pointer(ptr_type)) =
-                                        expected.clone()
-                                    {
-                                        if *ptr_type == Type::Undefined {
-                                            ptr.as_basic_value_enum()
+                                    let value =
+                                        if let Some(Type::Pointer(ptr_type)) = expected.clone() {
+                                            if *ptr_type == Type::Undefined {
+                                                ptr.as_basic_value_enum()
+                                            } else {
+                                                self.builder
+                                                    .build_load(field.llvm_type, ptr, "")
+                                                    .unwrap()
+                                            }
                                         } else {
-                                            self.builder
-                                                .build_load(field.llvm_type, ptr, "")
-                                                .unwrap()
-                                        }
-                                    } else {
-                                        self.builder.build_load(field.llvm_type, ptr, "").unwrap()
-                                    };
+                                            self.builder.build_load(field.llvm_type, ptr, "").unwrap()
+                                        };
 
                                     prev_type = field.datatype.clone();
                                     prev_val = value;
@@ -2378,7 +2395,8 @@ impl<'ctx> CodeGen<'ctx> {
 
                             let tuple_type = self.context.struct_type(
                                 &types
-                                    .iter().map(|t| t.clone())
+                                    .iter()
+                                    .map(|t| t.clone())
                                     .map(|typ| self.get_basic_type(typ))
                                     .collect::<Vec<BasicTypeEnum>>(),
                                 false,
@@ -2445,9 +2463,7 @@ impl<'ctx> CodeGen<'ctx> {
                                             .iter()
                                             .zip(function.arguments.clone())
                                             .map(|(arg, exp)| {
-                                                self.compile_expression(arg, Some(exp))
-                                                    .1
-                                                    .into()
+                                                self.compile_expression(arg, Some(exp)).1.into()
                                             })
                                             .collect::<Vec<BasicMetadataValueEnum>>();
 
@@ -2476,8 +2492,7 @@ impl<'ctx> CodeGen<'ctx> {
                                 }
                             }
                             Type::ImportObject(import_name) => {
-                                let module_content =
-                                    self.imports.get(import_name).unwrap().clone();
+                                let module_content = self.imports.get(import_name).unwrap().clone();
                                 let function = module_content.functions.get(*name).unwrap();
 
                                 let arguments = arguments
@@ -2841,11 +2856,6 @@ impl<'ctx> CodeGen<'ctx> {
                     let field_value =
                         self.compile_expression(&field_expr, Some(struct_field.datatype.clone()));
 
-                    // let ordered_index = self
-                    //     .context
-                    //     .i64_type()
-                    //     .const_int(struct_field.nth as u64, false);
-
                     let field_ptr = self
                         .builder
                         .build_struct_gep(structure.llvm_type, struct_alloca, struct_field.nth, "")
@@ -3157,9 +3167,7 @@ impl<'ctx> CodeGen<'ctx> {
             Type::Bool => self.context.bool_type().into(),
 
             Type::Pointer(_) => self.context.ptr_type(AddressSpace::default()).into(),
-            Type::Array(datatype, len) => {
-                self.get_basic_type(*datatype).array_type(len as u32).into()
-            }
+            Type::Array(datatype, len) => self.get_basic_type(*datatype).array_type(len as u32).into(),
             Type::DynamicArray(_) => todo!(),
 
             Type::Tuple(types) => {
