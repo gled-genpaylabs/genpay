@@ -1,12 +1,44 @@
 use crate::{
     END_STATEMENT, Parser,
     error::{self, ParserError},
-    expressions::Expressions,
+    expressions::{Expressions, Spannable},
     types::Type,
     value::Value,
 };
 use genpay_lexer::token_type::TokenType;
 use std::collections::BTreeMap;
+
+impl<'a> Spannable for Statements<'a> {
+    fn span(&self) -> (usize, usize) {
+        match self {
+            Statements::AssignStatement { span, .. } => *span,
+            Statements::BinaryAssignStatement { span, .. } => *span,
+            Statements::DerefAssignStatement { span, .. } => *span,
+            Statements::SliceAssignStatement { span, .. } => *span,
+            Statements::FieldAssignStatement { span, .. } => *span,
+            Statements::AnnotationStatement { span, .. } => *span,
+            Statements::FunctionDefineStatement { span, .. } => *span,
+            Statements::FunctionCallStatement { span, .. } => *span,
+            Statements::MacroCallStatement { span, .. } => *span,
+            Statements::StructDefineStatement { span, .. } => *span,
+            Statements::EnumDefineStatement { span, .. } => *span,
+            Statements::TypedefStatement { span, .. } => *span,
+            Statements::IfStatement { span, .. } => *span,
+            Statements::WhileStatement { span, .. } => *span,
+            Statements::ForStatement { span, .. } => *span,
+            Statements::ImportStatement { span, .. } => *span,
+            Statements::IncludeStatement { span, .. } => *span,
+            Statements::ExternStatement { span, .. } => *span,
+            Statements::ExternDeclareStatement { span, .. } => *span,
+            Statements::LinkCStatement { span, .. } => *span,
+            Statements::BreakStatements { span } => *span,
+            Statements::ReturnStatement { span, .. } => *span,
+            Statements::ScopeStatement { span, .. } => *span,
+            Statements::Expression(expr) => expr.span(),
+            Statements::None => (0, 0),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum Statements<'a> {
@@ -20,7 +52,7 @@ pub enum Statements<'a> {
     /// `OBJECT BINOP= EXPRESSION`
     BinaryAssignStatement {
         object: Expressions<'a>,
-        operand: &'a str,
+        operand: TokenType,
         value: Expressions<'a>,
         span: (usize, usize),
     },
@@ -464,39 +496,6 @@ impl<'a> PartialEq for Statements<'a> {
     }
 }
 
-impl<'a> Parser<'a> {
-    #[inline]
-    pub fn get_span_statement(stmt: &Statements<'a>) -> (usize, usize) {
-        match stmt {
-            Statements::AssignStatement { span, .. } => *span,
-            Statements::BinaryAssignStatement { span, .. } => *span,
-            Statements::DerefAssignStatement { span, .. } => *span,
-            Statements::SliceAssignStatement { span, .. } => *span,
-            Statements::FieldAssignStatement { span, .. } => *span,
-            Statements::AnnotationStatement { span, .. } => *span,
-            Statements::FunctionDefineStatement { span, .. } => *span,
-            Statements::FunctionCallStatement { span, .. } => *span,
-            Statements::MacroCallStatement { span, .. } => *span,
-            Statements::StructDefineStatement { span, .. } => *span,
-            Statements::EnumDefineStatement { span, .. } => *span,
-            Statements::TypedefStatement { span, .. } => *span,
-            Statements::IfStatement { span, .. } => *span,
-            Statements::WhileStatement { span, .. } => *span,
-            Statements::ForStatement { span, .. } => *span,
-            Statements::ImportStatement { span, .. } => *span,
-            Statements::IncludeStatement { span, .. } => *span,
-            Statements::ExternStatement { span, .. } => *span,
-            Statements::ExternDeclareStatement { span, .. } => *span,
-            Statements::LinkCStatement { span, .. } => *span,
-            Statements::BreakStatements { span } => *span,
-            Statements::ReturnStatement { span, .. } => *span,
-            Statements::ScopeStatement { span, .. } => *span,
-            Statements::Expression(expr) => Self::get_span_expression(expr),
-            Statements::None => (0, 0), // или можно вернуть Option<(usize, usize)>
-        }
-    }
-}
-
 use bumpalo::Bump;
 
 impl<'a> Parser<'a> {
@@ -538,7 +537,7 @@ impl<'a> Parser<'a> {
                     identifier: id,
                     datatype,
                     value: Some(value.clone()),
-                    span: (span_start, self.span_expression(&value).1),
+                    span: (span_start, value.span().1),
                 }
             }
             END_STATEMENT => {
@@ -603,7 +602,7 @@ impl<'a> Parser<'a> {
         }
 
         let path = self.expression(expr_arena, stmt_arena);
-        let span_end = Self::get_span_expression(&path).1;
+        let span_end = path.span().1;
 
         self.skip_eos();
 
@@ -930,7 +929,7 @@ impl<'a> Parser<'a> {
                         exception: "unexpected argument declaration found".to_string(),
                         help: "Use right arguments syntax: `identifier: type`".to_string(),
                         src: self.source.clone(),
-                        span: error::position_to_span(self.span_expression(&arg.clone())),
+                        span: error::position_to_span(arg.span()),
                     });
 
                     ("", Type::Void)
@@ -1006,7 +1005,7 @@ impl<'a> Parser<'a> {
             self.expression(expr_arena, stmt_arena)
         };
 
-        let end_span = Self::get_span_expression(&return_expr).1;
+        let end_span = return_expr.span().1;
         Statements::ReturnStatement {
             value: return_expr,
             span: (span_start, end_span),
@@ -1030,7 +1029,7 @@ impl<'a> Parser<'a> {
         }
 
         let value = self.expression(expr_arena, stmt_arena);
-        let end_span = Self::get_span_expression(&value).1;
+        let end_span = value.span().1;
         self.skip_eos();
 
         Statements::AssignStatement {
@@ -1043,7 +1042,7 @@ impl<'a> Parser<'a> {
     pub fn binary_assign_statement(
         &mut self,
         object: Expressions<'a>,
-        op: &'a str,
+        op: TokenType,
         span: (usize, usize),
         expr_arena: &'a Bump,
         stmt_arena: &'a Bump,
@@ -1053,7 +1052,7 @@ impl<'a> Parser<'a> {
         }
 
         let value = self.expression(expr_arena, stmt_arena);
-        let end_span = Self::get_span_expression(&value).1;
+        let end_span = value.span().1;
         self.skip_eos();
 
         Statements::BinaryAssignStatement {
@@ -1102,7 +1101,7 @@ impl<'a> Parser<'a> {
         let _ = self.next(); // consume '='
 
         let value_expr = self.expression(expr_arena, stmt_arena);
-        let end_span = Self::get_span_expression(&value_expr).1;
+        let end_span = value_expr.span().1;
         self.skip_eos();
 
         Statements::SliceAssignStatement {
@@ -1135,7 +1134,7 @@ impl<'a> Parser<'a> {
             self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma, expr_arena, stmt_arena);
 
         let span_end = if let Some(last_arg) = arguments.last() {
-            Self::get_span_expression(last_arg).1
+            last_arg.span().1
         } else {
             self.current().span.0
         };
@@ -1158,7 +1157,7 @@ impl<'a> Parser<'a> {
             self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma, expr_arena, stmt_arena);
 
         let span_end = if let Some(last_arg) = arguments.last() {
-            Self::get_span_expression(last_arg).1
+            last_arg.span().1
         } else {
             self.current().span.0
         };
@@ -1529,7 +1528,7 @@ impl<'a> Parser<'a> {
         }
 
         let path = self.expression(expr_arena, stmt_arena);
-        let span_end = Self::get_span_expression(&path).1;
+        let span_end = path.span().1;
 
         if let Expressions::Value(Value::String(_), _) = path {
             Statements::LinkCStatement {
