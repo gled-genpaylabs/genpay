@@ -1,6 +1,7 @@
 [package]
 name = "genpay-lexer"
 description = "Lexical Analyzer for Genpay Programming Language"
+build = "build.rs"
 
 version.workspace = true
 edition.workspace = true
@@ -9,3 +10,7 @@ authors.workspace = true
 [dependencies]
 miette = { version = "7.5.0", features = ["fancy"] }
 thiserror = "2.0.12"
+phf = { version = "0.11", features = ["macros"] }
+
+[build-dependencies]
+phf_codegen = "0.11"
