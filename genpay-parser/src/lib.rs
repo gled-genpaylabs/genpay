@@ -1,4 +1,3 @@
-
 use crate::{
     error::{ParserError, ParserWarning},
     expressions::Expressions,
@@ -136,7 +135,13 @@ impl<'a> Parser<'a> {
         let mut output = Vec::new();
 
         while self.current().token_type != TokenType::EOF {
-            output.push(self.statement(expr_arena, stmt_arena));
+            match self.statement(expr_arena, stmt_arena) {
+                Ok(stmt) => output.push(stmt),
+                Err(err) => {
+                    self.errors.push(err);
+                    self.skip_statement();
+                }
+            }
         }
 
         if !self.errors.is_empty() {
@@ -322,6 +327,21 @@ impl<'a> Parser<'a> {
         cur
     }
 
+    fn peek(&self) -> Option<&Token<'a>> {
+        self.peek_nth(1)
+    }
+
+    fn peek_nth(&self, n: usize) -> Option<&Token<'a>> {
+        self.tokens.get(self.position + n)
+    }
+
+    fn previous(&self) -> Option<&Token<'a>> {
+        if self.position == 0 {
+            return None;
+        }
+        self.tokens.get(self.position - 1)
+    }
+
     fn expect(&self, expected: TokenType) -> bool {
         self.current().token_type == expected
     }
@@ -475,36 +495,13 @@ impl<'a> Parser<'a> {
                 object: expr_arena.alloc(self.term(expr_arena, stmt_arena)),
                 span: (current.span.0, self.current().span.1),
             },
-
-            // This case looks is for C-like syntax: `type name`,
-            // but syntax must be like: `name: type`
-            // *-----------------------*
-            // TokenType::Type => {
-            //     let datatype = self.get_basic_type(current.value, current.span);
-            //     let identifier = self.current();
-            //
-            //     if !self.expect(TokenType::Identifier) {
-            //         return Expressions::Value(Value::Type(datatype), current.span);
-            //     }
-            //
-            //     let _ = self.next();
-            //
-            //     Expressions::Argument {
-            //         name: identifier.value.to_string(),
-            //         r#type: datatype,
-            //         span: current.span
-            //     }
-            // }
-            // *-----------------------*
             TokenType::LBrack => {
                 let span_start = current.span.0;
                 let values =
                     self.expressions_enum(TokenType::LBrack, TokenType::RBrack, TokenType::Comma, expr_arena, stmt_arena);
                 let len = values.len();
 
-                // self.position -= 1;
                 let span_end = self.current().span.1;
-                // let _ = self.next();
 
                 Expressions::Array {
                     values,
@@ -517,7 +514,13 @@ impl<'a> Parser<'a> {
                 let mut block = Vec::new();
 
                 while !self.expect(TokenType::RBrace) {
-                    block.push(self.statement(expr_arena, stmt_arena));
+                    match self.statement(expr_arena, stmt_arena) {
+                        Ok(stmt) => block.push(stmt),
+                        Err(err) => {
+                            self.errors.push(err);
+                            self.skip_statement();
+                        },
+                    }
                 }
 
                 let span_end = self.current().span.1;
@@ -602,10 +605,10 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Statements<'a> {
+    fn statement(&mut self, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Result<Statements<'a>, ParserError> {
         if self.current().token_type == TokenType::EOF {
             self.eof = true;
-            return Statements::None;
+            return Ok(Statements::None);
         }
         let current = self.current();
 
@@ -619,14 +622,12 @@ impl<'a> Parser<'a> {
                 "_link_c" => self.link_c_statement(expr_arena, stmt_arena),
                 "if" => self.if_statement(expr_arena, stmt_arena),
                 "else" => {
-                    self.error(ParserError::UnknownExpression {
+                    Err(ParserError::UnknownExpression {
                         exception: "unexpected `else` usage outside construction".to_string(),
                         help: "Consider placing keyword in `if/else` construction".to_string(),
                         src: self.source.clone(),
                         span: error::position_to_span(current.span),
-                    });
-
-                    Statements::None
+                    })
                 }
 
                 "while" => self.while_statement(expr_arena, stmt_arena),
@@ -638,9 +639,9 @@ impl<'a> Parser<'a> {
 
                 "pub" => {
                     let _ = self.next();
-                    let stmt = self.statement(expr_arena, stmt_arena);
+                    let stmt = self.statement(expr_arena, stmt_arena)?;
 
-                    match stmt {
+                    Ok(match stmt {
                         Statements::FunctionDefineStatement {
                             name,
                             datatype,
@@ -696,7 +697,7 @@ impl<'a> Parser<'a> {
 
                             Statements::None
                         }
-                    }
+                    })
                 }
                 "fn" => self.fn_statement(expr_arena, stmt_arena),
                 "return" => self.return_statement(expr_arena, stmt_arena),
@@ -709,7 +710,7 @@ impl<'a> Parser<'a> {
 
                 let mut block = Vec::new();
                 while !self.expect(TokenType::RBrace) {
-                    block.push(self.statement(expr_arena, stmt_arena));
+                    block.push(self.statement(expr_arena, stmt_arena)?);
                 }
 
                 let span = (span_start, self.current().span.1);
@@ -718,10 +719,10 @@ impl<'a> Parser<'a> {
                 }
                 self.skip_eos();
 
-                Statements::ScopeStatement {
+                Ok(Statements::ScopeStatement {
                     block,
                     span,
-                }
+                })
             }
             TokenType::Multiply => {
                 let span_start = self.current().span.0;
@@ -729,13 +730,13 @@ impl<'a> Parser<'a> {
 
                 match self.current().token_type {
                     TokenType::Identifier | TokenType::Multiply => {
-                        let stmt = self.statement(expr_arena, stmt_arena);
+                        let stmt = self.statement(expr_arena, stmt_arena)?;
 
                         self.position -= 1;
                         let span_end = self.current().span.1;
                         self.position += 1;
 
-                        match stmt {
+                        Ok(match stmt {
                             Statements::AssignStatement {
                                 object,
                                 value,
@@ -796,7 +797,7 @@ impl<'a> Parser<'a> {
                                 span,
                             },
                             _ => {
-                                self.error(ParserError::UnsupportedExpression {
+                                return Err(ParserError::UnsupportedExpression {
                                     exception: "unsupported for dereference statement kind"
                                         .to_string(),
                                     help: "If you didn't want to dereference, delete the operator"
@@ -804,21 +805,17 @@ impl<'a> Parser<'a> {
                                     src: self.source.clone(),
                                     span: error::position_to_span((span_start, span_end)),
                                 });
-
-                                Statements::None
                             }
-                        }
+                        })
                     }
                     _ => {
-                        self.error(ParserError::UnsupportedExpression {
+                        Err(ParserError::UnsupportedExpression {
                             exception: "unsupported for dereference statement kind".to_string(),
                             help: "If you didn't want to dereference, delete the operator"
                                 .to_string(),
                             src: self.source.clone(),
                             span: error::position_to_span(self.current().span),
-                        });
-
-                        Statements::None
+                        })
                     }
                 }
             }
@@ -850,11 +847,11 @@ impl<'a> Parser<'a> {
                                 let span_end = self.current().span.1;
                                 self.skip_eos();
 
-                                Statements::FieldAssignStatement {
+                                Ok(Statements::FieldAssignStatement {
                                     object: sub_expr,
                                     value,
                                     span: (current.span.0, span_end),
-                                }
+                                })
                             }
                             TokenType::Plus
                             | TokenType::Minus
@@ -864,7 +861,7 @@ impl<'a> Parser<'a> {
                                 let _ = self.next();
 
                                 if !self.expect(TokenType::Equal) {
-                                    self.error(ParserError::UnknownExpression {
+                                    return Err(ParserError::UnknownExpression {
                                         exception: "unexpected binary expression after subelement"
                                             .to_string(),
                                         help: "Consider adding `=` after subelement".to_string(),
@@ -874,8 +871,6 @@ impl<'a> Parser<'a> {
                                             self.current().span.1,
                                         )),
                                     });
-
-                                    return Statements::None;
                                 }
 
                                 let _ = self.next();
@@ -883,31 +878,29 @@ impl<'a> Parser<'a> {
                                 let span_end = self.current().span.1;
                                 self.skip_eos();
 
-                                Statements::BinaryAssignStatement {
+                                Ok(Statements::BinaryAssignStatement {
                                     object: sub_expr,
                                     operand,
                                     value,
                                     span: (current.span.0, span_end),
-                                }
+                                })
                             }
                             TokenType::Semicolon => {
                                 self.skip_eos();
-                                Statements::Expression(sub_expr)
+                                Ok(Statements::Expression(sub_expr))
                             }
                             _ => {
                                 self.position -= 1;
                                 let span_end = self.current().span.1;
                                 self.position += 1;
 
-                                self.error(ParserError::UnknownExpression {
+                                Err(ParserError::UnknownExpression {
                                     exception: "unknown subelement in statement found".to_string(),
                                     help: "Remove subelement expression if it's not necessary"
                                         .to_string(),
                                     src: self.source.clone(),
                                     span: error::position_to_span((current.span.0, span_end)),
-                                });
-
-                                Statements::None
+                                })
                             }
                         }
                     }
@@ -933,7 +926,7 @@ impl<'a> Parser<'a> {
                             let (op1, op2) = (next.token_type, self.current().token_type);
 
                             if op1 != op2 {
-                                self.error(ParserError::UnknownExpression {
+                                return Err(ParserError::UnknownExpression {
                                     exception: "unknown variation of increment/decrement found"
                                         .to_string(),
                                     help:
@@ -942,14 +935,12 @@ impl<'a> Parser<'a> {
                                     src: self.source.clone(),
                                     span: error::position_to_span((span_start, span_end)),
                                 });
-
-                                return Statements::None;
                             }
 
                             let _ = self.next();
                             self.skip_eos();
 
-                            Statements::BinaryAssignStatement {
+                            Ok(Statements::BinaryAssignStatement {
                                 object: Expressions::Value(
                                     Value::Identifier(current.value),
                                     current.span,
@@ -960,10 +951,10 @@ impl<'a> Parser<'a> {
                                     (current.span.0, span_end),
                                 ),
                                 span: (current.span.0, span_end),
-                            }
+                            })
                         }
                         _ => {
-                            self.error(ParserError::UnknownExpression {
+                            Err(ParserError::UnknownExpression {
                                 exception: "unknown binary operation in statement found"
                                     .to_string(),
                                 help: "Maybe you wanted to add assign operator?".to_string(),
@@ -972,32 +963,28 @@ impl<'a> Parser<'a> {
                                     current.span.0,
                                     self.current().span.1,
                                 )),
-                            });
-
-                            Statements::None
+                            })
                         }
                     },
-                    END_STATEMENT => Statements::Expression(Expressions::Value(
+                    END_STATEMENT => Ok(Statements::Expression(Expressions::Value(
                         Value::Identifier(current.value),
                         current.span,
-                    )),
+                    ))),
                     _ => {
-                        self.error(ParserError::UnknownExpression {
+                        Err(ParserError::UnknownExpression {
                             exception: "unknown expression found after identifier".to_string(),
                             help: String::new(),
                             src: self.source.clone(),
                             span: error::position_to_span((current.span.0, next.span.1)),
-                        });
-
-                        Statements::None
+                        })
                     }
                 }
             }
             TokenType::EOF => {
                 self.eof = true;
-                Statements::None
+                Ok(Statements::None)
             }
-            _ => Statements::Expression(self.expression(expr_arena, stmt_arena)),
+            _ => Ok(Statements::Expression(self.expression(expr_arena, stmt_arena))),
         }
     }
 }

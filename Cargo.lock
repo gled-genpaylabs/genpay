@@ -224,7 +224,7 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "genpay"
-version = "1.1.0"
+version = "0.0.1"
 dependencies = [
  "bumpalo",
  "clap",
@@ -242,7 +242,7 @@ dependencies = [
 
 [[package]]
 name = "genpay-codegen"
-version = "1.1.0"
+version = "0.0.1"
 dependencies = [
  "genpay-parser",
  "genpay-semantic",
@@ -253,7 +253,7 @@ dependencies = [
 
 [[package]]
 name = "genpay-lexer"
-version = "1.1.0"
+version = "0.0.1"
 dependencies = [
  "miette",
  "thiserror 2.0.14",
@@ -261,14 +261,16 @@ dependencies = [
 
 [[package]]
 name = "genpay-linker"
-version = "1.1.0"
+version = "0.0.1"
 dependencies = [
+ "inkwell",
+ "llvm-sys",
  "tempfile",
 ]
 
 [[package]]
 name = "genpay-parser"
-version = "1.1.0"
+version = "0.0.1"
 dependencies = [
  "bumpalo",
  "genpay-lexer",
@@ -278,7 +280,7 @@ dependencies = [
 
 [[package]]
 name = "genpay-semantic"
-version = "1.1.0"
+version = "0.0.1"
 dependencies = [
  "bumpalo",
  "genpay-lexer",
