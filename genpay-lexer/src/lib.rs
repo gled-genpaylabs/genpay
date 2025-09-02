@@ -4,10 +4,50 @@ use crate::{
     token_type::TokenType,
 };
 use miette::NamedSource;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
 
-include!(concat!(env!("OUT_DIR"), "/keywords.rs"));
+lazy_static! {
+    static ref KEYWORDS: HashMap<&'static str, TokenType> = {
+        let mut map = HashMap::new();
+        map.insert("let", TokenType::Keyword);
+        map.insert("pub", TokenType::Keyword);
+        map.insert("fn", TokenType::Keyword);
+        map.insert("import", TokenType::Keyword);
+        map.insert("include", TokenType::Keyword);
+        map.insert("extern", TokenType::Keyword);
+        map.insert("return", TokenType::Keyword);
+        map.insert("struct", TokenType::Keyword);
+        map.insert("enum", TokenType::Keyword);
+        map.insert("typedef", TokenType::Keyword);
+        map.insert("if", TokenType::Keyword);
+        map.insert("else", TokenType::Keyword);
+        map.insert("while", TokenType::Keyword);
+        map.insert("for", TokenType::Keyword);
+        map.insert("break", TokenType::Keyword);
+        map.insert("true", TokenType::Boolean);
+        map.insert("false", TokenType::Boolean);
+        map.insert("NULL", TokenType::Null);
+        map.insert("i8", TokenType::Type);
+        map.insert("i16", TokenType::Type);
+        map.insert("i32", TokenType::Type);
+        map.insert("i64", TokenType::Type);
+        map.insert("u8", TokenType::Type);
+        map.insert("u16", TokenType::Type);
+        map.insert("u32", TokenType::Type);
+        map.insert("u64", TokenType::Type);
+        map.insert("usize", TokenType::Type);
+        map.insert("f32", TokenType::Type);
+        map.insert("f64", TokenType::Type);
+        map.insert("bool", TokenType::Type);
+        map.insert("char", TokenType::Type);
+        map.insert("void", TokenType::Type);
+        map
+    };
+}
 
-fn is_valid_escape(b: u8) -> bool {
+
+fn is_escape_sequence(b: u8) -> bool {
     matches!(b, b'n' | b't' | b'r' | b'\\' | b'\'' | b'"' | b'0')
 }
 
@@ -73,21 +113,6 @@ impl<'s> Lexer<'s> {
         self.slice(start)
     }
 
-    fn eat_while_radix<F>(&mut self, mut f: F) -> &'s str
-    where
-        F: FnMut(u8) -> bool,
-    {
-        let start = self.cursor;
-        while let Some(b) = self.peek() {
-            if f(b) {
-                self.bump();
-            } else {
-                break;
-            }
-        }
-        self.slice(start)
-    }
-
     /* next token -------------------------------------------------------- */
     pub fn next_token(&mut self) -> Result<Token<'s>, LexerError> {
         self.skip_ws();
@@ -105,19 +130,19 @@ impl<'s> Lexer<'s> {
                     if self.peek_next() == Some(b'x') {
                         self.bump(); // 0
                         self.bump(); // x
-                        self.eat_while_radix(|b| b.is_ascii_hexdigit());
+                        self.eat_while(|b| b.is_ascii_hexdigit());
                         return Ok(Token::new(self.slice(start), TokenType::Number, (start, self.cursor)));
                     }
                     if self.peek_next() == Some(b'b') {
                         self.bump(); // 0
                         self.bump(); // b
-                        self.eat_while_radix(|b| b == b'0' || b == b'1');
+                        self.eat_while(|b| b == b'0' || b == b'1');
                         return Ok(Token::new(self.slice(start), TokenType::Number, (start, self.cursor)));
                     }
                 }
 
                 // Now decimal numbers (int or float)
-                self.eat_while_radix(|b| b.is_ascii_digit());
+                self.eat_while(|b| b.is_ascii_digit());
                 let mut is_float = false;
 
                 if self.peek() == Some(b'.') {
@@ -125,7 +150,7 @@ impl<'s> Lexer<'s> {
                     if self.src.as_bytes().get(self.cursor + 1).map_or(false, |c| c.is_ascii_digit()) {
                         is_float = true;
                         self.bump(); // consume '.'
-                        self.eat_while_radix(|b| b.is_ascii_digit());
+                        self.eat_while(|b| b.is_ascii_digit());
                     }
                 }
 
@@ -135,7 +160,7 @@ impl<'s> Lexer<'s> {
                     if self.peek() == Some(b'+') || self.peek() == Some(b'-') {
                         self.bump(); // consume sign
                     }
-                    let exponent_digits = self.eat_while_radix(|b| b.is_ascii_digit());
+                    let exponent_digits = self.eat_while(|b| b.is_ascii_digit());
                     if exponent_digits.is_empty() {
                         return Err(LexerError::InvalidNumberFormat {
                             message: "Missing exponent digits".to_string(),
@@ -156,7 +181,7 @@ impl<'s> Lexer<'s> {
                         Some(b'\\') => {
                             self.bump(); // consume '\'
                             if let Some(b) = self.peek() {
-                                if is_valid_escape(b) {
+                                if is_escape_sequence(b) {
                                     self.bump();
                                 } else {
                                     return Err(LexerError::UnknownCharacterEscape {
@@ -197,7 +222,7 @@ impl<'s> Lexer<'s> {
                         Some(b'\\') => {
                             self.bump(); // consume '\'
                             if let Some(b) = self.peek() {
-                                if is_valid_escape(b) {
+                                if is_escape_sequence(b) {
                                     self.bump();
                                 } else {
                                     return Err(LexerError::UnknownCharacterEscape {
