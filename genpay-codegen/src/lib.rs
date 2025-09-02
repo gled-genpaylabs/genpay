@@ -10,6 +10,7 @@ use genpay_parser::{
     expressions::Expressions, statements::Statements, token_type::TokenType, types::Type,
     value::Value,
 };
+use bumpalo::{collections::{CollectIn, Vec as BumpVec}, Bump};
 use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
@@ -36,6 +37,7 @@ pub struct CodeGen<'ctx> {
     context: &'ctx Context,
     builder: Builder<'ctx>,
     module: Module<'ctx>,
+    arena: &'ctx Bump,
 
     scope: Box<Scope<'ctx>>,
     function: Option<FunctionValue<'ctx>>,
@@ -61,6 +63,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     pub fn new(
         context: &'ctx Context,
+        arena: &'ctx Bump,
         module_name: &'ctx str,
         module_source: &'ctx str,
         symtable: SymbolTable<'ctx>,
@@ -90,6 +93,7 @@ impl<'ctx> CodeGen<'ctx> {
             context,
             builder,
             module,
+            arena,
 
             scope: Box::new(Scope::new()),
             function: None,
@@ -103,7 +107,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     pub fn compile(
         &mut self,
-        statements: Vec<Statements<'ctx>>,
+        statements: BumpVec<Statements<'ctx>>,
         prefix: Option<&'ctx str>,
     ) -> (&Module<'ctx>, ModuleContent<'ctx>) {
         statements
@@ -1450,12 +1454,13 @@ impl<'ctx> CodeGen<'ctx> {
                     .unwrap_or_default();
                 let mut codegen = Self::new(
                     self.context,
+                    self.arena,
                     static_module_name,
                     import.source,
                     import.embedded_symtable.clone(),
                 );
 
-                let (_module, mut module_content) = codegen.compile(import.ast.clone(), None);
+                let (_module, mut module_content) = codegen.compile(BumpVec::from_iter_in(import.ast.clone(), self.arena), None);
 
                 module_content.functions.iter_mut().for_each(|func| {
                     let args_fmt = func
@@ -2672,10 +2677,10 @@ impl<'ctx> CodeGen<'ctx> {
                     false,
                 );
 
-                let compiled_types = compiled_values
+                let compiled_types: BumpVec<Type> = compiled_values
                     .iter()
                     .map(|(typ, _)| typ.clone())
-                    .collect::<Vec<Type>>();
+                    .collect_in(self.arena);
                 let alloca = self
                     .builder
                     .build_alloca(
@@ -3383,8 +3388,10 @@ mod tests {
     #[test]
     fn panic_function_test() {
         let ctx = CodeGen::create_context();
+        let arena = Bump::new();
         let mut codegen = CodeGen::new(
             &ctx,
+            &arena,
             "",
             "",
             genpay_semantic::symtable::SymbolTable::default(),
@@ -3409,8 +3416,10 @@ mod tests {
     #[test]
     fn boolean_strings_test() {
         let ctx = CodeGen::create_context();
+        let arena = Bump::new();
         let mut codegen = CodeGen::new(
             &ctx,
+            &arena,
             "",
             "",
             genpay_semantic::symtable::SymbolTable::default(),

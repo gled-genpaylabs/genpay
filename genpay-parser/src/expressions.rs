@@ -6,6 +6,7 @@ use crate::{
     types::Type,
     value::Value,
 };
+use bumpalo::collections::Vec as BumpVec;
 use genpay_lexer::token_type::TokenType;
 use std::collections::HashMap;
 
@@ -53,20 +54,20 @@ pub enum Expressions<'a> {
     /// `OBJECT.SUBELEMENT_1.SUBELEMENT_2`
     SubElement {
         head: &'a Expressions<'a>,
-        subelements: Vec<Expressions<'a>>,
+        subelements: BumpVec<'a, Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `IDENTIFIER ( EXPRESSION, EXPRESSION, ... )`
     FnCall {
         name: &'a str,
-        arguments: Vec<Expressions<'a>>,
+        arguments: BumpVec<'a, Expressions<'a>>,
         span: (usize, usize),
     },
     /// `IDENTIFIER! ( EXPRESSION, EXPRESSION, ... )`
     MacroCall {
         name: &'a str,
-        arguments: Vec<Expressions<'a>>,
+        arguments: BumpVec<'a, Expressions<'a>>,
         span: (usize, usize),
     },
 
@@ -84,7 +85,7 @@ pub enum Expressions<'a> {
 
     /// `[EXPRESSION, EXPRESSION, ...]`
     Array {
-        values: Vec<Expressions<'a>>,
+        values: BumpVec<'a, Expressions<'a>>,
         len: usize,
         span: (usize, usize),
     },
@@ -152,7 +153,7 @@ impl<'a> Parser<'a> {
     ) -> Expressions<'a> {
         let head_span = head.span();
         let head = expr_arena.alloc(head);
-        let mut subelements = Vec::new();
+        let mut subelements = BumpVec::new_in(expr_arena);
         let mut end_span = head_span.1;
 
         loop {
@@ -499,15 +500,15 @@ impl<'a> Parser<'a> {
         separator: TokenType,
         expr_arena: &'a Bump,
         stmt_arena: &'a Bump,
-    ) -> Vec<Expressions<'a>> {
+    ) -> BumpVec<'a, Expressions<'a>> {
         if self.expect(start) {
             let _ = self.next();
         } else if self.expect(end.clone()) {
             let _ = self.next();
-            return Vec::new();
+            return BumpVec::new_in(expr_arena);
         }
 
-        let mut output = Vec::new();
+        let mut output = BumpVec::new_in(expr_arena);
 
         loop {
             if self.expect(end.clone()) {

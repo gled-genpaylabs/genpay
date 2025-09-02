@@ -5,6 +5,7 @@ use crate::{
     types::Type,
     value::Value,
 };
+use bumpalo::collections::{CollectIn, Vec as BumpVec};
 use genpay_lexer::token_type::TokenType;
 use std::collections::BTreeMap;
 
@@ -91,8 +92,8 @@ pub enum Statements<'a> {
     FunctionDefineStatement {
         name: &'a str,
         datatype: Type<'a>,
-        arguments: Vec<(&'a str, Type<'a>)>,
-        block: Vec<Statements<'a>>,
+        arguments: BumpVec<'a, (&'a str, Type<'a>)>,
+        block: BumpVec<'a, Statements<'a>>,
         public: bool,
         span: (usize, usize),
         header_span: (usize, usize),
@@ -100,14 +101,14 @@ pub enum Statements<'a> {
     /// `NAME ( EXPRESSION, EXPRESSION, ... )`
     FunctionCallStatement {
         name: &'a str,
-        arguments: Vec<Expressions<'a>>,
+        arguments: BumpVec<'a, Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `MACRONAME! ( EXPRESSION, EXPRESSION, ... )`
     MacroCallStatement {
         name: &'a str,
-        arguments: Vec<Expressions<'a>>,
+        arguments: BumpVec<'a, Expressions<'a>>,
         span: (usize, usize),
     },
 
@@ -137,7 +138,7 @@ pub enum Statements<'a> {
     /// ```
     EnumDefineStatement {
         name: &'a str,
-        fields: Vec<&'a str>,
+        fields: BumpVec<'a, &'a str>,
         functions: BTreeMap<&'a str, Statements<'a>>,
         public: bool,
         span: (usize, usize),
@@ -153,15 +154,15 @@ pub enum Statements<'a> {
     /// `if EXPRESSION { STATEMENTS } else { STATEMENTS }`
     IfStatement {
         condition: Expressions<'a>,
-        then_block: Vec<Statements<'a>>,
-        else_block: Option<Vec<Statements<'a>>>,
+        then_block: BumpVec<'a, Statements<'a>>,
+        else_block: Option<BumpVec<'a, Statements<'a>>>,
         span: (usize, usize),
     },
 
     /// `while EXPRESSION { STATEMENTS }`
     WhileStatement {
         condition: Expressions<'a>,
-        block: Vec<Statements<'a>>,
+        block: BumpVec<'a, Statements<'a>>,
         span: (usize, usize),
     },
 
@@ -169,7 +170,7 @@ pub enum Statements<'a> {
     ForStatement {
         binding: &'a str,
         iterator: Expressions<'a>,
-        block: Vec<Statements<'a>>,
+        block: BumpVec<'a, Statements<'a>>,
         span: (usize, usize),
     },
 
@@ -188,7 +189,7 @@ pub enum Statements<'a> {
     /// `extern "EXT_TYPE" pub/NOTHING fn IDENTIFIER ( TYPE, TYPE, ... ) TYPE/NOTHING`
     ExternStatement {
         identifier: &'a str,
-        arguments: Vec<Type<'a>>,
+        arguments: BumpVec<'a, Type<'a>>,
         return_type: Type<'a>,
         extern_type: &'a str,
         is_var_args: bool,
@@ -222,7 +223,7 @@ pub enum Statements<'a> {
 
     /// `{ STATEMENTS }`
     ScopeStatement {
-        block: Vec<Statements<'a>>,
+        block: BumpVec<'a, Statements<'a>>,
         span: (usize, usize),
     },
 
@@ -255,7 +256,7 @@ impl<'a> Parser<'a> {
 
         if self.next().token_type == TokenType::DoubleDots {
             let _ = self.next();
-            datatype = Some(self.parse_type());
+            datatype = Some(self.parse_type(stmt_arena));
         }
 
         match self.current().token_type {
@@ -369,7 +370,7 @@ impl<'a> Parser<'a> {
 
         let _ = self.next();
         let mut span_block_start = self.current().span.0;
-        let mut then_block = Vec::new();
+        let mut then_block = BumpVec::new_in(stmt_arena);
 
         while self.current().token_type != TokenType::RBrace {
             if self.current().token_type == TokenType::EOF {
@@ -422,10 +423,12 @@ impl<'a> Parser<'a> {
 
                         let stmt = self.if_statement(expr_arena, stmt_arena)?;
                         let span_end = self.current().span.1;
+                        let mut else_block = BumpVec::new_in(stmt_arena);
+                        else_block.push(stmt);
                         return Ok(Statements::IfStatement {
                             condition,
                             then_block,
-                            else_block: Some(vec![stmt]),
+                            else_block: Some(else_block),
                             span: (span_start, span_end),
                         });
                     }
@@ -442,7 +445,7 @@ impl<'a> Parser<'a> {
 
                 let _ = self.next();
 
-                let mut else_block = Vec::new();
+                let mut else_block = BumpVec::new_in(stmt_arena);
                 else_span_start = self.current().span.0;
 
                 while self.current().token_type != TokenType::RBrace {
@@ -504,7 +507,7 @@ impl<'a> Parser<'a> {
 
         let _ = self.next();
         let mut span_block_start = self.current().span.0;
-        let mut block = Vec::new();
+        let mut block = BumpVec::new_in(stmt_arena);
 
         while !self.expect(TokenType::RBrace) {
             if self.current().token_type == TokenType::EOF {
@@ -563,7 +566,7 @@ impl<'a> Parser<'a> {
 
         let _ = self.next();
         let mut span_block_start = self.current().span.0;
-        let mut block = Vec::new();
+        let mut block = BumpVec::new_in(stmt_arena);
 
         while !self.expect(TokenType::RBrace) {
             if self.current().token_type == TokenType::EOF {
@@ -613,7 +616,7 @@ impl<'a> Parser<'a> {
         let arguments =
             self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma, expr_arena, stmt_arena);
 
-        let arguments_tuples: Vec<(&str, Type)> = arguments
+        let arguments_tuples: BumpVec<(&str, Type)> = arguments
             .iter()
             .map(|arg| {
                 if let Expressions::Argument {
@@ -642,11 +645,11 @@ impl<'a> Parser<'a> {
                     ("", Type::Void)
                 }
             })
-            .collect();
+            .collect_in(stmt_arena);
 
         let mut datatype = Type::Void;
         if !self.expect(TokenType::LBrace) {
-            datatype = self.parse_type();
+            datatype = self.parse_type(stmt_arena);
         }
 
         if !self.expect(TokenType::LBrace) {
@@ -662,7 +665,7 @@ impl<'a> Parser<'a> {
 
         let _ = self.next();
         let mut span_block_start = self.current().span.0;
-        let mut block = Vec::new();
+        let mut block = BumpVec::new_in(stmt_arena);
 
         while !self.expect(TokenType::RBrace) {
             if self.current().token_type == TokenType::EOF {
@@ -965,7 +968,7 @@ impl<'a> Parser<'a> {
                     }
 
                     let _ = self.next();
-                    let field_type = self.parse_type();
+                    let field_type = self.parse_type(stmt_arena);
 
                     let extra_span = if let Some(prev) = self.previous() {
                         prev.span
@@ -1067,7 +1070,7 @@ impl<'a> Parser<'a> {
         }
         let _ = self.next();
 
-        let mut fields = Vec::new();
+        let mut fields = BumpVec::new_in(stmt_arena);
         let mut functions = BTreeMap::new();
 
         while !self.expect(TokenType::RBrace) {
@@ -1144,7 +1147,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub fn typedef_statement(&mut self, _expr_arena: &'a Bump, _stmt_arena: &'a Bump) -> Result<Statements<'a>, ParserError> {
+    pub fn typedef_statement(&mut self, _expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Result<Statements<'a>, ParserError> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1162,7 +1165,7 @@ impl<'a> Parser<'a> {
         let alias = self.current().value;
         let _ = self.next();
 
-        let datatype = self.parse_type();
+        let datatype = self.parse_type(stmt_arena);
         let span_end = self.current().span.1;
         self.skip_eos();
 
@@ -1173,7 +1176,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub fn extern_declare_statement(&mut self, _expr_arena: &'a Bump, _stmt_arena: &'a Bump) -> Result<Statements<'a>, ParserError> {
+    pub fn extern_declare_statement(&mut self, _expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Result<Statements<'a>, ParserError> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1192,7 +1195,7 @@ impl<'a> Parser<'a> {
         let identifier = self.current().value;
         let _ = self.next();
 
-        let datatype = self.parse_type();
+        let datatype = self.parse_type(stmt_arena);
         let span_end = self.current().span.1;
 
         self.skip_eos();
@@ -1229,7 +1232,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn extern_statement(&mut self, _expr_arena: &'a Bump, _stmt_arena: &'a Bump) -> Result<Statements<'a>, ParserError> {
+    pub fn extern_statement(&mut self, _expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Result<Statements<'a>, ParserError> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1287,7 +1290,7 @@ impl<'a> Parser<'a> {
             });
         }
 
-        let mut arguments = Vec::new();
+        let mut arguments = BumpVec::new_in(stmt_arena);
         let mut is_var_args = false;
         let _ = self.next();
 
@@ -1315,7 +1318,7 @@ impl<'a> Parser<'a> {
                 continue;
             }
 
-            arguments.push(self.parse_type());
+            arguments.push(self.parse_type(stmt_arena));
         }
 
         if self.expect(TokenType::RParen) {
@@ -1324,7 +1327,7 @@ impl<'a> Parser<'a> {
 
         let mut return_type = Type::Void;
         if !self.expect(TokenType::Semicolon) {
-            return_type = self.parse_type();
+            return_type = self.parse_type(stmt_arena);
         }
 
         let span_end = self.current().span.1;

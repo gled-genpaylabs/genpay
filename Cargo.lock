@@ -244,6 +244,7 @@ dependencies = [
 name = "genpay-codegen"
 version = "0.0.1"
 dependencies = [
+ "bumpalo",
  "genpay-parser",
  "genpay-semantic",
  "inkwell",

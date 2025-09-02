@@ -5,7 +5,7 @@ use crate::{
     types::Type,
     value::Value,
 };
-use bumpalo::Bump;
+use bumpalo::{collections::Vec as BumpVec, Bump};
 use genpay_lexer::{token::Token, token_type::TokenType, Lexer};
 use miette::NamedSource;
 
@@ -23,7 +23,7 @@ pub mod types;
 /// Basic Values Enum
 pub mod value;
 
-pub type ParserOk<'a> = (Vec<Statements<'a>>, Vec<ParserWarning>);
+pub type ParserOk<'a> = (BumpVec<'a, Statements<'a>>, Vec<ParserWarning>);
 pub type ParserErr = (Vec<ParserError>, Vec<ParserWarning>);
 
 const BINARY_OPERATORS: [TokenType; 5] = [
@@ -132,7 +132,7 @@ impl<'a> Parser<'a> {
         expr_arena: &'a Bump,
         stmt_arena: &'a Bump,
     ) -> Result<ParserOk<'a>, ParserErr> {
-        let mut output = Vec::new();
+        let mut output = BumpVec::new_in(stmt_arena);
 
         while self.current().token_type != TokenType::EOF {
             match self.statement(expr_arena, stmt_arena) {
@@ -198,7 +198,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_type(&mut self) -> Type<'a> {
+    fn parse_type(&mut self, arena: &'a Bump) -> Type<'a> {
         let current = self.current();
 
         match current.token_type {
@@ -212,13 +212,13 @@ impl<'a> Parser<'a> {
                 if self.current().token_type == TokenType::RBrack {
                     // dynamic array
                     let _ = self.next();
-                    let array_type = self.parse_type();
+                    let array_type = self.parse_type(arena);
 
                     return Type::DynamicArray(Box::new(array_type));
                 }
 
                 // default array
-                let array_type = self.parse_type();
+                let array_type = self.parse_type(arena);
 
                 if !self.expect(TokenType::Semicolon) {
                     // TODO: add error reporting
@@ -256,19 +256,19 @@ impl<'a> Parser<'a> {
             }
             TokenType::Multiply => {
                 let _ = self.next();
-                let ptr_type = self.parse_type();
+                let ptr_type = self.parse_type(arena);
 
                 Type::Pointer(Box::new(ptr_type))
             }
             TokenType::LParen => {
                 let _ = self.next();
-                let mut types = Vec::new();
+                let mut types = BumpVec::new_in(arena);
 
                 loop {
                     if self.expect(TokenType::RParen) {
                         break;
                     }
-                    types.push(self.parse_type());
+                    types.push(self.parse_type(arena));
                     if self.expect(TokenType::Comma) {
                         let _ = self.next();
                     } else if !self.expect(TokenType::RParen) {
@@ -474,7 +474,7 @@ impl<'a> Parser<'a> {
                     TokenType::DoubleDots => {
                         let _ = self.next();
 
-                        let datatype = self.parse_type();
+                        let datatype = self.parse_type(stmt_arena);
                         return Expressions::Argument {
                             name: current.value,
                             r#type: datatype,
@@ -708,7 +708,7 @@ impl<'a> Parser<'a> {
                 let span_start = current.span.0;
                 let _ = self.next();
 
-                let mut block = Vec::new();
+                let mut block = BumpVec::new_in(stmt_arena);
                 while !self.expect(TokenType::RBrace) {
                     block.push(self.statement(expr_arena, stmt_arena)?);
                 }

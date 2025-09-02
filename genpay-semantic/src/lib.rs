@@ -15,6 +15,7 @@ use genpay_parser::{
     Parser,
     Spannable,
 };
+use bumpalo::collections::{CollectIn, Vec as BumpVec};
 use miette::NamedSource;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -535,7 +536,7 @@ impl<'s> Analyzer<'s> {
                 }
 
                 let object_type = self.visit_expression(object, None, expr_arena, stmt_arena);
-                let unwrapped_object_type = self.unwrap_alias(&object_type).unwrap_or_else(|err| {
+                let unwrapped_object_type = self.unwrap_alias(&object_type, stmt_arena).unwrap_or_else(|err| {
                     self.error(SemanticError::UnresolvedName {
                         exception: err,
                         help: None,
@@ -586,7 +587,7 @@ impl<'s> Analyzer<'s> {
 
                         if &value_type != datatype {
                             let unwrapped_datatype =
-                                self.unwrap_alias(datatype).unwrap_or_else(|err| {
+                                self.unwrap_alias(datatype, stmt_arena).unwrap_or_else(|err| {
                                     self.error(SemanticError::UnresolvedName {
                                         exception: err,
                                         help: None,
@@ -683,10 +684,9 @@ impl<'s> Analyzer<'s> {
                         *name,
                         Type::Function(
                             arguments
-                                .to_vec()
                                 .iter()
                                 .map(|arg| arg.1.clone())
-                                .collect::<Vec<Type>>(),
+                                .collect_in(stmt_arena),
                             Box::new(datatype.clone()),
                             false,
                         ),
@@ -706,7 +706,7 @@ impl<'s> Analyzer<'s> {
                     .iter()
                     .for_each(|stmt| self.visit_statement(stmt, expr_arena, stmt_arena));
                 let exp = self
-                    .unwrap_alias(&self.scope.expected)
+                    .unwrap_alias(&self.scope.expected, stmt_arena)
                     .unwrap_or_else(|err| {
                         self.error(SemanticError::UnresolvedName {
                             exception: err,
@@ -717,7 +717,7 @@ impl<'s> Analyzer<'s> {
                         Type::Void
                     });
                 let ret = self
-                    .unwrap_alias(&self.scope.returned)
+                    .unwrap_alias(&self.scope.returned, stmt_arena)
                     .unwrap_or_else(|err| {
                         self.error(SemanticError::UnresolvedName {
                             exception: err,
@@ -968,7 +968,7 @@ impl<'s> Analyzer<'s> {
                 public: _,
                 span,
             } => {
-                let pre_type = Type::Enum(fields.to_vec(), BTreeMap::new());
+                let pre_type = Type::Enum(fields.clone(), BTreeMap::new());
                 self.scope.enums.insert(
                     *name,
                     element::ScopeElement {
@@ -995,7 +995,7 @@ impl<'s> Analyzer<'s> {
                 let _ = self.scope.enums.remove(name);
 
                 let enum_type = Type::Enum(
-                    fields.to_vec(),
+                    fields.clone(),
                     functions_signatures
                         .into_iter()
                         .map(|x| (x.0, x.1.datatype))
@@ -1227,7 +1227,7 @@ impl<'s> Analyzer<'s> {
                     Type::Array(typ, _) => binding_type = *typ,
                     Type::DynamicArray(typ) => binding_type = *typ,
                     Type::Alias(alias) => {
-                        let alias_type = self.unwrap_alias(&iterator_type).unwrap_or_else(|err| {
+                        let alias_type = self.unwrap_alias(&iterator_type, stmt_arena).unwrap_or_else(|err| {
                             self.error(SemanticError::UnresolvedName {
                                 exception: err,
                                 help: None,
@@ -1548,7 +1548,7 @@ impl<'s> Analyzer<'s> {
                 }
 
                 if let Type::Alias(_) = return_type {
-                    let _ = self.unwrap_alias(return_type).unwrap_or_else(|err| {
+                    let _ = self.unwrap_alias(return_type, stmt_arena).unwrap_or_else(|err| {
                         self.error(SemanticError::UnresolvedName {
                             exception: err,
                             help: None,
@@ -1563,7 +1563,7 @@ impl<'s> Analyzer<'s> {
                     .add_fn(
                         *identifier,
                         Type::Function(
-                            arguments.to_vec(),
+                            arguments.clone(),
                             Box::new(return_type.clone()),
                             *is_var_args,
                         ),
@@ -1755,11 +1755,11 @@ impl<'s> Analyzer<'s> {
                             if let Some(Type::Function(args, datatype, _)) = functions.get("binary")
                             {
                                 if !(*args
-                                    == vec![
+                                    == BumpVec::from_iter_in([
                                         Type::Alias(left),
                                         Type::Pointer(Box::new(Type::Alias(left))),
                                         Type::Pointer(Box::new(Type::Char)),
-                                    ]
+                                    ], expr_arena)
                                     && *datatype.clone() == Type::Alias(left))
                                 {
                                     self.error(SemanticError::IllegalImplementation {
@@ -1845,10 +1845,10 @@ impl<'s> Analyzer<'s> {
                             if let Some(Type::Function(args, datatype, _)) = functions.get("unary")
                             {
                                 if !(*args
-                                    == vec![
+                                    == BumpVec::from_iter_in([
                                         Type::Alias(alias),
                                         Type::Pointer(Box::new(Type::Char)),
-                                    ]
+                                    ], expr_arena)
                                     && *datatype.clone() == Type::Alias(alias))
                                 {
                                     self.error(SemanticError::IllegalImplementation {
@@ -1974,10 +1974,10 @@ impl<'s> Analyzer<'s> {
                                 functions.get("compare")
                             {
                                 if !(*args
-                                    == vec![
+                                    == BumpVec::from_iter_in([
                                         Type::Alias(left),
                                         Type::Pointer(Box::new(Type::Alias(left))),
-                                    ]
+                                    ], expr_arena)
                                     && *datatype.clone() == Type::I32)
                                 {
                                     self.error(SemanticError::IllegalImplementation {
@@ -2082,7 +2082,7 @@ impl<'s> Analyzer<'s> {
                 let head_type = self.visit_expression(head, expected.clone(), expr_arena, stmt_arena);
 
                 let mut prev_type_display = head_type.clone();
-                let mut prev_type = self.unwrap_alias(&head_type).unwrap_or_else(|err| {
+                let mut prev_type = self.unwrap_alias(&head_type, expr_arena).unwrap_or_else(|err| {
                     self.error(SemanticError::UnresolvedName {
                         exception: err,
                         help: None,
@@ -2118,7 +2118,7 @@ impl<'s> Analyzer<'s> {
                                     });
 
                                     prev_type_display = field_type.clone();
-                                    prev_type = self.unwrap_alias(field_type).unwrap_or_else(|err| {
+                                    prev_type = self.unwrap_alias(field_type, expr_arena).unwrap_or_else(|err| {
                                         self.error(SemanticError::UnresolvedName {
                                             exception: err,
                                             help: None,
@@ -2147,7 +2147,7 @@ impl<'s> Analyzer<'s> {
                                         });
                                     }
 
-                                    prev_expr = &*expr_arena.alloc(Expressions::SubElement { head: expr_arena.alloc(prev_expr.clone()), subelements: vec![], span: *field_span });
+                                    prev_expr = &*expr_arena.alloc(Expressions::SubElement { head: expr_arena.alloc(prev_expr.clone()), subelements: BumpVec::new_in(expr_arena), span: *field_span });
                                 },
                                 _ => {
                                     self.error(SemanticError::UnsupportedType {
@@ -2174,7 +2174,7 @@ impl<'s> Analyzer<'s> {
 
                                     let typ = types[*idx as usize].clone();
                                     prev_type_display = typ.clone();
-                                    prev_type = self.unwrap_alias(&typ).unwrap_or_else(|err| {
+                                    prev_type = self.unwrap_alias(&typ, expr_arena).unwrap_or_else(|err| {
                                         self.error(SemanticError::UnresolvedName {
                                             exception: err,
                                             help: None,
@@ -2242,7 +2242,7 @@ impl<'s> Analyzer<'s> {
                                         }
 
                                         prev_type_display = *datatype.clone();
-                                        prev_type = self.unwrap_alias(datatype).unwrap_or_else(|err| {
+                                        prev_type = self.unwrap_alias(datatype, expr_arena).unwrap_or_else(|err| {
                                             self.error(SemanticError::UnresolvedName {
                                                 exception: err,
                                                 help: None,
@@ -2271,7 +2271,7 @@ impl<'s> Analyzer<'s> {
                                                 expr_arena,
                                                 stmt_arena,
                                             );
-                                            let expr_type = self.unwrap_alias(&raw_expr_type).unwrap_or_else(|err| {
+                                            let expr_type = self.unwrap_alias(&raw_expr_type, expr_arena).unwrap_or_else(|err| {
                                                 self.error(SemanticError::UnresolvedName {
                                                     exception: err,
                                                     help: None,
@@ -2281,7 +2281,7 @@ impl<'s> Analyzer<'s> {
                                                 Type::Void
                                             });
                                             let raw_expected = expected;
-                                            let expected = self.unwrap_alias(expected).unwrap_or_else(|err| {
+                                            let expected = self.unwrap_alias(expected, expr_arena).unwrap_or_else(|err| {
                                                 self.error(SemanticError::UnresolvedName {
                                                     exception: err,
                                                     help: None,
@@ -2314,7 +2314,7 @@ impl<'s> Analyzer<'s> {
 
                                     if let Some(Type::Function(args, datatype, is_var_args)) = import.functions.get(static_name) {
                                         prev_type_display = *datatype.clone();
-                                        prev_type = self.unwrap_alias(datatype).unwrap_or_else(|err| {
+                                        prev_type = self.unwrap_alias(datatype, expr_arena).unwrap_or_else(|err| {
                                             self.error(SemanticError::UnresolvedName {
                                                 exception: err,
                                                 help: None,
@@ -2343,7 +2343,7 @@ impl<'s> Analyzer<'s> {
                                                 expr_arena,
                                                 stmt_arena,
                                             );
-                                            let expr_type = self.unwrap_alias(&raw_expr_type).unwrap_or_else(|err| {
+                                            let expr_type = self.unwrap_alias(&raw_expr_type, expr_arena).unwrap_or_else(|err| {
                                                 self.error(SemanticError::UnresolvedName {
                                                     exception: err,
                                                     help: None,
@@ -2352,7 +2352,7 @@ impl<'s> Analyzer<'s> {
                                                 });
                                                 Type::Void
                                             });
-                                            let expected = self.unwrap_alias(expected).unwrap_or_else(|err| {
+                                            let expected = self.unwrap_alias(expected, expr_arena).unwrap_or_else(|err| {
                                                 self.error(SemanticError::UnresolvedName {
                                                     exception: err,
                                                     help: None,
@@ -2405,7 +2405,7 @@ impl<'s> Analyzer<'s> {
                                         fields.iter().for_each(|field| {
                                             let struct_field = struct_fields.get(field.0);
                                             if let Some(field_type) = struct_field {
-                                                let field_type = self.unwrap_alias(field_type).unwrap_or_else(|err| {
+                                                let field_type = self.unwrap_alias(field_type, expr_arena).unwrap_or_else(|err| {
                                                     self.error(SemanticError::UnresolvedName {
                                                         exception: err,
                                                         help: None,
@@ -2601,7 +2601,7 @@ impl<'s> Analyzer<'s> {
                         if let Type::Struct(_, functions) = struct_type {
                             if let Some(Type::Function(args, datatype, _)) = functions.get("deref")
                             {
-                                if *args != vec![Type::Alias(alias)] {
+                                if *args != BumpVec::from_iter_in([Type::Alias(alias)], expr_arena) {
                                     self.error(SemanticError::IllegalImplementation {
                                         exception: format!("type `{alias}` has wrong implementation for dereference"),
                                         help: Some(format!("Consider using right format: {IMPLEMENTATION_FORMAT}")),
@@ -2694,7 +2694,7 @@ impl<'s> Analyzer<'s> {
                     .iter()
                     .zip(expected_types)
                     .map(|(val, exp)| self.visit_expression(val, exp, expr_arena, stmt_arena))
-                    .collect::<Vec<Type>>();
+                    .collect_in(expr_arena);
 
                 Type::Tuple(types)
             }
@@ -2758,7 +2758,7 @@ impl<'s> Analyzer<'s> {
                         if let Type::Struct(_, functions) = struct_type {
                             if let Some(Type::Function(args, datatype, _)) = functions.get("slice")
                             {
-                                if !(*args == vec![Type::Alias(alias), Type::USIZE]
+                                if !(*args == BumpVec::from_iter_in([Type::Alias(alias), Type::USIZE], expr_arena)
                                     && *datatype.clone() != Type::Void)
                                 {
                                     self.error(SemanticError::IllegalImplementation {
@@ -3271,7 +3271,7 @@ impl<'s> Analyzer<'s> {
     }
 
     #[inline]
-    fn unwrap_alias(&self, typ: &Type<'s>) -> Result<Type<'s>, String> {
+    fn unwrap_alias(&self, typ: &Type<'s>, arena: &'s Bump) -> Result<Type<'s>, String> {
         match typ {
             Type::Alias(alias) => {
                 let struct_type = self.scope.get_struct(alias);
@@ -3312,21 +3312,21 @@ impl<'s> Analyzer<'s> {
             }
 
             Type::Pointer(ptr_type) => {
-                let unwrapped_type = self.unwrap_alias(ptr_type)?;
+                let unwrapped_type = self.unwrap_alias(ptr_type, arena)?;
                 Ok(Type::Pointer(Box::new(unwrapped_type)))
             }
             Type::Array(typ, size) => {
-                let unwrapped_type = self.unwrap_alias(typ)?;
+                let unwrapped_type = self.unwrap_alias(typ, arena)?;
                 Ok(Type::Array(Box::new(unwrapped_type), *size))
             }
             Type::DynamicArray(typ) => {
-                let unwrapped_type = self.unwrap_alias(typ)?;
+                let unwrapped_type = self.unwrap_alias(typ, arena)?;
                 Ok(Type::DynamicArray(Box::new(unwrapped_type)))
             }
             Type::Tuple(types) => {
-                let mut unwrapped_types = Vec::new();
+                let mut unwrapped_types = BumpVec::new_in(arena);
                 for typ in types {
-                    let unwrapped_type = self.unwrap_alias(typ)?;
+                    let unwrapped_type = self.unwrap_alias(typ, arena)?;
                     unwrapped_types.push(unwrapped_type)
                 }
 
