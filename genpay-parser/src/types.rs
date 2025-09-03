@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use bumpalo::collections::Vec as BumpVec;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type<'s> {
@@ -29,13 +30,13 @@ pub enum Type<'s> {
     Array(Box<Type<'s>>, usize),
     DynamicArray(Box<Type<'s>>),
 
-    Tuple(Vec<Type<'s>>),
+    Tuple(BumpVec<'s, Type<'s>>),
     Alias(&'s str),
 
     // for semantical analyzer
-    Function(Vec<Type<'s>>, Box<Type<'s>>, bool), // fn foo(a: i32, b: u32) string  --->  Function([I32, U32], String)
+    Function(BumpVec<'s, Type<'s>>, Box<Type<'s>>, bool), // fn foo(a: i32, b: u32) string  --->  Function([I32, U32], String)
     Struct(BTreeMap<&'s str, Type<'s>>, BTreeMap<&'s str, Type<'s>>), // struct Abc { a: i32, b: bool, c: *u64 }  ---> Struct([I32, Bool, Pointer(U64)])
-    Enum(Vec<&'s str>, BTreeMap<&'s str, Type<'s>>), // enum Abc { A, B, C } -> Enum([A, B, C])
+    Enum(BumpVec<'s, &'s str>, BTreeMap<&'s str, Type<'s>>), // enum Abc { A, B, C } -> Enum([A, B, C])
 
     ImportObject(&'s str),
 }
