@@ -40,7 +40,7 @@ See official documentation here: [Genpay Documentation](https://genpay-site.verc
 - **Arena Allocation:** bumpalo
 
  ## Memory Model
- Complete description's link: https://github.com/gled-genpaylabs/genpay/wiki/Memory-Model
+ https://github.com/gled-genpaylabs/genpay/wiki/Memory-Model
  
 #### Structure
 The project is divided into submodules using a virtual workspace environment:
