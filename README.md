@@ -38,7 +38,9 @@ See official documentation here: [Genpay Documentation](https://genpay-site.verc
 - **Error Reporting:** miette, colored
 - **Command Line Interface:** clap
 - **Arena Allocation:** bumpalo
-
+- 
+ ## Memory Model
+ 
 #### Structure
 The project is divided into submodules using a virtual workspace environment:
 - `genpay` - main executable module. Combines all submodules into the main process.
