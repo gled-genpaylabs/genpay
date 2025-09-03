@@ -62,6 +62,6 @@ The project is divided into submodules using a virtual workspace environment:
 5. The executable file will be in the `target/release` folder.
 
 ## Repository
-The project is licensed under the BSD-3 Clause License. <br>
+The project is licensed under the  Apache License Version 2.0, January 2004. <br>
 For more information see [License File](https://github.com/gled-genpaylabs/genpay/blob/master/LICENSE) <br/>
 You can check the contribution guide by: [CONTRIBUTING.md](https://github.com/gled-genpaylabs/genpay/blob/master/CONTRIBUTING.md).
