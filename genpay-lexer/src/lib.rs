@@ -121,7 +121,7 @@ impl<'s> Lexer<'s> {
             None => Ok(Token::new("", TokenType::EOF, (start, start))),
             Some(b'a'..=b'z' | b'A'..=b'Z' | b'_') => {
                 let ident = self.eat_while(|b| b.is_ascii_alphanumeric() || b == b'_');
-                let token_type = KEYWORDS.get(ident).cloned().unwrap_or(TokenType::Identifier);
+                let token_type = KEYWORDS.get(ident).copied().unwrap_or(TokenType::Identifier);
                 Ok(Token::new(ident, token_type, (start, self.cursor)))
             }
             Some(b'0'..=b'9') => {
