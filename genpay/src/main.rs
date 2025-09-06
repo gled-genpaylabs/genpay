@@ -27,7 +27,7 @@ fn main() {
             clap::error::ErrorKind::DisplayVersion => {
                 // --version flag
                 // Just return necessary information and exit with 0
-                eprintln!("{}", "🦎 Genpay Programming Language".bold().cyan());
+                eprintln!("{}", "Genpay Programming Language".bold().cyan());
                 eprintln!("| - version: {version_fmt}");
                 eprintln!("| - authors: {authors_fmt}");
 
@@ -35,16 +35,16 @@ fn main() {
             }
             _ => {
                 // Wrong arguments or --help flag
-                eprintln!("{}", "🦎 Genpay Programming Language".bold().cyan());
+                eprintln!("{}", "Genpay Programming Language".bold().cyan());
                 eprintln!("| - version: {version_fmt}");
                 eprintln!("| - authors: {authors_fmt}");
                 eprintln!();
-                eprintln!("{}", "🍀 Options:".bold().cyan());
+                eprintln!("{}", "Options:".bold().cyan());
 
                 command.print_help().unwrap();
 
                 eprintln!();
-                eprintln!("{}", "🎓 Examples of usage:".bold().cyan());
+                eprintln!("{}", "Examples of usage:".bold().cyan());
                 eprintln!("  genpay source.genpay output");
                 eprintln!("  genpay source.genpay output --no-warns");
                 eprintln!("  genpay source.genpay output --include foo.c");
