@@ -1,0 +1,5 @@
+[llvm-18]
+url = "https://github.com/llvm/llvm-project.git"
+tag = "llvmorg-18.1.0"
+target = ["X86", "AArch64", "RISCV"]
+cmake_options = ["-DLLVM_POLLY_LINK_INTO_TOOLS=ON"]
