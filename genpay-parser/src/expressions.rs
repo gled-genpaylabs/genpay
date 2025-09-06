@@ -1,6 +1,6 @@
 use crate::{
     BINARY_OPERATORS, BITWISE_OPERATORS, BOOLEAN_OPERATORS, PRECEDENCE_BOOLEAN_OPERATORS,
-    PRECEDENCE_BOOLEAN_OPERATORS, Parser,
+    Parser,
     error::{self, ParserError},
     statements::Statements,
     types::Type,
