@@ -25,9 +25,9 @@ lazy_static! {
         map.insert("while", TokenType::Keyword);
         map.insert("for", TokenType::Keyword);
         map.insert("break", TokenType::Keyword);
-        map.insert("true", TokenType::Boolean);
-        map.insert("false", TokenType::Boolean);
-        map.insert("NULL", TokenType::Null);
+        map.insert("true", TokenType::Keyword);
+        map.insert("false", TokenType::Keyword);
+        map.insert("NULL", TokenType::Keyword);
         map.insert("i8", TokenType::Type);
         map.insert("i16", TokenType::Type);
         map.insert("i32", TokenType::Type);
@@ -471,13 +471,14 @@ mod tests {
     }
 
     #[test]
-    fn boolean_keywords() {
-        let input = "true false";
+    fn literal_keywords() {
+        let input = "true false NULL";
         let mut lexer = Lexer::new(input, "test.genpay");
 
         let expected = vec![
-            Token::new("true", TokenType::Boolean, (0, 4)),
-            Token::new("false", TokenType::Boolean, (5, 10)),
+            Token::new("true", TokenType::Keyword, (0, 4)),
+            Token::new("false", TokenType::Keyword, (5, 10)),
+            Token::new("NULL", TokenType::Keyword, (11, 15)),
         ];
 
         assert_tokens(&mut lexer, &expected);

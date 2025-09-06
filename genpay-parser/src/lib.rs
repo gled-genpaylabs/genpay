@@ -366,7 +366,6 @@ impl<'a> Parser<'a> {
         let _ = self.next();
 
         match current.token_type {
-            TokenType::Null => Expressions::Value(Value::Null, current.span),
             TokenType::Number => Expressions::Value(
                 Value::Integer(current.value.trim().parse().unwrap()),
                 current.span,
@@ -380,10 +379,12 @@ impl<'a> Parser<'a> {
                 Value::Char(current.value.chars().nth(0).unwrap()),
                 current.span,
             ),
-            TokenType::Boolean => {
-                Expressions::Value(Value::Boolean(current.value == "true"), current.span)
-            }
-            TokenType::Keyword => Expressions::Value(Value::Keyword(current.value), current.span),
+            TokenType::Keyword => match current.value {
+                "true" => Expressions::Value(Value::Boolean(true), current.span),
+                "false" => Expressions::Value(Value::Boolean(false), current.span),
+                "NULL" => Expressions::Value(Value::Null, current.span),
+                _ => Expressions::Value(Value::Keyword(current.value), current.span),
+            },
 
             TokenType::Minus | TokenType::Not => {
                 let object = self.term(expr_arena, stmt_arena);
@@ -3117,7 +3118,7 @@ fn return_statement() {
 
 #[test]
 fn basic_values() {
-    const SRC: &str = "123; 5.0; 'a'; \"some\"; true";
+    const SRC: &str = "123; 5.0; 'a'; \"some\"; true; false; NULL;";
     const FILENAME: &str = "test.genpay";
 
     let mut parser = Parser::new(SRC, FILENAME);
@@ -3148,7 +3149,19 @@ fn basic_values() {
         panic!("Test failure for: {:?}", ast_iter.nth_back(0).unwrap())
     }
 
-    if let Some(Statements::Expression(Expressions::Value(Value::Boolean(_), _))) = ast_iter.next()
+    if let Some(Statements::Expression(Expressions::Value(Value::Boolean(true), _))) = ast_iter.next()
+    {
+    } else {
+        panic!("Test failure for: {:?}", ast_iter.nth_back(0).unwrap())
+    }
+
+    if let Some(Statements::Expression(Expressions::Value(Value::Boolean(false), _))) = ast_iter.next()
+    {
+    } else {
+        panic!("Test failure for: {:?}", ast_iter.nth_back(0).unwrap())
+    }
+
+    if let Some(Statements::Expression(Expressions::Value(Value::Null, _))) = ast_iter.next()
     {
     } else {
         panic!("Test failure for: {:?}", ast_iter.nth_back(0).unwrap())

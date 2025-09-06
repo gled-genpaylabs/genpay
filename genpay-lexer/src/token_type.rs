@@ -8,8 +8,6 @@ pub enum TokenType {
     FloatNumber, // 1.23
     String,      // "hello"
     Char,        // 'c'
-    Boolean,     // true/false
-    Null,        // NULL
 
     Equal,    // =
     Plus,     // +
