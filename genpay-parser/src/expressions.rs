@@ -1,6 +1,6 @@
 use crate::{
-    BINARY_OPERATORS, BITWISE_OPERATORS, BOOLEAN_OPERATORS, PRIORITY_BINARY_OPERATORS,
-    PRIORITY_BOOLEAN_OPERATORS, Parser,
+    BINARY_OPERATORS, BITWISE_OPERATORS, BOOLEAN_OPERATORS, PRECEDENCE_BOOLEAN_OPERATORS,
+    PRECEDENCE_BOOLEAN_OPERATORS, Parser,
     error::{self, ParserError},
     statements::Statements,
     types::Type,
@@ -186,7 +186,7 @@ impl<'a> Parser<'a> {
                 let rhs = self.expression(expr_arena, stmt_arena);
                 let span_end = rhs.span().1;
 
-                if PRIORITY_BINARY_OPERATORS.contains(&tty) {
+                if PRECEDENCE_BOOLEAN_OPERATORS.contains(&tty) {
                     let new_node = rhs.clone();
                     let old_lhs = lhs.clone();
 
@@ -200,7 +200,7 @@ impl<'a> Parser<'a> {
                         let lhs_new = expr_arena.alloc(old_lhs);
                         let rhs_new = lhs;
 
-                        let priority_node = Expressions::Binary {
+                        let precedence_node = Expressions::Binary {
                             operand: current.token_type.clone(),
                             lhs: lhs_new,
                             rhs: rhs_new,
@@ -209,7 +209,7 @@ impl<'a> Parser<'a> {
 
                         return Expressions::Binary {
                             operand,
-                            lhs: expr_arena.alloc(priority_node),
+                            lhs: expr_arena.alloc(precedence_node),
                             rhs,
                             span: (node_span.0, span_end),
                         };
@@ -234,7 +234,7 @@ impl<'a> Parser<'a> {
         let current = self.current();
 
         match current.token_type {
-            ref op if PRIORITY_BOOLEAN_OPERATORS.contains(&op) => node,
+            ref op if PRECEDENCE_BOOLEAN_OPERATORS.contains(&op) => node,
             ref op if BOOLEAN_OPERATORS.contains(&op) => {
                 let _ = self.next();
 
@@ -242,7 +242,7 @@ impl<'a> Parser<'a> {
                 let rhs = self.expression(expr_arena, stmt_arena);
                 let span_end = rhs.span().1;
 
-                if PRIORITY_BOOLEAN_OPERATORS.contains(&self.current().token_type) {
+                if PRECEDENCE_BOOLEAN_OPERATORS.contains(&self.current().token_type) {
                     let operand = self.current().token_type.clone();
                     let lhs_node = Expressions::Boolean {
                         operand: current.token_type.clone(),
