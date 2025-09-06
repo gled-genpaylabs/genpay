@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use bumpalo::collections::Vec as BumpVec;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Type<'s> {
+pub enum Type<'a> {
     SelfRef,
     Undefined,
     NoDrop,
@@ -26,22 +26,22 @@ pub enum Type<'s> {
     Null,
     Char,
 
-    Pointer(Box<Type<'s>>),
-    Array(Box<Type<'s>>, usize),
-    DynamicArray(Box<Type<'s>>),
+    Pointer(Box<Type<'a>>),
+    Array(Box<Type<'a>>, usize),
+    DynamicArray(Box<Type<'a>>),
 
-    Tuple(BumpVec<'s, Type<'s>>),
-    Alias(&'s str),
+    Tuple(BumpVec<'a, Type<'a>>),
+    Alias(&'a str),
 
     // for semantical analyzer
-    Function(BumpVec<'s, Type<'s>>, Box<Type<'s>>, bool), // fn foo(a: i32, b: u32) string  --->  Function([I32, U32], String)
-    Struct(BTreeMap<&'s str, Type<'s>>, BTreeMap<&'s str, Type<'s>>), // struct Abc { a: i32, b: bool, c: *u64 }  ---> Struct([I32, Bool, Pointer(U64)])
-    Enum(BumpVec<'s, &'s str>, BTreeMap<&'s str, Type<'s>>), // enum Abc { A, B, C } -> Enum([A, B, C])
+    Function(BumpVec<'a, Type<'a>>, Box<Type<'a>>, bool), // fn foo(a: i32, b: u32) string  --->  Function([I32, U32], String)
+    Struct(BTreeMap<&'a str, Type<'a>>, BTreeMap<&'a str, Type<'a>>), // struct Abc { a: i32, b: bool, c: *u64 }  ---> Struct([I32, Bool, Pointer(U64)])
+    Enum(BumpVec<'a, &'a str>, BTreeMap<&'a str, Type<'a>>), // enum Abc { A, B, C } -> Enum([A, B, C])
 
-    ImportObject(&'s str),
+    ImportObject(&'a str),
 }
 
-impl<'s> std::fmt::Display for Type<'s> {
+impl<'a> std::fmt::Display for Type<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Type::SelfRef => write!(f, "&self"),
