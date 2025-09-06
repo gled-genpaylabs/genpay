@@ -1,8 +1,5 @@
-target/
-*.o
-*.c
-hello
-/genpay-linker/tests/hello.c
-/genpay-linker/tests/hello.o
-/genpay-linker/tests/hello
-/llvm_build/
+/target
+.DS_Store
+.idea/
+.vscode/
+.llvm/
