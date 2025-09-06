@@ -148,12 +148,11 @@ impl<'a> Parser<'a> {
         &mut self,
         head: Expressions<'a>,
         separator: TokenType,
-        expr_arena: &'a Bump,
-        stmt_arena: &'a Bump,
+        arena: &'a Bump,
     ) -> Expressions<'a> {
         let head_span = head.span();
-        let head = expr_arena.alloc(head);
-        let mut subelements = BumpVec::new_in(expr_arena);
+        let head = arena.alloc(head);
+        let mut subelements = BumpVec::new_in(arena);
         let mut end_span = head_span.1;
 
         loop {
@@ -162,7 +161,7 @@ impl<'a> Parser<'a> {
             }
             let _ = self.next();
 
-            let term = self.term(expr_arena, stmt_arena);
+            let term = self.term(arena);
             end_span = term.span().1;
             subelements.push(term);
         }
@@ -174,7 +173,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn binary_expression(&mut self, node: Expressions<'a>, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
+    pub fn binary_expression(&mut self, node: Expressions<'a>, arena: &'a Bump) -> Expressions<'a> {
         let node_span = node.span();
         let current = self.current();
 
@@ -183,7 +182,7 @@ impl<'a> Parser<'a> {
                 let _ = self.next();
 
                 let lhs = node;
-                let rhs = self.expression(expr_arena, stmt_arena);
+                let rhs = self.expression(arena);
                 let span_end = rhs.span().1;
 
                 if PRECEDENCE_BOOLEAN_OPERATORS.contains(&tty) {
@@ -197,7 +196,7 @@ impl<'a> Parser<'a> {
                         span,
                     } = new_node
                     {
-                        let lhs_new = expr_arena.alloc(old_lhs);
+                        let lhs_new = arena.alloc(old_lhs);
                         let rhs_new = lhs;
 
                         let precedence_node = Expressions::Binary {
@@ -209,7 +208,7 @@ impl<'a> Parser<'a> {
 
                         return Expressions::Binary {
                             operand,
-                            lhs: expr_arena.alloc(precedence_node),
+                            lhs: arena.alloc(precedence_node),
                             rhs,
                             span: (node_span.0, span_end),
                         };
@@ -218,8 +217,8 @@ impl<'a> Parser<'a> {
 
                 Expressions::Binary {
                     operand: current.token_type,
-                    lhs: expr_arena.alloc(lhs),
-                    rhs: expr_arena.alloc(rhs),
+                    lhs: arena.alloc(lhs),
+                    rhs: arena.alloc(rhs),
                     span: (node_span.0, span_end),
                 }
             }
@@ -227,7 +226,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn boolean_expression(&mut self, node: Expressions<'a>, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
+    pub fn boolean_expression(&mut self, node: Expressions<'a>, arena: &'a Bump) -> Expressions<'a> {
         // FIXME: Expressions like `true || false` returns error "Undefined term found"
 
         let node_span = node.span();
@@ -239,33 +238,33 @@ impl<'a> Parser<'a> {
                 let _ = self.next();
 
                 let lhs = node.clone();
-                let rhs = self.expression(expr_arena, stmt_arena);
+                let rhs = self.expression(arena);
                 let span_end = rhs.span().1;
 
                 if PRECEDENCE_BOOLEAN_OPERATORS.contains(&self.current().token_type) {
                     let operand = self.current().token_type.clone();
                     let lhs_node = Expressions::Boolean {
                         operand: current.token_type.clone(),
-                        lhs: expr_arena.alloc(lhs),
-                        rhs: expr_arena.alloc(rhs),
+                        lhs: arena.alloc(lhs),
+                        rhs: arena.alloc(rhs),
                         span: (current.span.0, self.current().span.1),
                     };
 
                     let _ = self.next();
-                    let rhs_node = self.expression(expr_arena, stmt_arena);
+                    let rhs_node = self.expression(arena);
 
                     return Expressions::Boolean {
                         operand,
-                        lhs: expr_arena.alloc(lhs_node),
-                        rhs: expr_arena.alloc(rhs_node),
+                        lhs: arena.alloc(lhs_node),
+                        rhs: arena.alloc(rhs_node),
                         span: (node_span.0, span_end),
                     };
                 }
 
                 Expressions::Boolean {
                     operand: current.token_type,
-                    lhs: expr_arena.alloc(lhs),
-                    rhs: expr_arena.alloc(rhs),
+                    lhs: arena.alloc(lhs),
+                    rhs: arena.alloc(rhs),
                     span: (node_span.0, span_end),
                 }
             }
@@ -273,7 +272,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn bitwise_expression(&mut self, node: Expressions<'a>, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
+    pub fn bitwise_expression(&mut self, node: Expressions<'a>, arena: &'a Bump) -> Expressions<'a> {
         let node_span = node.span();
         let current = self.current();
 
@@ -281,8 +280,8 @@ impl<'a> Parser<'a> {
             ref tty if BITWISE_OPERATORS.contains(&tty) => {
                 let _ = self.next();
 
-                let lhs = expr_arena.alloc(node);
-                let rhs = expr_arena.alloc(self.expression(expr_arena, stmt_arena));
+                let lhs = arena.alloc(node);
+                let rhs = arena.alloc(self.expression(arena));
                 let span_end = rhs.span().1;
 
                 Expressions::Bitwise {
@@ -296,7 +295,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn call_expression(&mut self, fname: &'a str, span: (usize, usize), expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
+    pub fn call_expression(&mut self, fname: &'a str, span: (usize, usize), arena: &'a Bump) -> Expressions<'a> {
         match self.current().token_type {
             TokenType::Identifier => {
                 let _ = self.next();
@@ -315,7 +314,7 @@ impl<'a> Parser<'a> {
         };
 
         let arguments =
-            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma, expr_arena, stmt_arena);
+            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma, arena);
 
         let span_end = if let Some(last_arg) = arguments.last() {
             last_arg.span().1
@@ -330,13 +329,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn macrocall_expression(&mut self, name: &'a str, span: (usize, usize), expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
+    pub fn macrocall_expression(&mut self, name: &'a str, span: (usize, usize), arena: &'a Bump) -> Expressions<'a> {
         if self.expect(TokenType::Not) {
             let _ = self.next();
         }
 
         let arguments =
-            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma, expr_arena, stmt_arena);
+            self.expressions_enum(TokenType::LParen, TokenType::RParen, TokenType::Comma, arena);
 
         let span_end = if let Some(last_arg) = arguments.last() {
             last_arg.span().1
@@ -351,13 +350,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn slice_expression(&mut self, expr: Expressions<'a>, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
+    pub fn slice_expression(&mut self, expr: Expressions<'a>, arena: &'a Bump) -> Expressions<'a> {
         if let TokenType::LBrack = self.current().token_type {
             let _ = self.next();
         }
 
-        let object = expr_arena.alloc(expr.clone());
-        let index = expr_arena.alloc(self.expression(expr_arena, stmt_arena));
+        let object = arena.alloc(expr.clone());
+        let index = arena.alloc(self.expression(arena));
 
         if self.current().token_type != TokenType::RBrack {
             self.error(ParserError::UnclosedExpression {
@@ -382,7 +381,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn struct_expression(&mut self, name: &'a str, expr_arena: &'a Bump, stmt_arena: &'a Bump) -> Expressions<'a> {
+    pub fn struct_expression(&mut self, name: &'a str, arena: &'a Bump) -> Expressions<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Identifier) {
             let _ = self.next();
@@ -460,7 +459,7 @@ impl<'a> Parser<'a> {
             }
 
             let _ = self.next();
-            let value = self.expression(expr_arena, stmt_arena);
+            let value = self.expression(arena);
 
             if !self.expect(TokenType::Comma) && !self.expect(TokenType::RBrace) {
                 self.error(ParserError::SyntaxError {
@@ -498,24 +497,23 @@ impl<'a> Parser<'a> {
         start: TokenType,
         end: TokenType,
         separator: TokenType,
-        expr_arena: &'a Bump,
-        stmt_arena: &'a Bump,
+        arena: &'a Bump,
     ) -> BumpVec<'a, Expressions<'a>> {
         if self.expect(start) {
             let _ = self.next();
         } else if self.expect(end.clone()) {
             let _ = self.next();
-            return BumpVec::new_in(expr_arena);
+            return BumpVec::new_in(arena);
         }
 
-        let mut output = BumpVec::new_in(expr_arena);
+        let mut output = BumpVec::new_in(arena);
 
         loop {
             if self.expect(end.clone()) {
                 break;
             }
 
-            output.push(self.expression(expr_arena, stmt_arena));
+            output.push(self.expression(arena));
 
             if self.expect(separator.clone()) {
                 let _ = self.next();

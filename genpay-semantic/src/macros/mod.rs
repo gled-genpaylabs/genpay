@@ -23,8 +23,7 @@ pub trait MacroObject<'s>: std::fmt::Debug {
         analyzer: &mut Analyzer<'s>,
         arguments: &[Expressions<'s>],
         span: &(usize, usize),
-        expr_arena: &'s Bump,
-        stmt_arena: &'s Bump,
+        arena: &'s Bump,
     ) -> Type<'s>;
 }
 
@@ -46,27 +45,26 @@ impl<'s> MacroObject<'s> for CompilerMacros {
         analyzer: &mut Analyzer<'s>,
         arguments: &[Expressions<'s>],
         span: &(usize, usize),
-        expr_arena: &'s Bump,
-        stmt_arena: &'s Bump,
+        arena: &'s Bump,
     ) -> Type<'s> {
         match self {
             CompilerMacros::PrintMacro(instance) => {
-                instance.verify_call(analyzer, arguments, span, expr_arena, stmt_arena)
+                instance.verify_call(analyzer, arguments, span, arena)
             }
             CompilerMacros::PrintlnMacro(instance) => {
-                instance.verify_call(analyzer, arguments, span, expr_arena, stmt_arena)
+                instance.verify_call(analyzer, arguments, span, arena)
             }
             CompilerMacros::FormatMacro(instance) => {
-                instance.verify_call(analyzer, arguments, span, expr_arena, stmt_arena)
+                instance.verify_call(analyzer, arguments, span, arena)
             }
             CompilerMacros::PanicMacro(instance) => {
-                instance.verify_call(analyzer, arguments, span, expr_arena, stmt_arena)
+                instance.verify_call(analyzer, arguments, span, arena)
             }
             CompilerMacros::SizeofMacro(instance) => {
-                instance.verify_call(analyzer, arguments, span, expr_arena, stmt_arena)
+                instance.verify_call(analyzer, arguments, span, arena)
             }
             CompilerMacros::CastMacro(instance) => {
-                instance.verify_call(analyzer, arguments, span, expr_arena, stmt_arena)
+                instance.verify_call(analyzer, arguments, span, arena)
             }
             CompilerMacros::None => Type::Void,
         }
