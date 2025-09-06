@@ -116,9 +116,8 @@ fn main() {
     // Syntax Analyzer initialization.
     // It takes full ownership for tokens vector (because we don't need them anymore)
     let mut parser = genpay_parser::Parser::new_with_lexer(lexer, &src, fname);
-    let expr_arena = bumpalo::Bump::new();
-    let stmt_arena = bumpalo::Bump::new();
-    let (ast, warns) = match parser.parse(&expr_arena, &stmt_arena) {
+    let arena = bumpalo::Bump::new();
+    let (ast, warns) = match parser.parse(&arena) {
         Ok(ast) => ast,
         Err(e) => {
             let (errors, warns) = e;
@@ -175,7 +174,7 @@ fn main() {
     //
     // Analyzer takes only reference to AST (because we only provide checking)
     let mut analyzer = genpay_semantic::Analyzer::new(&src, fname, true);
-    let (symtable, warns) = match analyzer.analyze(&ast, &expr_arena, &stmt_arena) {
+    let (symtable, warns) = match analyzer.analyze(&ast, &arena) {
         Ok(res) => res,
         Err((errors, warns)) => {
             errors.iter().for_each(|e| {
@@ -238,7 +237,7 @@ fn main() {
     // Code Generator Initialization.
     // Creating custom context and a very big wrapper for builder.
     let ctx = genpay_codegen::CodeGen::create_context();
-    let mut codegen = genpay_codegen::CodeGen::new(&ctx, &expr_arena, &module_name, &src, symtable);
+    let mut codegen = genpay_codegen::CodeGen::new(&ctx, &arena, &module_name, &src, symtable);
 
     // Compiling AST
     let (module_ref, _) = codegen.compile(ast, None);

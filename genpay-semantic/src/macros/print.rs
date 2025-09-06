@@ -13,10 +13,9 @@ impl<'s> MacroObject<'s> for PrintMacro {
         analyzer: &mut Analyzer<'s>,
         arguments: &[Expressions<'s>],
         span: &(usize, usize),
-        expr_arena: &'s Bump,
-        stmt_arena: &'s Bump,
+        arena: &'s Bump,
     ) -> Type<'s> {
-        let _ = super::FormatMacro.verify_call(analyzer, arguments, span, expr_arena, stmt_arena);
+        let _ = super::FormatMacro.verify_call(analyzer, arguments, span, arena);
         Type::Void
     }
 }

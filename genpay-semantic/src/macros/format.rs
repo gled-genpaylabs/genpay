@@ -17,8 +17,7 @@ impl<'s> MacroObject<'s> for FormatMacro {
         analyzer: &mut Analyzer<'s>,
         arguments: &[Expressions<'s>],
         span: &(usize, usize),
-        expr_arena: &'s Bump,
-        stmt_arena: &'s Bump,
+        arena: &'s Bump,
     ) -> Type<'s> {
         const DISPLAY_IMPLEMENTATION_FORMAT: &str = "fn display(&self) *char";
         const MINIMUM_ARGUMENTS_LEN: usize = 1;
@@ -82,7 +81,7 @@ impl<'s> MacroObject<'s> for FormatMacro {
         let arguments_iterator = arguments.iter();
 
         arguments_iterator.skip(1).for_each(|expr| {
-            let expr_type = analyzer.visit_expression(expr, None, expr_arena, stmt_arena);
+            let expr_type = analyzer.visit_expression(expr, None, arena);
 
             match expr_type.clone() {
                 int if Analyzer::is_integer(&int) => {}
