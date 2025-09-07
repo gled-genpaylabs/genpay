@@ -959,7 +959,7 @@ impl<'ctx> CodeGen<'ctx> {
                 match compiled_iterator.0.clone() {
                     typ if deen_semantic::Analyzer::is_integer(&typ) => {
                         // runtime checker for negative number
-                        if !deen_semantic::Analyzer::is_unsigned_integer(&typ)
+                        if !genpay_semantic::Analyzer::is_unsigned_integer(&typ)
                             && compiled_iterator
                                 .1
                                 .into_int_value()
@@ -1229,7 +1229,7 @@ impl<'ctx> CodeGen<'ctx> {
                 // making iteration
 
                 match compiled_iterator.0 {
-                    typ if deen_semantic::Analyzer::is_integer(&typ) => {
+                    typ if genpay_semantic::Analyzer::is_integer(&typ) => {
                         let current_value = self
                             .builder
                             .build_load(basic_binding_type, binding_ptr, "itertmp")
@@ -1600,11 +1600,11 @@ impl<'ctx> CodeGen<'ctx> {
                 }
 
                 if deen_semantic::Analyzer::is_integer(&return_type)
-                    && (deen_semantic::Analyzer::is_integer(
+                    && (genpay_semantic::Analyzer::is_integer(
                         expected.as_ref().unwrap_or(&Type::Void),
                     ) || matches!(expected.as_ref().unwrap_or(&Type::Void), Type::Char))
-                    && deen_semantic::Analyzer::integer_order(expected.as_ref().unwrap())
-                        <= deen_semantic::Analyzer::integer_order(&return_type)
+                    && genpay_semantic::Analyzer::integer_order(expected.as_ref().unwrap())
+                        <= genpay_semantic::Analyzer::integer_order(&return_type)
                 {
                     return_type = expected.unwrap();
                 }
@@ -1819,8 +1819,8 @@ impl<'ctx> CodeGen<'ctx> {
                 let rhs_value = self.compile_expression(*rhs.clone(), expected.clone());
 
                 let senior_type = match lhs_value.0.clone() {
-                    typ if deen_semantic::Analyzer::is_integer(&typ) => {
-                        if deen_semantic::Analyzer::integer_order(&lhs_value.0)
+                    typ if genpay_semantic::Analyzer::is_integer(&typ) => {
+                        if genpay_semantic::Analyzer::integer_order(&lhs_value.0)
                             > deen_semantic::Analyzer::integer_order(&rhs_value.0)
                         {
                             lhs_value.0
@@ -1828,8 +1828,8 @@ impl<'ctx> CodeGen<'ctx> {
                             rhs_value.0.clone()
                         }
                     }
-                    typ if deen_semantic::Analyzer::is_float(&typ) => {
-                        if deen_semantic::Analyzer::float_order(&lhs_value.0)
+                    typ if genpay_semantic::Analyzer::is_float(&typ) => {
+                        if genpay_semantic::Analyzer::float_order(&lhs_value.0)
                             > deen_semantic::Analyzer::float_order(&rhs_value.0)
                         {
                             lhs_value.0
