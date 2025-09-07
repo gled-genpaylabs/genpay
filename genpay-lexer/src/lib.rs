@@ -1,4 +1,4 @@
-//! # Deen Lexical Analyzer
+//! # Genpay Lexical Analyzer
 //! Tools to convert user's source code into abstracted data structures - tokens. <br/>
 //! Wikipedia Explanation: <https://en.wikipedia.org/wiki/Lexical_analysis> <br/>
 //!
