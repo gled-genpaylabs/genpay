@@ -1935,7 +1935,7 @@ impl<'ctx> CodeGen<'ctx> {
                             }
                         }
                         "%" => {
-                            if deen_semantic::Analyzer::is_unsigned_integer(&typ) {
+                            if genpay_semantic::Analyzer::is_unsigned_integer(&typ) {
                                 self.builder
                                     .build_int_unsigned_rem(
                                         lhs_value.1.into_int_value(),
