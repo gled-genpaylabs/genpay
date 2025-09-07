@@ -1,4 +1,4 @@
-### 🍀 Description
+###  Description
 **Version:** `<version>`
 **Related:** _no issue_
 
