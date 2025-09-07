@@ -3,7 +3,7 @@ use crate::{
     Analyzer,
     error::{self, SemanticError},
 };
-use deen_parser::{expressions::Expressions, types::Type};
+use genpay_parser::{expressions::Expressions, types::Type};
 
 /// **Converts expression to provided type**
 /// `cast!(EXPRESSION, TYPE)` -> `usize`
