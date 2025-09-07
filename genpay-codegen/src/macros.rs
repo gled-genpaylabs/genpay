@@ -499,8 +499,8 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                     // float types casts
                     (from, to)
-                        if deen_semantic::Analyzer::is_float(from)
-                            && deen_semantic::Analyzer::is_float(to) =>
+                        if genpay_semantic::Analyzer::is_float(from)
+                            && genpay_semantic::Analyzer::is_float(to) =>
                     {
                         let from_order = deen_semantic::Analyzer::float_order(from);
                         let to_order = deen_semantic::Analyzer::float_order(to);
@@ -532,10 +532,10 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                     // `float -> integer` cast
                     (from, to)
-                        if deen_semantic::Analyzer::is_float(from)
-                            && deen_semantic::Analyzer::is_integer(to) =>
+                        if genpay_semantic::Analyzer::is_float(from)
+                            && genpay_semantic::Analyzer::is_integer(to) =>
                     {
-                        let unsigned = deen_semantic::Analyzer::is_unsigned_integer(to);
+                        let unsigned = genpay_semantic::Analyzer::is_unsigned_integer(to);
 
                         let value = if unsigned {
                             self.builder
