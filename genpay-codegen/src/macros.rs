@@ -502,8 +502,8 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                         if genpay_semantic::Analyzer::is_float(from)
                             && genpay_semantic::Analyzer::is_float(to) =>
                     {
-                        let from_order = deen_semantic::Analyzer::float_order(from);
-                        let to_order = deen_semantic::Analyzer::float_order(to);
+                        let from_order = genpay_semantic::Analyzer::float_order(from);
+                        let to_order = genpay_semantic::Analyzer::float_order(to);
 
                         let value = if from_order > to_order {
                             // truncating
