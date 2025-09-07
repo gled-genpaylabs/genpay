@@ -917,7 +917,7 @@ impl<'ctx> CodeGen<'ctx> {
                 }
 
                 let binding_type = match compiled_iterator.0.clone() {
-                    typ if deen_semantic::Analyzer::is_integer(&typ) => typ,
+                    typ if genpay_semantic::Analyzer::is_integer(&typ) => typ,
 
                     Type::Array(typ, _) => *typ,
                     Type::DynamicArray(typ) => *typ,
