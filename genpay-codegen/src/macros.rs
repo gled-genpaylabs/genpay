@@ -562,10 +562,10 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                     // `integer -> float` cast
                     (from, to)
-                        if deen_semantic::Analyzer::is_integer(from)
-                            && deen_semantic::Analyzer::is_float(to) =>
+                        if genpay_semantic::Analyzer::is_integer(from)
+                            && genpay_semantic::Analyzer::is_float(to) =>
                     {
-                        let unsigned = deen_semantic::Analyzer::is_unsigned_integer(from);
+                        let unsigned = genpay_semantic::Analyzer::is_unsigned_integer(from);
 
                         let value = if unsigned {
                             self.builder
