@@ -704,7 +704,7 @@ impl Lexer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{Lexer, token::Token, token_type::TokenType};
 
     #[test]
     fn getc_test() {
@@ -754,5 +754,369 @@ mod tests {
         .for_each(|(chr, exp)| assert_eq!(Lexer::character_escape(chr), Some(exp)));
 
         assert!(Lexer::character_escape(' ').is_none())
+    }
+
+    #[test]
+    fn basic_types() {
+        let input = String::from("i8 i16 i32 i64 u8 u16 u32 u64 usize char bool void");
+        let mut lexer = Lexer::new(&input, "tests.dn");
+
+        let tokens = lexer.tokenize().unwrap().0;
+        let expected = vec![
+            (TokenType::Type, String::from("i8")),
+            (TokenType::Type, String::from("i16")),
+            (TokenType::Type, String::from("i32")),
+            (TokenType::Type, String::from("i64")),
+            (TokenType::Type, String::from("u8")),
+            (TokenType::Type, String::from("u16")),
+            (TokenType::Type, String::from("u32")),
+            (TokenType::Type, String::from("u64")),
+            (TokenType::Type, String::from("usize")),
+            (TokenType::Type, String::from("char")),
+            (TokenType::Type, String::from("bool")),
+            (TokenType::Type, String::from("void")),
+        ];
+
+        tokens.iter().zip(expected).for_each(|(token, expected)| {
+            assert_eq!(token.token_type, expected.0);
+            assert_eq!(token.value, expected.1);
+        });
+    }
+
+    #[test]
+    fn boolean_keywords() {
+        let input = String::from("true false");
+        let mut lexer = Lexer::new(&input, "tests.pay");
+
+        let tokens = lexer.tokenize().unwrap().0;
+        let expected = vec![
+            (TokenType::Boolean, String::from("true")),
+            (TokenType::Boolean, String::from("false")),
+        ];
+
+        tokens.iter().zip(expected).for_each(|(token, expected)| {
+            assert_eq!(token.token_type, expected.0);
+            assert_eq!(token.value, expected.1);
+        });
+    }
+
+    #[test]
+    fn main_keywords() {
+        let input = String::from("let fn import return struct enum typedef");
+        let mut lexer = Lexer::new(&input, "tests.pay");
+
+        let tokens = lexer.tokenize().unwrap().0;
+        let expected = vec![
+            (TokenType::Keyword, String::from("let")),
+            (TokenType::Keyword, String::from("fn")),
+            (TokenType::Keyword, String::from("import")),
+            (TokenType::Keyword, String::from("return")),
+            (TokenType::Keyword, String::from("struct")),
+            (TokenType::Keyword, String::from("enum")),
+            (TokenType::Keyword, String::from("typedef")),
+        ];
+
+        tokens.iter().zip(expected).for_each(|(token, expected)| {
+            assert_eq!(token.token_type, expected.0);
+            assert_eq!(token.value, expected.1);
+        });
+    }
+
+    #[test]
+    fn constructions_keywords() {
+        let input = String::from("if else while for break");
+        let mut lexer = Lexer::new(&input, "tests.pay");
+
+        let tokens = lexer.tokenize().unwrap().0;
+        let expected = vec![
+            (TokenType::Keyword, String::from("if")),
+            (TokenType::Keyword, String::from("else")),
+            (TokenType::Keyword, String::from("while")),
+            (TokenType::Keyword, String::from("for")),
+            (TokenType::Keyword, String::from("break")),
+        ];
+
+        tokens.iter().zip(expected).for_each(|(token, expected)| {
+            assert_eq!(token.token_type, expected.0);
+            assert_eq!(token.value, expected.1);
+        });
+    }
+
+    #[test]
+    fn basic_number() {
+        let mut lexer = Lexer::new("123", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from("123"), TokenType::Number, (0, 2)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn big_number() {
+        let mut lexer = Lexer::new("999999999999999", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from("999999999999999"), TokenType::Number, (0, 14)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn negative_number() {
+        let mut lexer = Lexer::new("-15", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from("-"), TokenType::Minus, (0, 1)),
+                Token::new(String::from("15"), TokenType::Number, (1, 2)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn float_number() {
+        let mut lexer = Lexer::new("1.0", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from("1"), TokenType::FloatNumber, (0, 2)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn advanced_float_number() {
+        let mut lexer = Lexer::new("1.89", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from("1.89"), TokenType::FloatNumber, (0, 3)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn big_float_number() {
+        let mut lexer = Lexer::new("3.141592653589793", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(
+                    String::from("3.141592653589793"),
+                    TokenType::FloatNumber,
+                    (0, 16)
+                ),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn negative_float_number() {
+        let mut lexer = Lexer::new("-1.89", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from("-"), TokenType::Minus, (0, 1)),
+                Token::new(String::from("1.89"), TokenType::FloatNumber, (1, 4)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn basic_string() {
+        let mut lexer = Lexer::new("\"hello\"", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from("hello"), TokenType::String, (0, 7)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn big_string() {
+        let mut lexer = Lexer::new(
+            "\"Hello, World! Here's an interesting thing: first LLVM initial release was in 2003 year. The original authors of core was Chris Lattner and Vikram Adve\"",
+            "test.dn",
+        );
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(
+                    String::from(
+                        "Hello, World! Here's an interesting thing: first LLVM initial release was in 2003 year. The original authors of core was Chris Lattner and Vikram Adve"
+                    ),
+                    TokenType::String,
+                    (0, 152)
+                ),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn advanced_string() {
+        let mut lexer = Lexer::new("\"¿?👉👈🤠👀\"", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from("¿?👉👈🤠👀"), TokenType::String, (0, 21)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn basic_char() {
+        let mut lexer = Lexer::new("'a'", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from("a"), TokenType::Char, (0, 3)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn advanced_char() {
+        let mut lexer = Lexer::new("'👀'", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from("👀"), TokenType::Char, (0, 3)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn binary_symbols() {
+        let mut lexer = Lexer::new("+-*/", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from("+"), TokenType::Plus, (0, 1)),
+                Token::new(String::from("-"), TokenType::Minus, (1, 2)),
+                Token::new(String::from("*"), TokenType::Multiply, (2, 3)),
+                Token::new(String::from("/"), TokenType::Divide, (3, 4)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn boolean_symbols() {
+        let mut lexer = Lexer::new("> < ! && || == !=", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from(">"), TokenType::Bt, (0, 0)),
+                Token::new(String::from("<"), TokenType::Lt, (2, 2)),
+                Token::new(String::from("!"), TokenType::Not, (4, 4)),
+                Token::new(String::from("&&"), TokenType::And, (6, 8)),
+                Token::new(String::from("||"), TokenType::Or, (9, 11)),
+                Token::new(String::from("=="), TokenType::Eq, (12, 13)),
+                Token::new(String::from("!="), TokenType::Ne, (15, 16)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn bitwise_symbols() {
+        let mut lexer = Lexer::new(">> << ^", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from(">>"), TokenType::RShift, (0, 2)),
+                Token::new(String::from("<<"), TokenType::LShift, (3, 5)),
+                Token::new(String::from("^"), TokenType::Xor, (6, 7)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn parentheses_symbols() {
+        let mut lexer = Lexer::new("(){}[]", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from("("), TokenType::LParen, (0, 1)),
+                Token::new(String::from(")"), TokenType::RParen, (1, 2)),
+                Token::new(String::from("{"), TokenType::LBrace, (2, 3)),
+                Token::new(String::from("}"), TokenType::RBrace, (3, 4)),
+                Token::new(String::from("["), TokenType::LBrack, (4, 5)),
+                Token::new(String::from("]"), TokenType::RBrack, (5, 6)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
+    }
+
+    #[test]
+    fn other_symbols() {
+        let mut lexer = Lexer::new("&ref : ; & | _ . , =", "test.pay");
+        let tokens = lexer.tokenize().unwrap().0;
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(String::from("&"), TokenType::Ref, (0, 1)),
+                Token::new(String::from("ref"), TokenType::Identifier, (1, 4)),
+                Token::new(String::from(":"), TokenType::DoubleDots, (5, 6)),
+                Token::new(String::from(";"), TokenType::Semicolon, (7, 8)),
+                Token::new(String::from("&"), TokenType::Ampersand, (9, 10)),
+                Token::new(String::from("|"), TokenType::Verbar, (11, 12)),
+                Token::new(String::from("_"), TokenType::Identifier, (13, 14)),
+                Token::new(String::from("."), TokenType::Dot, (15, 16)),
+                Token::new(String::from(","), TokenType::Comma, (17, 18)),
+                Token::new(String::from("="), TokenType::Equal, (19, 20)),
+                Token::new(String::new(), TokenType::EOF, (0, 0))
+            ]
+        )
     }
 }
