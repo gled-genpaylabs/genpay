@@ -23,38 +23,37 @@
 See official documentation here: [Genpay Documentation](https://genpay-site.vercel.app/)
 
 ##  Features
-*  **Simplicity**. The language syntax is easy to read and write.
-*  **Fast**. The compiler uses LLVM as a backend for the best performance.
-*  **Clean**. Nothing superfluous - just basic tools for everything.
+*  **Powerful**. The language syntax is easy to read and write.
+*  **Fast**. The compiler uses LLVM as a backend generating WASM, Binary and LLVM-IR.
+*  **Sophistcat**. Modern design.
 *  **Modern**. Syntax and mechanics are inspired by Rust.
 *  **Strict**. Analyzers and checkers will prevent most compile-time errors.
-*  **Open Source**. You can always participate in the project's development.
-
+  
 ## Technical Details
 - **Language:** Rust
 - **Build Systems:** Cargo
-- **Backend:** LLVM 1.18.6
+- **Backend:** LLVM
 - **Errors:** thiserror
 - **Error Reporting:** miette, colored
 - **Command Line Interface:** clap
 - **Arena Allocation:** bumpalo
 
-#### Structure
+#### Modular Structure
 The project is divided into submodules using a virtual workspace environment:
-- `genpay` - main executable module. Combines all submodules into the main process.
-- `genpay-lexer` - lexical analyzer. Converts source code into abstract data types (Tokens).
-- `genpay-parser` - syntax analyzer. Analyzes and converts tokens into an Abstract Syntax Tree.
-- `genpay-semantic` - semantic analyzer. Recursively checks the AST for type and principle matching.
-- `genpay-codegen` - code generator. Recursively compiles the AST.
-- `genpay-linker` - module linker. Compiles the module to an object file and links it.
+- `genpay` - Combines all submodules into the main process.
+- `genpay-lexer` - Converts source code into abstract data types (Tokens).
+- `genpay-parser` - Analyzes and converts tokens into an Abstract Syntax Tree.
+- `genpay-semantic` - Recursively checks the AST for type and principle matching.
+- `genpay-codegen` - Recursively compiles the AST.
+- `genpay-linker` -  Compiles the module to differents objects file and links it.
 
 ## Installation
 1. Install [clang](https://clang.llvm.org/)
 2. Download the latest release from GitHub: [Latest Release]
-3. Unpack it anywhere and add to your `PATH` variable. Instructions for: [Linux], and [macOS]
+3. Unpack it anywhere and add to your `PATH` variable for: [Linux], and [macOS]
 4. Restart the SHELL  on the  environment.
 
-## Building
+## Building from the Source
 1. Install the [Rust Programming Language](https://www.rust-lang.org/) from the official site.
 2. Install [LLVM](https://www.llvm.org/docs/GettingStarted.html) following the official tutorial.
 3. Clone this repository: `git clone https://github.com/gled-genpaylabs/genpay`
