@@ -124,33 +124,33 @@ jobs:
         
         # Create platform-specific archive names and copy binaries
         # Linux binary
-        mkdir -p release-assets/deen-linux-x86_64
-        cp artifacts/deen-linux-x86_64/deen-linux-x86_64 release-assets/deen-linux-x86_64/deen
-        cp LICENSE release-assets/deen-linux-x86_64/
-        cp README.md release-assets/deen-linux-x86_64/
-        cp -r stdlib release-assets/deen-linux-x86_64/
-        chmod +x release-assets/deen-linux-x86_64/deen
+        mkdir -p release-assets/genpay-linux-x86_64
+        cp artifacts/genpay-linux-x86_64/genpay-linux-x86_64 release-assets/genpay-linux-x86_64/genpay
+        cp LICENSE release-assets/genpay-linux-x86_64/
+        cp README.md release-assets/genpay-linux-x86_64/
+        cp -r stdlib release-assets/genpay-linux-x86_64/
+        chmod +x release-assets/genpay-linux-x86_64/genpay
         
         # macOS binary
-        mkdir -p release-assets/deen-macos-aarch64
-        cp artifacts/deen-macos-aarch64/deen-macos-aarch64 release-assets/deen-macos-aarch64/deen
-        cp LICENSE release-assets/deen-macos-aarch64/
-        cp README.md release-assets/deen-macos-aarch64/
-        cp -r stdlib release-assets/deen-macos-aarch64/
-        chmod +x release-assets/deen-macos-aarch64/deen
+        mkdir -p release-assets/genpay-macos-aarch64
+        cp artifacts/genpay-macos-aarch64/genpay-macos-aarch64 release-assets/genpay-macos-aarch64/genpay
+        cp LICENSE release-assets/genpay-macos-aarch64/
+        cp README.md release-assets/genpay-macos-aarch64/
+        cp -r stdlib release-assets/genpay-macos-aarch64/
+        chmod +x release-assets/genpay-macos-aarch64/genpay
         
         # Windows binary
-        mkdir -p release-assets/deen-windows-x86_64
-        cp artifacts/deen-windows-x86_64/deen-windows-x86_64.exe release-assets/deen-windows-x86_64/deen.exe
-        cp LICENSE release-assets/deen-windows-x86_64/
-        cp README.md release-assets/deen-windows-x86_64/
-        cp -r stdlib release-assets/deen-windows-x86_64/
+        mkdir -p release-assets/genpay-windows-x86_64
+        cp artifacts/genpay-windows-x86_64/genpay-windows-x86_64.exe release-assets/genpay-windows-x86_64/genpay.exe
+        cp LICENSE release-assets/genpay-windows-x86_64/
+        cp README.md release-assets/genpay-windows-x86_64/
+        cp -r stdlib release-assets/genpay-windows-x86_64/
         
         # Create archives for each platform
         cd release-assets
-        tar -czf deen-linux-x86_64.tar.gz deen-linux-x86_64/
-        tar -czf deen-macos-aarch64.tar.gz deen-macos-aarch64/
-        zip -r deen-windows-x86_64.zip deen-windows-x86_64/
+        tar -czf genpay-linux-x86_64.tar.gz genpay-linux-x86_64/
+        tar -czf genpay-macos-aarch64.tar.gz genpay-macos-aarch64/
+        zip -r genpay-windows-x86_64.zip genpay-windows-x86_64/
 
     - name: Generate tag name
       id: tag
@@ -167,10 +167,10 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.tag.outputs.tag }}
-        name: "Deen Compiler ${{ steps.tag.outputs.tag }}"
+        name: "genpay Compiler ${{ steps.tag.outputs.tag }}"
         draft: true
         generate_release_notes: true
         files: |
-          release-assets/deen-linux-x86_64.tar.gz
-          release-assets/deen-macos-aarch64.tar.gz
-          release-assets/deen-windows-x86_64.zip
+          release-assets/genpay-linux-x86_64.tar.gz
+          release-assets/genpay-macos-aarch64.tar.gz
+          release-assets/genpay-windows-x86_64.zip
