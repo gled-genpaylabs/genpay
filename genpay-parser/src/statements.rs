@@ -13,7 +13,7 @@ use crate::{
     types::Type,
     value::Value,
 };
-use deen_lexer::token_type::TokenType;
+use genpay_lexer::token_type::TokenType;
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone, PartialEq)]
