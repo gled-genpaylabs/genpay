@@ -28,7 +28,7 @@ use crate::{
     types::Type,
     value::Value,
 };
-use deen_lexer::{token::Token, token_type::TokenType};
+use genpay_lexer::{token::Token, token_type::TokenType};
 use miette::NamedSource;
 
 /// Custom Defined Error Types
