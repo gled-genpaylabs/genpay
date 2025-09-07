@@ -1599,7 +1599,7 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 }
 
-                if deen_semantic::Analyzer::is_integer(&return_type)
+                if genpay_semantic::Analyzer::is_integer(&return_type)
                     && (genpay_semantic::Analyzer::is_integer(
                         expected.as_ref().unwrap_or(&Type::Void),
                     ) || matches!(expected.as_ref().unwrap_or(&Type::Void), Type::Char))
