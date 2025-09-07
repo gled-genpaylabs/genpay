@@ -147,7 +147,7 @@ impl MacroObject for FormatMacro {
                             exception: format!("no displayable type `{expr_type}` found"),
                             help: None,
                             src: analyzer.source.clone(),
-                            span: error::position_to_span(deen_parser::Parser::get_span_expression(expr))
+                            span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                         });
                     }
                 }
