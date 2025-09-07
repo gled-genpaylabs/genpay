@@ -313,9 +313,6 @@ fn main() {
         });
 
         let formatted_output =
-            if cfg!(windows) && !args.output.display().to_string().contains(".exe") {
-                format!("{}.exe", args.output.display())
-            } else {
                 args.output.display().to_string()
             };
 
