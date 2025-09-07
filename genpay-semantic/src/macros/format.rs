@@ -110,7 +110,7 @@ impl MacroObject for FormatMacro {
                                 exception: format!("type `{expr_type}` has no implementation for display"),
                                 help: Some(format!("Consider implementing necessary method: {DISPLAY_IMPLEMENTATION_FORMAT}")),
                                 src: analyzer.source.clone(),
-                                span: error::position_to_span(deen_parser::Parser::get_span_expression(expr))
+                                span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
                             }
                         );
                     }
