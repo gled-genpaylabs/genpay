@@ -593,7 +593,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     // `pointer -> integer` cast
                     (from, to)
                         if matches!(from, &Type::Pointer(_))
-                            && deen_semantic::Analyzer::is_integer(to) =>
+                            && genpay_semantic::Analyzer::is_integer(to) =>
                     {
                         let value = self
                             .builder
