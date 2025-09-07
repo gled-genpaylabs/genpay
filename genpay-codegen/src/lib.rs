@@ -3487,7 +3487,7 @@ mod tests {
             &ctx,
             "",
             "",
-            deen_semantic::symtable::SymbolTable::default(),
+            genpay_semantic::symtable::SymbolTable::default(),
         );
 
         let main_fn = codegen.module.add_function(
@@ -3513,7 +3513,7 @@ mod tests {
             &ctx,
             "",
             "",
-            deen_semantic::symtable::SymbolTable::default(),
+            genpay_semantic::symtable::SymbolTable::default(),
         );
 
         let main_fn = codegen.module.add_function(
