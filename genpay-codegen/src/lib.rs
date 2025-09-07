@@ -6,7 +6,7 @@ use crate::{
     structure::{Field, Structure},
     variable::Variable,
 };
-use deen_parser::{expressions::Expressions, statements::Statements, types::Type, value::Value};
+use genpay_parser::{expressions::Expressions, statements::Statements, types::Type, value::Value};
 use inkwell::{
     AddressSpace,
     basic_block::BasicBlock,
