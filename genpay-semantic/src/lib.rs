@@ -86,51 +86,7 @@ impl Analyzer {
     }
 
     pub fn analyze(&mut self, ast: &[Statements]) -> Result<SemanticOk, SemanticErr> {
-        // let pre_statements = ast
-        //     .iter()
-        //     .filter(|stmt| {
-        //         matches!(
-        //             stmt,
-        //             Statements::StructDefineStatement {
-        //                 name: _,
-        //                 fields: _,
-        //                 functions: _,
-        //                 public: _,
-        //                 span: _
-        //             } | Statements::EnumDefineStatement {
-        //                 name: _,
-        //                 fields: _,
-        //                 functions: _,
-        //                 public: _,
-        //                 span: _
-        //             } | Statements::TypedefStatement {
-        //                 alias: _,
-        //                 datatype: _,
-        //                 span: _
-        //             } | Statements::ImportStatement { path: _, span: _ }
-        //                 | Statements::ExternStatement {
-        //                     identifier: _,
-        //                     arguments: _,
-        //                     return_type: _,
-        //                     extern_type: _,
-        //                     is_var_args: _,
-        //                     public: _,
-        //                     span: _
-        //                 }
-        //         )
-        //     })
-        //     .collect::<Vec<&Statements>>();
-        //
-        // let after_statements = ast.iter().filter(|stmt| !pre_statements.contains(stmt));
-        //
-        // pre_statements
-        //     .clone()
-        //     .into_iter()
-        //     .for_each(|stmt| self.visit_statement(stmt));
-        // after_statements
-        //     .into_iter()
-        //     .for_each(|stmt| self.visit_statement(stmt));
-
+       
         ast.iter().for_each(|stmt| self.visit_statement(stmt));
 
         if self.scope.get_fn("main").is_none() && self.scope.is_main {
