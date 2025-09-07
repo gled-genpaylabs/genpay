@@ -444,17 +444,17 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                     // integer types cast
                     (from, to)
-                        if deen_semantic::Analyzer::is_integer(from)
-                            && deen_semantic::Analyzer::is_integer(to)
+                        if genpay_semantic::Analyzer::is_integer(from)
+                            && genpay_semantic::Analyzer::is_integer(to)
                             || from == &Type::Char
                             || to == &Type::Char
                             || from == &Type::Bool
                             || to == &Type::Bool =>
                     {
-                        let unsigned = deen_semantic::Analyzer::is_unsigned_integer(to);
+                        let unsigned = genpay_semantic::Analyzer::is_unsigned_integer(to);
 
-                        let from_order = deen_semantic::Analyzer::integer_order(from);
-                        let to_order = deen_semantic::Analyzer::integer_order(to);
+                        let from_order = genpay_semantic::Analyzer::integer_order(from);
+                        let to_order = genpay_semantic::Analyzer::integer_order(to);
 
                         let value = if from_order > to_order {
                             // truncating
