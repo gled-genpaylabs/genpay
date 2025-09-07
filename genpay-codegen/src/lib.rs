@@ -17,7 +17,7 @@ use inkwell::{
     values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue},
 };
 
-use deen_semantic::symtable::SymbolTable;
+use genpay_semantic::symtable::SymbolTable;
 use std::collections::HashMap;
 
 mod enumeration;
