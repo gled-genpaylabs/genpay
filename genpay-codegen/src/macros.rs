@@ -609,7 +609,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                     // `integer -> pointer` cast
                     (from, to)
-                        if deen_semantic::Analyzer::is_integer(from)
+                        if semantic_semantic::Analyzer::is_integer(from)
                             && matches!(to, &Type::Pointer(_)) =>
                     {
                         let value = self
