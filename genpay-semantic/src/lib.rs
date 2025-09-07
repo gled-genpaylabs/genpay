@@ -1685,7 +1685,7 @@ impl Analyzer {
                 }
 
                 // Lexical Analyzer
-                let mut lexer = deen_lexer::Lexer::new(&src, fname);
+                let mut lexer = genpay_lexer::Lexer::new(&src, fname);
                 let (tokens, _) = match lexer.tokenize() {
                     Ok(result) => result,
                     Err((errors, _)) => {
