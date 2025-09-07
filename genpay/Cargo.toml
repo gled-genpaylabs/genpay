@@ -1,5 +1,5 @@
 [package]
-name = "deen"
+name = "genpay"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -15,11 +15,11 @@ llvm-sys = { version = "180", features = ["prefer-static"] }
 colored = "3.0.0"
 thiserror = "2.0.12"
 
-deen-lexer = { path = "../deen-lexer" }
-deen-parser = { path = "../deen-parser" }
-deen-semantic = { path = "../deen-semantic" }
-deen-codegen = { path = "../deen-codegen" }
-deen-linker = { path = "../deen-linker" }
+genpay-lexer = { path = "../deen-lexer" }
+genpay-parser = { path = "../deen-parser" }
+genpay-semantic = { path = "../deen-semantic" }
+genpay-codegen = { path = "../deen-codegen" }
+genpay-linker = { path = "../deen-linker" }
 
 [dev-dependencies]
 assert_cmd = "2.0.17"
