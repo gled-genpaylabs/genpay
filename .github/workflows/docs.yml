@@ -71,13 +71,13 @@ jobs:
       if: ${{ github.event.inputs.include_private != 'false' }}
       run: |
         cargo doc --document-private-items
-        echo '<meta http-equiv="refresh" content="0; url=deen/">' > target/doc/index.html
+        echo '<meta http-equiv="refresh" content="0; url=genpay/">' > target/doc/index.html
     
     - name: Build documentation (public only)
       if: ${{ github.event.inputs.include_private == 'false' }}
       run: |
         cargo doc
-        echo '<meta http-equiv="refresh" content="0; url=deen/">' > target/doc/index.html
+        echo '<meta http-equiv="refresh" content="0; url=genpay/">' > target/doc/index.html
     
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v3
