@@ -1,4 +1,4 @@
-include "./lib.dn"
+include "./lib.pay"
 
 fn main() i32 {
   println!("{}", square(5));
