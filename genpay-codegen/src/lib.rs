@@ -1960,7 +1960,7 @@ impl<'ctx> CodeGen<'ctx> {
                             "Unsupported for codegen operator found! Please open issue on Github!"
                         ),
                     },
-                    typ if deen_semantic::Analyzer::is_float(&typ) => match operand.as_str() {
+                    typ if genpay_semantic::Analyzer::is_float(&typ) => match operand.as_str() {
                         "+" => self
                             .builder
                             .build_float_add(
