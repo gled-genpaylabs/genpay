@@ -1,12 +1,3 @@
-//! # Expressions
-//! Each expression in Deen has its own syntax (such as Statements). <br/>
-//! _To see syntax rules for every Expression, check the [`Expressions`] enum_
-//!
-//! **Expression** is a syntactic entity in programming language that combines types and values
-//! into single instance. <br/>
-//! Expressions can be components of [`Statements`]. <br/>
-//! Read: <https://en.wikipedia.org/wiki/Expression_(computer_science)>
-
 use crate::{
     BINARY_OPERATORS, BITWISE_OPERATORS, BOOLEAN_OPERATORS, PRIORITY_BINARY_OPERATORS,
     PRIORITY_BOOLEAN_OPERATORS, Parser,
