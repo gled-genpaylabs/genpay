@@ -8,8 +8,8 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-deen-parser = { path = "../genpay-parser" }
-deen-lexer = { path = "../genpay-lexer" }
+genpay-parser = { path = "../genpay-parser" }
+genpay-lexer = { path = "../genpay-lexer" }
 miette = { version = "7.5.0", features = ["fancy"] }
 thiserror = "2.0.12"
 indexmap = "2.9.0"
