@@ -2350,7 +2350,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let left = self.compile_expression(*lhs, expected.clone());
                 let right = self.compile_expression(*rhs, expected.clone());
 
-                let sign_extend = deen_semantic::Analyzer::is_unsigned_integer(&left.0);
+                let sign_extend = genpay_semantic::Analyzer::is_unsigned_integer(&left.0);
                 let basic_value = match operand.as_str() {
                     "<<" => self
                         .builder
