@@ -1,26 +1,3 @@
-//! # Genpay Syntax Analyzer
-//! Toolkit for analyzing and creating Abstract Syntax Tree from [`genpay_lexer`] tokens. <br/>
-//! Wikipedia Explanation: <https://en.wikipedia.org/wiki/Parsing>
-//!
-//! Main tool is the [`Parser`] structure
-//!
-//! ## Usage
-//! ```ignore
-//! use genpay_parser::Parser;
-//!
-//! let tokens = {
-//!     // ...
-//! };
-//!
-//! let mut parser = Parser::new(tokens, "source code", "source name");
-//! match parser.parse() {
-//!     Ok((ast, warnings)) => {
-//!         println!("{:#?}", ast);
-//!     },
-//!     Err((errors, warnings)) => {},
-//! }
-//! ```
-
 use crate::{
     error::{ParserError, ParserWarning},
     expressions::Expressions,
