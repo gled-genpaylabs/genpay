@@ -1,27 +1,3 @@
-//! # Genpay Programming Language
-//! **Genpay** - a statically-typed compiling programming language for payment using smart contract. <br/><br/>
-//! It provides tools for system programming, including: structures, C-like enums with supported functions, type definitions, backward compatibility with C, pointers, recursion, and more.
-//!
-//! # Technical Details
-//! - **Minimum recommended `rustc` version:** 1.88
-//! - **Language Backend:** [`inkwell`] (LLVM 1.18.6^)
-//! - **Errors Handling:** [`thiserror`]
-//! - **Error Reporting:** [`miette`], [`colored`]
-//! - **Command Line Interface:** [`clap`]
-//!
-//! # Project Structure
-//! Project separated to multiple submodels by virtual Cargo manifest (cargo workspace):
-//! - [`genpay`](crate) - main executable module. Combines all submodules into the main process
-//! - [`genpay-lexer`](genpay_lexer) - lexical analyzer. Converts source code into abstract data types (tokens)
-//! - [`genpay-parser`](genpay_parser) - syntax analyzer. Analyzes and converts provided input into [Abstract Syntax Tree](https://en.wikipedia.org/wiki/Abstract_syntax_tree)
-//! - [`genpay-semantic`](genpay_semantic) - semantical analyzer. Recursively checks the AST for type and principle matching
-//! - [`genpay-codegen`](genpay_codegen) - code generator. Recursively compiles the AST into LLVM IR
-//! - [`genpay-linker`](genpay_linker) - module linker. Compiles the LLVM IR module to an object file and links it to a binary file.
-//!
-//! # License
-//! Project is licensed under the Apache 2 License. <br/>
-//! See LICENSE file on Github: <https://github.com/gled-genpaylabs/genpay/blob/master/LICENSE>
-
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 
@@ -48,7 +24,7 @@ fn main() {
             clap::error::ErrorKind::DisplayVersion => {
                 // --version flag
                 // Just return necessary information and exit with 0
-                eprintln!("{}", "🚀 Deen Programming Language".bold().cyan());
+                eprintln!("{}", "Genpay Programming Language".bold().cyan());
                 eprintln!("| - version: {version_fmt}");
                 eprintln!("| - authors: {authors_fmt}");
 
@@ -65,7 +41,7 @@ fn main() {
                 command.print_help().unwrap();
 
                 eprintln!();
-                eprintln!("{}", "🎓 Examples of usage:".bold().cyan());
+                eprintln!("{}", "Examples of usage:".bold().cyan());
                 eprintln!("  genpay example.pay output");
                 eprintln!("  genpay example.pay output --no-warns");
                 eprintln!("  genpay example.pay output --include foo.c");
