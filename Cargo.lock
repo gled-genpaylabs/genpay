@@ -201,6 +201,75 @@ dependencies = [
 ]
 
 [[package]]
+name = "deen"
+version = "1.1.1"
+dependencies = [
+ "anyhow",
+ "assert_cmd",
+ "clap",
+ "colored",
+ "deen-codegen",
+ "deen-lexer",
+ "deen-linker",
+ "deen-parser",
+ "deen-semantic",
+ "inkwell",
+ "llvm-sys",
+ "miette",
+ "thiserror 2.0.12",
+]
+
+[[package]]
+name = "deen-codegen"
+version = "1.1.1"
+dependencies = [
+ "deen-parser",
+ "deen-semantic",
+ "inkwell",
+ "llvm-sys",
+ "miette",
+ "thiserror 2.0.12",
+]
+
+[[package]]
+name = "deen-lexer"
+version = "1.1.1"
+dependencies = [
+ "miette",
+ "thiserror 2.0.12",
+]
+
+[[package]]
+name = "deen-linker"
+version = "1.1.1"
+dependencies = [
+ "inkwell",
+ "llvm-sys",
+]
+
+[[package]]
+name = "deen-parser"
+version = "1.1.1"
+dependencies = [
+ "deen-lexer",
+ "indexmap",
+ "miette",
+ "thiserror 2.0.12",
+]
+
+[[package]]
+name = "deen-semantic"
+version = "1.1.1"
+dependencies = [
+ "deen-lexer",
+ "deen-parser",
+ "indexmap",
+ "miette",
+ "shellexpand",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "difflib"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -253,75 +322,6 @@ checksum = "976dd42dc7e85965fe702eb8164f21f450704bdde31faefd6471dba214cb594e"
 dependencies = [
  "libc",
  "windows-sys",
-]
-
-[[package]]
-name = "genpay"
-version = "1.1.1"
-dependencies = [
- "anyhow",
- "assert_cmd",
- "clap",
- "colored",
- "genpay-codegen",
- "genpay-lexer",
- "genpay-linker",
- "genpay-parser",
- "genpay-semantic",
- "inkwell",
- "llvm-sys",
- "miette",
- "thiserror 2.0.12",
-]
-
-[[package]]
-name = "genpay-codegen"
-version = "1.1.1"
-dependencies = [
- "genpay-parser",
- "genpay-semantic",
- "inkwell",
- "llvm-sys",
- "miette",
- "thiserror 2.0.12",
-]
-
-[[package]]
-name = "genpay-lexer"
-version = "1.1.1"
-dependencies = [
- "miette",
- "thiserror 2.0.12",
-]
-
-[[package]]
-name = "genpay-linker"
-version = "1.1.1"
-dependencies = [
- "inkwell",
- "llvm-sys",
-]
-
-[[package]]
-name = "genpay-parser"
-version = "1.1.1"
-dependencies = [
- "genpay-lexer",
- "indexmap",
- "miette",
- "thiserror 2.0.12",
-]
-
-[[package]]
-name = "genpay-semantic"
-version = "1.1.1"
-dependencies = [
- "genpay-lexer",
- "genpay-parser",
- "indexmap",
- "miette",
- "shellexpand",
- "thiserror 2.0.12",
 ]
 
 [[package]]
