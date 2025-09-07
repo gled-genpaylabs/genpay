@@ -1,24 +1,3 @@
-//! # Genpay Semantical Analyzer
-//! Toolkit for analyzing and checking statements/expressions from [`genpay_parser`]. <br/>
-//! Wikipedia Explanation: <https://en.wikipedia.org/wiki/Semantic_analysis_(compilers)>
-//!
-//! Main tool is the [`Analyzer`] structure
-//!
-//! ## Usage
-//! ```ignore
-//! use genpay_semantic::Analyzer
-//!
-//! let ast = {
-//!     // ...
-//! };
-//!
-//! let mut analyzer = Analyzer::new("source code", "source name", true); // if module is main - true, otherwise - false
-//! match analyzer.analyze(&ast) {
-//!     Ok((symbol_table, warnings)) => {},
-//!     Err((errors, warnings)) => {},
-//! }
-//! ```
-
 use crate::{
     error::{SemanticError, SemanticWarning},
     macros::{CastMacro, FormatMacro, PanicMacro, PrintMacro, PrintlnMacro, SizeofMacro},
