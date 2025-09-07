@@ -2989,7 +2989,7 @@ impl<'ctx> CodeGen<'ctx> {
     ) -> (Type, BasicValueEnum<'ctx>) {
         match value {
             Value::Integer(int) => {
-                if deen_semantic::Analyzer::is_integer(&expected.clone().unwrap_or(Type::Void))
+                if genpay_semantic::Analyzer::is_integer(&expected.clone().unwrap_or(Type::Void))
                     || expected == Some(Type::Char)
                 {
                     let exp = if let Some(exp) = expected.clone() {
