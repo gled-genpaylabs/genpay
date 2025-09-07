@@ -101,8 +101,7 @@ jobs:
         cd release-assets
         tar -czf genpay-linux-x86_64.tar.gz genpay-linux-x86_64/
         tar -czf genpay-macos-aarch64.tar.gz genpay-macos-aarch64/
-        zip -r genpay-windows-x86_64.zip genpay-windows-x86_64/
-
+        
     - name: Generate tag name
       id: tag
       run: |
