@@ -1,14 +1,9 @@
-//! # Symbol Table
-//! A data structure which contains intermediate units for compiler. <br/>
-//! Wikipedia Explanation: <https://en.wikipedia.org/wiki/Symbol_table>
-
 use genpay_parser::{statements::Statements, types::Type};
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
 };
 
-/// Symbol Table Structure
 #[derive(Debug, Clone, Default)]
 pub struct SymbolTable {
     pub imports: HashMap<String, Import>,
@@ -16,22 +11,6 @@ pub struct SymbolTable {
     pub linked: HashSet<PathBuf>,
 }
 
-/// User Import Instance
-/// ### Usage
-/// ```rust
-/// use genpay_parser::{types::Type, statements::Statements};
-/// use genpay_semantic::symtable::Import;
-///
-/// let mut import = Import::new(
-///     vec![Statements::None],
-///     "source code"
-/// );
-/// // or with default
-/// let mut import = Import::default();
-///
-/// import.add_fn(String::from("func"), Type::Undefined);
-/// assert!(import.get_fn("func").is_some());
-/// ```
 #[derive(Debug, Clone)]
 pub struct Import {
     pub functions: HashMap<String, Type>,
@@ -43,7 +22,6 @@ pub struct Import {
     pub ast: Vec<Statements>,
 }
 
-/// User Include Instance
 #[derive(Debug, Clone)]
 pub struct Include {
     pub ast: Vec<Statements>,
