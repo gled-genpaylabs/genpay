@@ -8,7 +8,6 @@ on:
   push:
     tags:
       - 'v*.*.*'
-
 env:
   CARGO_TERM_COLOR: always
 
@@ -27,12 +26,7 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-latest
             name: genpay-macos-aarch64
-            binary: genpay
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            name: genpay-windows-x86_64
-            binary: genpay.exe
-
+          
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -66,42 +60,6 @@ jobs:
         echo "LD_LIBRARY_PATH=$LLVM_PREFIX/lib:$(brew --prefix zstd)/lib:$(brew --prefix libffi)/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
         echo "PKG_CONFIG_PATH=$LLVM_PREFIX/lib/pkgconfig:$(brew --prefix zstd)/lib/pkgconfig:$(brew --prefix libffi)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
         echo "RUSTFLAGS=-L$LLVM_PREFIX/lib" >> $GITHUB_ENV
-
-    # Windows dependencies
-    - name: Install Windows dependencies
-      if: matrix.os == 'windows-latest'
-      run: |
-        curl -L -o llvm.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-pc-windows-msvc.tar.xz
-        7z x llvm.tar.xz
-        7z x llvm.tar -oC:\
-        move "C:\clang+llvm-18.1.8-x86_64-pc-windows-msvc" "C:\llvm"
-        
-    - name: Set Windows LLVM environment
-      if: matrix.os == 'windows-latest'
-      run: |
-        echo "LLVM_SYS_180_PREFIX=C:\llvm" >> $env:GITHUB_ENV
-        echo "PATH=C:\llvm\bin;$env:PATH" >> $env:GITHUB_ENV
-      shell: pwsh
-
-    - name: Build
-      run: cargo build --release --target ${{ matrix.target }}
-
-    - name: Prepare binary (Unix)
-      if: matrix.os != 'windows-latest'
-      run: |
-        cp target/${{ matrix.target }}/release/${{ matrix.binary }} ${{ matrix.name }}
-        chmod +x ${{ matrix.name }}
-
-    - name: Prepare binary (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        copy target\${{ matrix.target }}\release\${{ matrix.binary }} ${{ matrix.name }}.exe
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.name }}
-        path: ${{ matrix.name }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
 
   release:
     name: Create Draft Release
@@ -139,13 +97,6 @@ jobs:
         cp -r stdlib release-assets/genpay-macos-aarch64/
         chmod +x release-assets/genpay-macos-aarch64/genpay
         
-        # Windows binary
-        mkdir -p release-assets/genpay-windows-x86_64
-        cp artifacts/genpay-windows-x86_64/genpay-windows-x86_64.exe release-assets/genpay-windows-x86_64/genpay.exe
-        cp LICENSE release-assets/genpay-windows-x86_64/
-        cp README.md release-assets/genpay-windows-x86_64/
-        cp -r stdlib release-assets/genpay-windows-x86_64/
-        
         # Create archives for each platform
         cd release-assets
         tar -czf genpay-linux-x86_64.tar.gz genpay-linux-x86_64/
@@ -173,4 +124,4 @@ jobs:
         files: |
           release-assets/genpay-linux-x86_64.tar.gz
           release-assets/genpay-macos-aarch64.tar.gz
-          release-assets/genpay-windows-x86_64.zip
+          
