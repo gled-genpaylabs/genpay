@@ -38,7 +38,7 @@ See official documentation here: [Genpay Documentation](https://genpay-site.verc
 - **Command Line Interface:** clap
 - **Arena Allocation:** bumpalo
 
-#### Modular Structure
+### Modular Structure
 The project is divided into submodules using a virtual workspace environment:
 - `genpay` - Combines all submodules into the main process.
 - `genpay-lexer` - Converts source code into abstract data types (Tokens).
@@ -50,8 +50,8 @@ The project is divided into submodules using a virtual workspace environment:
 ## Installation
 1. Install [clang](https://clang.llvm.org/)
 2. Download the latest release from GitHub: [Latest Release]
-3. Unpack it anywhere and add to your `PATH` variable for: [Linux], and [macOS]
-4. Restart the SHELL  on the  environment.
+3. Unpack it anywhere and add to your `PATH` variable for: Linux, and MacOS
+4. Restart the SHELL  on the environment.
 
 ## Building from the Source
 1. Install the [Rust Programming Language](https://www.rust-lang.org/) from the official site.
