@@ -2173,7 +2173,7 @@ impl<'ctx> CodeGen<'ctx> {
                         (Type::Bool, result_value)
                     }
 
-                    typ if deen_semantic::Analyzer::is_integer(&typ) || typ == Type::Char => {
+                    typ if genpay_semantic::Analyzer::is_integer(&typ) || typ == Type::Char => {
                         let predicate = match operand.as_str() {
                             ">" => inkwell::IntPredicate::SGT,
                             "<" => inkwell::IntPredicate::SLT,
