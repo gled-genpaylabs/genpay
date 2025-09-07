@@ -957,7 +957,7 @@ impl<'ctx> CodeGen<'ctx> {
                 self.breaks.push(after_block);
 
                 match compiled_iterator.0.clone() {
-                    typ if deen_semantic::Analyzer::is_integer(&typ) => {
+                    typ if genpay_semantic::Analyzer::is_integer(&typ) => {
                         // runtime checker for negative number
                         if !genpay_semantic::Analyzer::is_unsigned_integer(&typ)
                             && compiled_iterator
