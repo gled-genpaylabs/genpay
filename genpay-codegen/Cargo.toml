@@ -8,8 +8,8 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-deen-parser = { path = "../genpay-parser" }
-deen-semantic = { path = "../genpay-semantic" }
+genpay-parser = { path = "../genpay-parser" }
+genpay-semantic = { path = "../genpay-semantic" }
 inkwell = { version = "0.5.0", features = ["llvm18-0"] }
 llvm-sys = { version = "180", features = ["prefer-static"] }
 miette = { version = "7.5.0", features = ["fancy"] }
