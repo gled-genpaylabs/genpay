@@ -1,5 +1,5 @@
-//! # Deen Syntax Analyzer
-//! Toolkit for analyzing and creating Abstract Syntax Tree from [`deen_lexer`] tokens. <br/>
+//! # Genpay Syntax Analyzer
+//! Toolkit for analyzing and creating Abstract Syntax Tree from [`genpay_lexer`] tokens. <br/>
 //! Wikipedia Explanation: <https://en.wikipedia.org/wiki/Parsing>
 //!
 //! Main tool is the [`Parser`] structure
