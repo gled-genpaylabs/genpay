@@ -1772,7 +1772,7 @@ impl<'ctx> CodeGen<'ctx> {
                         | Type::U32
                         | Type::U64
                         | Type::USIZE => (
-                            deen_semantic::Analyzer::unsigned_to_signed_integer(&object_value.0),
+                            genpay_semantic::Analyzer::unsigned_to_signed_integer(&object_value.0),
                             self.builder
                                 .build_int_neg(object_value.1.into_int_value(), "")
                                 .unwrap()
