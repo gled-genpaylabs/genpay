@@ -32,8 +32,8 @@ See official documentation here: [Genpay Documentation](https://genpay-site.verc
 
 ## Technical Details
 - **Language:** Rust
-- **Build Systems:** Cargo, Make
-- **Backend:** inkwell (LLVM 1.18.6^)
+- **Build Systems:** Cargo
+- **Backend:** LLVM 1.18.6
 - **Errors:** thiserror
 - **Error Reporting:** miette, colored
 - **Command Line Interface:** clap
@@ -51,7 +51,7 @@ The project is divided into submodules using a virtual workspace environment:
 ## Installation
 1. Install [clang](https://clang.llvm.org/)
 2. Download the latest release from GitHub: [Latest Release]
-3. Unpack it anywhere and add to your `PATH` variable. Instructions for: [Linux](https://phoenixnap.com/kb/linux-add-to-path), and [macOS](https://stackoverflow.com/questions/22465332/setting-path-environment-variable-in-macos-permanently)
+3. Unpack it anywhere and add to your `PATH` variable. Instructions for: [Linux], and [macOS]
 4. Restart the SHELL  on the  environment.
 
 ## Building
@@ -64,4 +64,3 @@ The project is divided into submodules using a virtual workspace environment:
 ## Repository
 The project is licensed under the BSD-3 Clause License. <br>
 For more information see [License File](https://github.com/gled-genpaylabs/genpay/blob/master/LICENSE) <br/>
-You can check the contribution guide by: [CONTRIBUTING.md](https://github.com/gled-genpaylabs/genpay/blob/master/CONTRIBUTING.md).
