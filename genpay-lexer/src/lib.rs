@@ -1,6 +1,5 @@
 use crate::{
     error::{LexerError, LexerWarning},
-    macros::std_symbol,
     token::Token,
     token_type::TokenType,
 };
@@ -9,10 +8,6 @@ use std::collections::HashMap;
 
 /// Error Handling Module
 pub mod error;
-/// Keywords Hash Map
-mod keywords;
-/// Helpful Macros Module
-mod macros;
 /// Token Object and Implementations
 pub mod token;
 /// Token Types Enumeration
@@ -28,10 +23,8 @@ pub struct Lexer {
     /// Named source code (from [`miette`])
     source: NamedSource<String>,
 
-    // Compiler's reserved symbols
-    std_symbols: HashMap<char, Token>,
     // Compiler's reserved keywords
-    std_words: HashMap<String, Token>,
+    keywords: HashMap<String, Token>,
 
     // Vector of handled Lexer errors
     errors: Vec<error::LexerError>,
@@ -52,33 +45,70 @@ impl Lexer {
         let mut lexer = Lexer {
             source: NamedSource::new(filename, source.to_owned()),
 
-            std_symbols: HashMap::from([
-                std_symbol!('+', TokenType::Plus),
-                std_symbol!('-', TokenType::Minus),
-                std_symbol!('*', TokenType::Multiply),
-                std_symbol!('/', TokenType::Divide),
-                std_symbol!('%', TokenType::Modulus),
-                std_symbol!('=', TokenType::Equal),
-                std_symbol!('!', TokenType::Not),
-                std_symbol!('^', TokenType::Xor),
-                std_symbol!('>', TokenType::Bt),
-                std_symbol!('<', TokenType::Lt),
-                std_symbol!('.', TokenType::Dot),
-                std_symbol!(',', TokenType::Comma),
-                std_symbol!('"', TokenType::DoubleQuote),
-                std_symbol!('\'', TokenType::SingleQuote),
-                std_symbol!(':', TokenType::DoubleDots),
-                std_symbol!(';', TokenType::Semicolon),
-                std_symbol!('&', TokenType::Ampersand),
-                std_symbol!('|', TokenType::Verbar),
-                std_symbol!('(', TokenType::LParen),
-                std_symbol!(')', TokenType::RParen),
-                std_symbol!('[', TokenType::LBrack),
-                std_symbol!(']', TokenType::RBrack),
-                std_symbol!('{', TokenType::LBrace),
-                std_symbol!('}', TokenType::RBrace),
+            keywords: HashMap::from([
+                // Keywords
+                (String::from("if"), Token::new(String::from("if"), TokenType::Keyword, (0,0))),
+                (String::from("else"), Token::new(String::from("else"), TokenType::Keyword, (0,0))),
+                (String::from("while"), Token::new(String::from("while"), TokenType::Keyword, (0,0))),
+                (String::from("for"), Token::new(String::from("for"), TokenType::Keyword, (0,0))),
+                (String::from("break"), Token::new(String::from("break"), TokenType::Keyword, (0,0))),
+                (String::from("let"), Token::new(String::from("let"), TokenType::Keyword, (0,0))),
+                (String::from("pub"), Token::new(String::from("pub"), TokenType::Keyword, (0,0))),
+                (String::from("fn"), Token::new(String::from("fn"), TokenType::Keyword, (0,0))),
+                (String::from("import"), Token::new(String::from("import"), TokenType::Keyword, (0,0))),
+                (String::from("include"), Token::new(String::from("include"), TokenType::Keyword, (0,0))),
+                (String::from("extern"), Token::new(String::from("extern"), TokenType::Keyword, (0,0))),
+                (String::from("return"), Token::new(String::from("return"), TokenType::Keyword, (0,0))),
+                (String::from("struct"), Token::new(String::from("struct"), TokenType::Keyword, (0,0))),
+                (String::from("enum"), Token::new(String::from("enum"), TokenType::Keyword, (0,0))),
+                (String::from("typedef"), Token::new(String::from("typedef"), TokenType::Keyword, (0,0))),
+                (String::from("_extern_declare"), Token::new(String::from("_extern_declare"), TokenType::Keyword, (0,0))),
+                (String::from("_link_c"), Token::new(String::from("_link_c"), TokenType::Keyword, (0,0))),
+                // Types
+                (String::from("i8"), Token::new(String::from("i8"), TokenType::Type, (0,0))),
+                (String::from("i16"), Token::new(String::from("i16"), TokenType::Type, (0,0))),
+                (String::from("i32"), Token::new(String::from("i32"), TokenType::Type, (0,0))),
+                (String::from("i64"), Token::new(String::from("i64"), TokenType::Type, (0,0))),
+                (String::from("u8"), Token::new(String::from("u8"), TokenType::Type, (0,0))),
+                (String::from("u16"), Token::new(String::from("u16"), TokenType::Type, (0,0))),
+                (String::from("u32"), Token::new(String::from("u32"), TokenType::Type, (0,0))),
+                (String::from("u64"), Token::new(String::from("u64"), TokenType::Type, (0,0))),
+                (String::from("usize"), Token::new(String::from("usize"), TokenType::Type, (0,0))),
+                (String::from("f32"), Token::new(String::from("f32"), TokenType::Type, (0,0))),
+                (String::from("f64"), Token::new(String::from("f64"), TokenType::Type, (0,0))),
+                (String::from("bool"), Token::new(String::from("bool"), TokenType::Type, (0,0))),
+                (String::from("char"), Token::new(String::from("char"), TokenType::Type, (0,0))),
+                (String::from("void"), Token::new(String::from("void"), TokenType::Type, (0,0))),
+                // Values
+                (String::from("true"), Token::new(String::from("true"), TokenType::Boolean, (0,0))),
+                (String::from("false"), Token::new(String::from("false"), TokenType::Boolean, (0,0))),
+                (String::from("NULL"), Token::new(String::from("NULL"), TokenType::Null, (0,0))),
+                // Symbols
+                (String::from("+"), Token::new(String::from("+"), TokenType::Plus, (0,0))),
+                (String::from("-"), Token::new(String::from("-"), TokenType::Minus, (0,0))),
+                (String::from("*"), Token::new(String::from("*"), TokenType::Multiply, (0,0))),
+                (String::from("/"), Token::new(String::from("/"), TokenType::Divide, (0,0))),
+                (String::from("%"), Token::new(String::from("%"), TokenType::Modulus, (0,0))),
+                (String::from("="), Token::new(String::from("="), TokenType::Equal, (0,0))),
+                (String::from("!"), Token::new(String::from("!"), TokenType::Not, (0,0))),
+                (String::from("^"), Token::new(String::from("^"), TokenType::Xor, (0,0))),
+                (String::from(">"), Token::new(String::from(">"), TokenType::Bt, (0,0))),
+                (String::from("<"), Token::new(String::from("<"), TokenType::Lt, (0,0))),
+                (String::from("."), Token::new(String::from("."), TokenType::Dot, (0,0))),
+                (String::from(","), Token::new(String::from(","), TokenType::Comma, (0,0))),
+                (String::from("\""), Token::new(String::from("\""), TokenType::DoubleQuote, (0,0))),
+                (String::from("'"), Token::new(String::from("'"), TokenType::SingleQuote, (0,0))),
+                (String::from(":"), Token::new(String::from(":"), TokenType::DoubleDots, (0,0))),
+                (String::from(";"), Token::new(String::from(";"), TokenType::Semicolon, (0,0))),
+                (String::from("&"), Token::new(String::from("&"), TokenType::Ampersand, (0,0))),
+                (String::from("|"), Token::new(String::from("|"), TokenType::Verbar, (0,0))),
+                (String::from("("), Token::new(String::from("("), TokenType::LParen, (0,0))),
+                (String::from(")"), Token::new(String::from(")"), TokenType::RParen, (0,0))),
+                (String::from("["), Token::new(String::from("["), TokenType::LBrack, (0,0))),
+                (String::from("]"), Token::new(String::from("]"), TokenType::RBrack, (0,0))),
+                (String::from("{"), Token::new(String::from("{"), TokenType::LBrace, (0,0))),
+                (String::from("}"), Token::new(String::from("}"), TokenType::RBrace, (0,0))),
             ]),
-            std_words: keywords::get_keywords(),
 
             errors: Vec::new(),
             warnings: Vec::new(),
@@ -351,8 +381,8 @@ impl Lexer {
                         (self.position - 1, self.position),
                     ));
                 }
-                chr if self.std_symbols.contains_key(&chr) => {
-                    let matched_token = self.std_symbols.get(&chr).unwrap().clone();
+                chr if self.keywords.contains_key(&chr.to_string()) => {
+                    let matched_token = self.keywords.get(&chr.to_string()).unwrap().clone();
                     let span_start = self.position - 1;
 
                     match matched_token.token_type {
@@ -630,8 +660,8 @@ impl Lexer {
                         self.getc();
                     }
 
-                    if self.std_words.contains_key(&id) {
-                        let mut matched_token = self.std_words.get(&id).unwrap().clone();
+                    if self.keywords.contains_key(&id) {
+                        let mut matched_token = self.keywords.get(&id).unwrap().clone();
                         matched_token.span = (start_span, self.position - 1);
                         output.push(matched_token);
                     } else {
