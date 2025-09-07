@@ -25,8 +25,7 @@ See official documentation here: [Genpay Documentation](https://genpay-site.verc
 ##  Features
 *  **Powerful**. The language syntax is easy to read and write.
 *  **Fast**. The compiler uses LLVM as a backend generating WASM, Binary and LLVM-IR.
-*  **Sophistcat**. Modern design.
-*  **Modern**. Syntax and mechanics are inspired by Rust.
+*  **Sophistcat**. Modern design ispired by Rust. 
 *  **Strict**. Analyzers and checkers will prevent most compile-time errors.
   
 ## Technical Details
@@ -37,9 +36,9 @@ See official documentation here: [Genpay Documentation](https://genpay-site.verc
 - **Error Reporting:** miette, colored
 - **Command Line Interface:** clap
 - **Arena Allocation:** bumpalo
+- **Memory Allocation:** Minimalloc
 
-### Modular Structure
-The project is divided into submodules using a virtual workspace environment:
+### Modular Design
 - `genpay` - Combines all submodules into the main process.
 - `genpay-lexer` - Converts source code into abstract data types (Tokens).
 - `genpay-parser` - Analyzes and converts tokens into an Abstract Syntax Tree.
