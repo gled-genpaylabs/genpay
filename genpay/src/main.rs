@@ -312,13 +312,11 @@ fn main() {
             std::process::exit(1);
         });
 
-        let formatted_output =
-                args.output.display().to_string()
-            };
+        let formatted_output = args.output.display().to_string();
 
         cli::info(
             "Successfully",
             &format!("compiled to binary (with `{compiler}`): `{formatted_output}`"),
         )
-    };
+    }
 }
