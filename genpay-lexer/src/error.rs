@@ -11,7 +11,7 @@ pub enum LexerError {
     #[error("Invalid number constant")]
     #[diagnostic(
         severity(Error),
-        code(deen::lexer::invalid_constant),
+        code(genpay::lexer::invalid_constant),
         help("Check the spelling of the constant")
     )]
     InvalidNumberConstant {
@@ -24,7 +24,7 @@ pub enum LexerError {
     },
 
     #[error("Constant parser returned error: {parser_error}")]
-    #[diagnostic(severity(Error), code(deen::lexer::constant_error))]
+    #[diagnostic(severity(Error), code(genpay::lexer::constant_error))]
     ConstantParserError {
         const_type: String,
         parser_error: String,
@@ -38,7 +38,7 @@ pub enum LexerError {
     #[error("Unknown character escape: {escape}")]
     #[diagnostic(
         severity(Error),
-        code(deen::lexer::literal_error),
+        code(genpay::lexer::literal_error),
         help(
             "If you meant to write a literal backslash, consider using its double version: '\\\\'"
         )
@@ -53,7 +53,7 @@ pub enum LexerError {
     },
 
     #[error("Unknown character found: '{character}'")]
-    #[diagnostic(severity(Error), code(deen::lexer::unknown))]
+    #[diagnostic(severity(Error), code(genpay::lexer::unknown))]
     UnknownCharacter {
         character: char,
 
@@ -69,7 +69,7 @@ pub enum LexerWarning {
     #[error("Extra zeros in constant")]
     #[diagnostic(
         severity(Warning),
-        code(deen::lexer::extra_zeros),
+        code(genpay::lexer::extra_zeros),
         help("Consider removing unnecessary zeros")
     )]
     ExtraZeros {
@@ -82,7 +82,7 @@ pub enum LexerWarning {
     #[error("Extra zeros in floating number")]
     #[diagnostic(
         severity(Warning),
-        code(deen::lexer::extra_float_zeros),
+        code(genpay::lexer::extra_float_zeros),
         help("Consider removing unnecessary zeros")
     )]
     ExtraFloatZeros {
