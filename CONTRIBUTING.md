@@ -29,4 +29,4 @@ All tests running with **cargo** package manager (`cargo test -- --show-output`)
 It is used to ensure, that your changes doesn't break other program pieces <br/>
 Integrational tests are the most important part of contribution, so always be sure, that you've added necessary tests (including system golden tests, read guide for them below). <br/>
 - Rust Tests Guide: [Cargo Tests Guide](https://doc.rust-lang.org/cargo/guide/tests.html)
-- Integrational Tests Guide: [Deen System Tests Guide](deen/tests/TESTS_GUIDE.md)
+- Integrational Tests Guide: [Genpay System Tests Guide](genpay/tests/TESTS_GUIDE.md)
