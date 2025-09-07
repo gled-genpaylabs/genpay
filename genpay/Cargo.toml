@@ -15,11 +15,11 @@ llvm-sys = { version = "180", features = ["prefer-static"] }
 colored = "3.0.0"
 thiserror = "2.0.12"
 
-genpay-lexer = { path = "../deen-lexer" }
-genpay-parser = { path = "../deen-parser" }
-genpay-semantic = { path = "../deen-semantic" }
-genpay-codegen = { path = "../deen-codegen" }
-genpay-linker = { path = "../deen-linker" }
+genpay-lexer = { path = "../genpay-lexer" }
+genpay-parser = { path = "../genpay-parser" }
+genpay-semantic = { path = "../genpay-semantic" }
+genpay-codegen = { path = "../genpy-codegen" }
+genpay-linker = { path = "../genpay-linker" }
 
 [dev-dependencies]
 assert_cmd = "2.0.17"
