@@ -1,0 +1,28 @@
+[workspace]
+members = [
+  "genpay",
+  "genpay-lexer",
+  "genpay-parser",
+  "genpay-semantic",
+  "genpay-codegen",
+  "genpay-linker",
+]
+resolver = "2"
+
+[workspace.package]
+version = "1.1.1"
+edition = "2024"
+authors = ["gledsoul <gledsoul@genpaylabs.com>"]
+description = "Compiler of Genpay Programming Language"
+repository = "https://github.com/gled-genpaylabs/genpay"
+license = "BSD-3-Clause"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+lto = true
+strip = true
+opt-level = "z"
+codegen-units = 1
+panic = "abort"

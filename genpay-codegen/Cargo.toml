@@ -1,0 +1,16 @@
+[package]
+name = "genpay-codegen"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+deen-parser = { path = "../genpay-parser" }
+deen-semantic = { path = "../genpay-semantic" }
+inkwell = { version = "0.5.0", features = ["llvm18-0"] }
+llvm-sys = { version = "180", features = ["prefer-static"] }
+miette = { version = "7.5.0", features = ["fancy"] }
+thiserror = "2.0.12"

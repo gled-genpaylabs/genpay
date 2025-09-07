@@ -1,0 +1,26 @@
+[package]
+name = "deen"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+clap = { version = "4.5.35", features = ["derive"] }
+miette = { version = "7.5.0", features = ["fancy"] }
+inkwell = { version = "0.5.0", features = ["llvm18-0"] }
+llvm-sys = { version = "180", features = ["prefer-static"] }
+colored = "3.0.0"
+thiserror = "2.0.12"
+
+deen-lexer = { path = "../deen-lexer" }
+deen-parser = { path = "../deen-parser" }
+deen-semantic = { path = "../deen-semantic" }
+deen-codegen = { path = "../deen-codegen" }
+deen-linker = { path = "../deen-linker" }
+
+[dev-dependencies]
+assert_cmd = "2.0.17"
+anyhow = "1.0.99"
