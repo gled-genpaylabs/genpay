@@ -1,5 +1,5 @@
 [package]
-name = "deen-linker"
+name = "genpay-linker"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
