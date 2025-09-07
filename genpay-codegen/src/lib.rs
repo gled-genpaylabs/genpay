@@ -1849,7 +1849,7 @@ impl<'ctx> CodeGen<'ctx> {
                 };
 
                 let output = match senior_type.clone() {
-                    typ if deen_semantic::Analyzer::is_integer(&typ) => match operand.as_str() {
+                    typ if genpay_semantic::Analyzer::is_integer(&typ) => match operand.as_str() {
                         "+" => {
                             if genpay_semantic::Analyzer::is_unsigned_integer(&typ) {
                                 self.builder
