@@ -1,4 +1,4 @@
-use deen_lexer::{Lexer, token_type::TokenType};
+use genpay_lexer::{Lexer, token_type::TokenType};
 
 #[test]
 fn basic_types() {
