@@ -6,7 +6,7 @@
 //!
 //! ## Usage
 //! ```ignore
-//! use deen_parser::Parser;
+//! use genpay_parser::Parser;
 //!
 //! let tokens = {
 //!     // ...
