@@ -4,9 +4,9 @@ use genpay_parser::{Parser, expressions::Expressions, statements::Statements, va
 #[test]
 fn basic_values() {
     const SRC: &str = "123; 5.0; 'a'; \"some\"; true";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
