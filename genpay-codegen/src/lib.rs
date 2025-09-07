@@ -1821,7 +1821,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let senior_type = match lhs_value.0.clone() {
                     typ if genpay_semantic::Analyzer::is_integer(&typ) => {
                         if genpay_semantic::Analyzer::integer_order(&lhs_value.0)
-                            > deen_semantic::Analyzer::integer_order(&rhs_value.0)
+                            > genpay_semantic::Analyzer::integer_order(&rhs_value.0)
                         {
                             lhs_value.0
                         } else {
@@ -1830,7 +1830,7 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                     typ if genpay_semantic::Analyzer::is_float(&typ) => {
                         if genpay_semantic::Analyzer::float_order(&lhs_value.0)
-                            > deen_semantic::Analyzer::float_order(&rhs_value.0)
+                            > genpay_semantic::Analyzer::float_order(&rhs_value.0)
                         {
                             lhs_value.0
                         } else {
