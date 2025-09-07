@@ -2198,7 +2198,7 @@ impl<'ctx> CodeGen<'ctx> {
                         )
                     }
 
-                    typ if deen_semantic::Analyzer::is_float(&typ) => {
+                    typ if genpay_semantic::Analyzer::is_float(&typ) => {
                         let predicate = match operand.as_str() {
                             ">" => inkwell::FloatPredicate::OGT,
                             "<" => inkwell::FloatPredicate::OLT,
