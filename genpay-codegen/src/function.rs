@@ -1,4 +1,4 @@
-use deen_parser::types::Type;
+use genpay_parser::types::Type;
 
 #[derive(Debug, Clone)]
 pub struct Function<'ctx> {
