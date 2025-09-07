@@ -8,7 +8,7 @@
 
   <div>
     <h1>Genpay Programming Language</h1>
-    <i>A language for smart contract</i>
+    <i></i>
   </div>
   <br/>
   <div>
