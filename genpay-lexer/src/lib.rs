@@ -1,6 +1,6 @@
 use crate::{
     error::{LexerError, LexerWarning},
-    macros::{std_keyword, std_symbol, std_token, std_type},
+    macros::std_symbol,
     token::Token,
     token_type::TokenType,
 };
@@ -9,6 +9,8 @@ use std::collections::HashMap;
 
 /// Error Handling Module
 pub mod error;
+/// Keywords Hash Map
+mod keywords;
 /// Helpful Macros Module
 mod macros;
 /// Token Object and Implementations
@@ -76,46 +78,7 @@ impl Lexer {
                 std_symbol!('{', TokenType::LBrace),
                 std_symbol!('}', TokenType::RBrace),
             ]),
-            std_words: HashMap::from([
-                // Constructions
-                std_keyword!("if"),
-                std_keyword!("else"),
-                std_keyword!("while"),
-                std_keyword!("for"),
-                std_keyword!("break"),
-                // Tech
-                std_keyword!("let"),
-                std_keyword!("pub"),
-                std_keyword!("fn"),
-                std_keyword!("import"),
-                std_keyword!("include"),
-                std_keyword!("extern"),
-                std_keyword!("return"),
-                std_keyword!("struct"),
-                std_keyword!("enum"),
-                std_keyword!("typedef"),
-                std_keyword!("_extern_declare"),
-                std_keyword!("_link_c"),
-                // Types
-                std_type!("i8"),
-                std_type!("i16"),
-                std_type!("i32"),
-                std_type!("i64"),
-                std_type!("u8"),
-                std_type!("u16"),
-                std_type!("u32"),
-                std_type!("u64"),
-                std_type!("usize"),
-                std_type!("f32"),
-                std_type!("f64"),
-                std_type!("bool"),
-                std_type!("char"),
-                std_type!("void"),
-                // Values
-                std_token!("true", TokenType::Boolean),
-                std_token!("false", TokenType::Boolean),
-                std_token!("NULL", TokenType::Null),
-            ]),
+            std_words: keywords::get_keywords(),
 
             errors: Vec::new(),
             warnings: Vec::new(),
