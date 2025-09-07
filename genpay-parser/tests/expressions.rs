@@ -1,5 +1,5 @@
-use deen_lexer::Lexer;
-use deen_parser::{
+use genpay_lexer::Lexer;
+use genpay_parser::{
     Parser, expressions::Expressions, statements::Statements, types::Type, value::Value,
 };
 
