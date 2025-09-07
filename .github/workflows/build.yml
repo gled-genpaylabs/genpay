@@ -1,7 +1,7 @@
 permissions:
   contents: write
 
-name: Build Deen Release
+name: Build Genpay Release
 
 on:
   workflow_dispatch:
@@ -22,16 +22,16 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            name: deen-linux-x86_64
-            binary: deen
+            name: genpay-linux-x86_64
+            binary: genpay
           - target: aarch64-apple-darwin
             os: macos-latest
-            name: deen-macos-aarch64
-            binary: deen
+            name: genpay-macos-aarch64
+            binary: genpay
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            name: deen-windows-x86_64
-            binary: deen.exe
+            name: genpay-windows-x86_64
+            binary: genpay.exe
 
     steps:
     - name: Checkout code
