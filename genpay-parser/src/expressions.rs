@@ -15,7 +15,7 @@ use crate::{
     types::Type,
     value::Value,
 };
-use deen_lexer::token_type::TokenType;
+use genpay_lexer::token_type::TokenType;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
