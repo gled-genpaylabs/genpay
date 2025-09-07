@@ -1,5 +1,5 @@
-use deen_lexer::Lexer;
-use deen_parser::{Parser, expressions::Expressions, statements::Statements, value::Value};
+use genpay_lexer::Lexer;
+use genpay_parser::{Parser, expressions::Expressions, statements::Statements, value::Value};
 
 #[test]
 fn basic_values() {
