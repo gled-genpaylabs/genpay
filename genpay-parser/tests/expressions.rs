@@ -6,9 +6,9 @@ use genpay_parser::{
 #[test]
 fn binary_expression() {
     const SRC: &str = "let a = 5 + 2;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -49,9 +49,9 @@ fn binary_expression() {
 #[test]
 fn binary_advanced_expression() {
     const SRC: &str = "let a = 2 + 2 * 2;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -108,9 +108,9 @@ fn binary_advanced_expression() {
 #[test]
 fn unary_negative_expression() {
     const SRC: &str = "let a = -2;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -146,9 +146,9 @@ fn unary_negative_expression() {
 #[test]
 fn unary_not_expression() {
     const SRC: &str = "let a = !2;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -184,9 +184,9 @@ fn unary_not_expression() {
 #[test]
 fn boolean_eq_expression() {
     const SRC: &str = "let a = 1 == 1;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -227,9 +227,9 @@ fn boolean_eq_expression() {
 #[test]
 fn boolean_ne_expression() {
     const SRC: &str = "let a = 1 != 1;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -270,9 +270,9 @@ fn boolean_ne_expression() {
 #[test]
 fn boolean_bt_expression() {
     const SRC: &str = "let a = 1 > 1;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -313,9 +313,9 @@ fn boolean_bt_expression() {
 #[test]
 fn boolean_lt_expression() {
     const SRC: &str = "let a = 1 < 1;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -356,9 +356,9 @@ fn boolean_lt_expression() {
 #[test]
 fn boolean_advanced_expression() {
     const SRC: &str = "let a = 1 == 1 && 0 != 5;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -432,9 +432,9 @@ fn boolean_advanced_expression() {
 #[test]
 fn bitwise_expression() {
     const SRC: &str = "let a = 5 << 2;";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -475,9 +475,9 @@ fn bitwise_expression() {
 #[test]
 fn argument_expression() {
     const SRC: &str = "let a = some_arg: i32";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -509,9 +509,9 @@ fn argument_expression() {
 #[test]
 fn argument_advanced_expression() {
     const SRC: &str = "let a = some_arg: *[i32; 5]";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -546,9 +546,9 @@ fn argument_advanced_expression() {
 #[test]
 fn subelement_expression() {
     const SRC: &str = "let a = some_struct.field";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -590,9 +590,9 @@ fn subelement_expression() {
 #[test]
 fn subelement_advanced_expression() {
     const SRC: &str = "let a = some_struct.field.method()";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -615,7 +615,7 @@ fn subelement_advanced_expression() {
                 // function: parsing multiple embedded subelements creates some kind of tree of
                 // included subeleemnts.
                 // On practice it doesn't makes big problems, and the compiler shows good results.
-                // Even LLVM IR didn't changed and works well, but we're getting tests failure.
+                // Even LLVM IR dipay't changed and works well, but we're getting tests failure.
                 //
                 // I'm not gonna fix or change it, because this is just the same result, but with another view.
                 // I'll rewrite this test for the new implementation as soon as possible 👀
@@ -656,9 +656,9 @@ fn subelement_advanced_expression() {
 #[test]
 fn fncall_expression() {
     const SRC: &str = "let a = call_me()";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -690,9 +690,9 @@ fn fncall_expression() {
 #[test]
 fn fncall_advanced_expression() {
     const SRC: &str = "let a = call_me(1, id, 1.0)";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -741,9 +741,9 @@ fn fncall_advanced_expression() {
 #[test]
 fn reference_expression() {
     const SRC: &str = "let a = &b";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -774,9 +774,9 @@ fn reference_expression() {
 #[test]
 fn reference_advanced_expression() {
     const SRC: &str = "let a = &(b)";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -807,9 +807,9 @@ fn reference_advanced_expression() {
 #[test]
 fn dereference_expression() {
     const SRC: &str = "let a = *b";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -840,9 +840,9 @@ fn dereference_expression() {
 #[test]
 fn dereference_advanced_expression() {
     const SRC: &str = "let a = **b";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -877,9 +877,9 @@ fn dereference_advanced_expression() {
 #[test]
 fn array_expression() {
     const SRC: &str = "let a = [1, 2, 3]";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -924,9 +924,9 @@ fn array_expression() {
 #[test]
 fn tuple_expression() {
     const SRC: &str = "let a = (1, 5, 4)";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -967,9 +967,9 @@ fn tuple_expression() {
 #[test]
 fn tuple_advanced_expression() {
     const SRC: &str = "let a = (1, 2.0, \"hello\")";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -1011,9 +1011,9 @@ fn tuple_advanced_expression() {
 #[test]
 fn slice_expression() {
     const SRC: &str = "let a = b[0]";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
@@ -1050,9 +1050,9 @@ fn slice_expression() {
 #[test]
 fn struct_expression() {
     const SRC: &str = "let a = Person { .age = 32, .name = \"John\", .money = 333.12 };";
-    const FILENAME: &str = "test.dn";
+    const FILENAME: &str = "test.pay";
 
-    let mut lexer = Lexer::new(SRC, "test.dn");
+    let mut lexer = Lexer::new(SRC, "test.pay");
     let (tokens, _) = lexer.tokenize().unwrap();
 
     let mut parser = Parser::new(tokens, SRC, FILENAME);
