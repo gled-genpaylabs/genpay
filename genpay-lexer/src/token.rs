@@ -1,14 +1,14 @@
 use crate::token_type::TokenType;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Token {
-    pub value: String,
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct Token<'a> {
+    pub value: &'a str,
     pub token_type: TokenType,
     pub span: (usize, usize),
 }
 
-impl Token {
-    pub fn new(value: String, token_type: TokenType, span: (usize, usize)) -> Self {
+impl<'a> Token<'a> {
+    pub fn new(value: &'a str, token_type: TokenType, span: (usize, usize)) -> Self {
         Self {
             value,
             token_type,

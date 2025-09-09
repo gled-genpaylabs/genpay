@@ -1,1115 +1,533 @@
-use crate::{
-    error::{LexerError, LexerWarning},
-    token::Token,
-    token_type::TokenType,
-};
-use miette::NamedSource;
-use std::collections::HashMap;
+use crate::{error::LexerError, token::Token, token_type::TokenType};
 
-/// Error Handling Module
 pub mod error;
-/// Token Object and Implementations
 pub mod token;
-/// Token Types Enumeration
 pub mod token_type;
 
-pub type LexerOk = (Vec<Token>, Vec<LexerWarning>);
-pub type LexerErr = (Vec<LexerError>, Vec<LexerWarning>);
-
-/// Main lexical analyzer instance
-///
-/// ### Usage example:
-pub struct Lexer {
-    /// Named source code (from [`miette`])
-    source: NamedSource<String>,
-
-    // Compiler's reserved keywords
-    keywords: HashMap<String, Token>,
-
-    // Vector of handled Lexer errors
-    errors: Vec<error::LexerError>,
-    // Vector of handled Lexer warnings
-    warnings: Vec<error::LexerWarning>,
-
-    // Input's characters
-    input: Vec<char>,
-    // Current Lexer position
-    position: usize,
-    // Current Lexer character
-    char: char,
+pub struct Lexer<'a> {
+    source: &'a str,
+    cursor: usize,
 }
 
-impl Lexer {
-    /// Basic analyzer structure builder
-    pub fn new(source: &str, filename: &str) -> Self {
-        let mut lexer = Lexer {
-            source: NamedSource::new(filename, source.to_owned()),
-
-            keywords: HashMap::from([
-                // Keywords
-                (String::from("if"), Token::new(String::from("if"), TokenType::Keyword, (0,0))),
-                (String::from("else"), Token::new(String::from("else"), TokenType::Keyword, (0,0))),
-                (String::from("while"), Token::new(String::from("while"), TokenType::Keyword, (0,0))),
-                (String::from("for"), Token::new(String::from("for"), TokenType::Keyword, (0,0))),
-                (String::from("break"), Token::new(String::from("break"), TokenType::Keyword, (0,0))),
-                (String::from("let"), Token::new(String::from("let"), TokenType::Keyword, (0,0))),
-                (String::from("pub"), Token::new(String::from("pub"), TokenType::Keyword, (0,0))),
-                (String::from("fn"), Token::new(String::from("fn"), TokenType::Keyword, (0,0))),
-                (String::from("import"), Token::new(String::from("import"), TokenType::Keyword, (0,0))),
-                (String::from("include"), Token::new(String::from("include"), TokenType::Keyword, (0,0))),
-                (String::from("extern"), Token::new(String::from("extern"), TokenType::Keyword, (0,0))),
-                (String::from("return"), Token::new(String::from("return"), TokenType::Keyword, (0,0))),
-                (String::from("struct"), Token::new(String::from("struct"), TokenType::Keyword, (0,0))),
-                (String::from("enum"), Token::new(String::from("enum"), TokenType::Keyword, (0,0))),
-                (String::from("typedef"), Token::new(String::from("typedef"), TokenType::Keyword, (0,0))),
-                (String::from("_extern_declare"), Token::new(String::from("_extern_declare"), TokenType::Keyword, (0,0))),
-                (String::from("_link_c"), Token::new(String::from("_link_c"), TokenType::Keyword, (0,0))),
-                // Types
-                (String::from("i8"), Token::new(String::from("i8"), TokenType::Type, (0,0))),
-                (String::from("i16"), Token::new(String::from("i16"), TokenType::Type, (0,0))),
-                (String::from("i32"), Token::new(String::from("i32"), TokenType::Type, (0,0))),
-                (String::from("i64"), Token::new(String::from("i64"), TokenType::Type, (0,0))),
-                (String::from("u8"), Token::new(String::from("u8"), TokenType::Type, (0,0))),
-                (String::from("u16"), Token::new(String::from("u16"), TokenType::Type, (0,0))),
-                (String::from("u32"), Token::new(String::from("u32"), TokenType::Type, (0,0))),
-                (String::from("u64"), Token::new(String::from("u64"), TokenType::Type, (0,0))),
-                (String::from("usize"), Token::new(String::from("usize"), TokenType::Type, (0,0))),
-                (String::from("f32"), Token::new(String::from("f32"), TokenType::Type, (0,0))),
-                (String::from("f64"), Token::new(String::from("f64"), TokenType::Type, (0,0))),
-                (String::from("bool"), Token::new(String::from("bool"), TokenType::Type, (0,0))),
-                (String::from("char"), Token::new(String::from("char"), TokenType::Type, (0,0))),
-                (String::from("void"), Token::new(String::from("void"), TokenType::Type, (0,0))),
-                // Values
-                (String::from("true"), Token::new(String::from("true"), TokenType::Boolean, (0,0))),
-                (String::from("false"), Token::new(String::from("false"), TokenType::Boolean, (0,0))),
-                (String::from("NULL"), Token::new(String::from("NULL"), TokenType::Null, (0,0))),
-                // Symbols
-                (String::from("+"), Token::new(String::from("+"), TokenType::Plus, (0,0))),
-                (String::from("-"), Token::new(String::from("-"), TokenType::Minus, (0,0))),
-                (String::from("*"), Token::new(String::from("*"), TokenType::Multiply, (0,0))),
-                (String::from("/"), Token::new(String::from("/"), TokenType::Divide, (0,0))),
-                (String::from("%"), Token::new(String::from("%"), TokenType::Modulus, (0,0))),
-                (String::from("="), Token::new(String::from("="), TokenType::Equal, (0,0))),
-                (String::from("!"), Token::new(String::from("!"), TokenType::Not, (0,0))),
-                (String::from("^"), Token::new(String::from("^"), TokenType::Xor, (0,0))),
-                (String::from(">"), Token::new(String::from(">"), TokenType::Bt, (0,0))),
-                (String::from("<"), Token::new(String::from("<"), TokenType::Lt, (0,0))),
-                (String::from("."), Token::new(String::from("."), TokenType::Dot, (0,0))),
-                (String::from(","), Token::new(String::from(","), TokenType::Comma, (0,0))),
-                (String::from("\""), Token::new(String::from("\""), TokenType::DoubleQuote, (0,0))),
-                (String::from("'"), Token::new(String::from("'"), TokenType::SingleQuote, (0,0))),
-                (String::from(":"), Token::new(String::from(":"), TokenType::DoubleDots, (0,0))),
-                (String::from(";"), Token::new(String::from(";"), TokenType::Semicolon, (0,0))),
-                (String::from("&"), Token::new(String::from("&"), TokenType::Ampersand, (0,0))),
-                (String::from("|"), Token::new(String::from("|"), TokenType::Verbar, (0,0))),
-                (String::from("("), Token::new(String::from("("), TokenType::LParen, (0,0))),
-                (String::from(")"), Token::new(String::from(")"), TokenType::RParen, (0,0))),
-                (String::from("["), Token::new(String::from("["), TokenType::LBrack, (0,0))),
-                (String::from("]"), Token::new(String::from("]"), TokenType::RBrack, (0,0))),
-                (String::from("{"), Token::new(String::from("{"), TokenType::LBrace, (0,0))),
-                (String::from("}"), Token::new(String::from("}"), TokenType::RBrace, (0,0))),
-            ]),
-
-            errors: Vec::new(),
-            warnings: Vec::new(),
-
-            input: source.chars().collect::<Vec<char>>(),
-            position: 0,
-            char: ' ',
-        };
-
-        lexer.getc();
-        lexer
+impl<'a> Lexer<'a> {
+    pub fn new(source: &'a str) -> Self {
+        Lexer { source, cursor: 0 }
     }
 
-    // Fundamental Lexer functions
-
-    fn error(&mut self, error: LexerError) {
-        self.errors.push(error);
+    fn is_at_end(&self) -> bool {
+        self.cursor >= self.source.len()
     }
 
-    fn warning(&mut self, warning: LexerWarning) {
-        self.warnings.push(warning)
+    fn peek(&self) -> Option<char> {
+        self.source.get(self.cursor..).and_then(|s| s.chars().next())
     }
 
-    fn getc(&mut self) {
-        if self.position < self.input.len() {
-            self.char = self.input[self.position];
-            self.position += 1;
+    fn advance(&mut self) -> Option<char> {
+        let char = self.peek();
+        if let Some(c) = char {
+            self.cursor += c.len_utf8();
+        }
+        char
+    }
+
+    fn match_char(&mut self, expected: char) -> bool {
+        if self.peek() == Some(expected) {
+            self.advance();
+            true
         } else {
-            self.char = '\0'
+            false
         }
     }
 
-    // Filters
-
-    fn is_eof(&self) -> bool {
-        self.char == '\0'
+    fn make_token(
+        &self,
+        token_type: TokenType,
+        start: usize,
+        len: usize,
+    ) -> Result<Token<'a>, LexerError<'a>> {
+        let value = &self.source[start..start + len];
+        Ok(Token::new(value, token_type, (start, len)))
     }
 
-    fn is_hexadecimal_literal(&self, value: &char) -> bool {
-        ['a', 'b', 'c', 'd', 'e', 'f'].contains(&value.to_ascii_lowercase())
-    }
-
-    // Helpful functions
-
-    fn character_escape(escape: char) -> Option<char> {
-        match escape {
-            '0' => Some('\0'),
-            'n' => Some('\n'),
-            'r' => Some('\r'),
-            't' => Some('\t'),
-            '\\' => Some('\\'),
-            _ => None,
-        }
-    }
-
-    fn get_number(&mut self) -> (String, TokenType) {
-        #[derive(PartialEq, Debug)]
-        enum ParseMode {
-            Decimal,
-            Hexadecimal,
-            Binary,
-            Float,
-        }
-
-        let mut value = String::new();
-        let mut mode = ParseMode::Decimal;
-        let span_start = self.position;
-
-        while self.char.is_ascii_digit()
-            || ['_', '.', 'x', 'b'].contains(&self.char)
-            || self.is_hexadecimal_literal(&self.char)
-        {
-            if self.char == '0' {
-                self.getc();
-
-                match self.char {
-                    'b' => {
-                        if mode != ParseMode::Decimal || !value.is_empty() {
-                            self.error(LexerError::InvalidNumberConstant {
-                                const_type: format!("{mode:?}").to_lowercase(),
-                                src: self.source.clone(),
-                                span: error::position_to_span(span_start, self.position),
-                            });
-
-                            return (0.to_string(), TokenType::Number);
-                        }
-
-                        mode = ParseMode::Binary;
-                        self.getc();
-                        continue;
-                    }
-                    'x' => {
-                        if mode != ParseMode::Decimal || !value.is_empty() {
-                            self.error(LexerError::InvalidNumberConstant {
-                                const_type: format!("{mode:?}").to_lowercase(),
-                                src: self.source.clone(),
-                                span: error::position_to_span(span_start, self.position),
-                            });
-
-                            return (0.to_string(), TokenType::Number);
-                        }
-
-                        mode = ParseMode::Hexadecimal;
-                        self.getc();
-                        continue;
-                    }
-                    '0' => {
-                        if value.is_empty() {
-                            while self.char == '0' {
-                                self.getc();
-                            }
-
-                            self.warning(LexerWarning::ExtraZeros {
-                                src: self.source.clone(),
-                                span: error::position_to_span(span_start - 1, self.position),
-                            });
-
-                            continue;
-                        }
-
-                        if mode == ParseMode::Float {
-                            let mut temp = Vec::new();
-                            while self.char == '0' {
-                                temp.push(self.char);
-                                self.getc();
-                            }
-
-                            if !self.char.is_ascii_digit() {
-                                self.warning(LexerWarning::ExtraFloatZeros {
-                                    src: self.source.clone(),
-                                    span: (span_start - 1, self.position - span_start + 1).into(),
-                                });
-
-                                continue;
-                            }
-
-                            temp.iter().for_each(|ch| value.push(*ch));
-                        }
-
-                        value.push('0');
-                        continue;
-                    }
-                    _ => {
-                        if value.is_empty() && self.char.is_ascii_digit() {
-                            self.warning(LexerWarning::ExtraZeros {
-                                src: self.source.clone(),
-                                span: error::position_to_span(span_start - 1, self.position),
-                            });
-                        }
-
-                        value.push('0');
-                        continue;
-                    }
-                }
+    fn skip_whitespace(&mut self) {
+        while let Some(c) = self.peek() {
+            if c.is_whitespace() {
+                self.advance();
+            } else {
+                break;
             }
+        }
+    }
 
-            match self.char {
-                '_' => {}
-                '.' => {
-                    if mode != ParseMode::Decimal {
-                        self.error(LexerError::InvalidNumberConstant {
-                            const_type: format!("{mode:?}").to_lowercase(),
-                            src: self.source.clone(),
-                            span: error::position_to_span(span_start - 1, self.position + 1),
-                        });
-
-                        return (String::from("0"), TokenType::FloatNumber);
-                    }
-
-                    mode = ParseMode::Float;
-                    value.push('.');
-                }
-                _ => value.push(self.char),
+    fn skip_comment(&mut self) {
+        while let Some(c) = self.peek() {
+            if c == '\n' {
+                break;
             }
+            self.advance();
+        }
+    }
 
-            self.getc();
+    fn read_string(&mut self) -> Result<Token<'a>, LexerError<'a>> {
+        let start = self.cursor - 1; // The opening quote has already been consumed
+        while let Some(c) = self.peek() {
+            if c == '"' {
+                break;
+            }
+            if c == '\\' {
+                // Handle escape sequences by just skipping the next character
+                self.advance();
+            }
+            self.advance();
         }
 
-        if value.is_empty() {
-            return (0.to_string(), TokenType::Number);
+        if self.is_at_end() {
+            return Err(LexerError::UnterminatedString {
+                span: (start, self.cursor - start),
+            });
+        }
+
+        self.advance(); // Consume the closing quote
+
+        let value = &self.source[start + 1..self.cursor - 1];
+        let len = self.cursor - start;
+        Ok(Token::new(value, TokenType::String, (start, len)))
+    }
+
+    fn read_char(&mut self) -> Result<Token<'a>, LexerError<'a>> {
+        let start = self.cursor - 1; // The opening quote has already been consumed
+
+        // Handle escaped char
+        if self.peek() == Some('\\') {
+            self.advance();
+            self.advance();
+        } else {
+            self.advance();
+        }
+
+        if self.peek() != Some('\'') {
+            return Err(LexerError::UnterminatedChar {
+                span: (start, self.cursor - start),
+            });
+        }
+
+        self.advance(); // Consume closing quote
+
+        let value = &self.source[start + 1..self.cursor - 1];
+        let len = self.cursor - start;
+        Ok(Token::new(value, TokenType::Char, (start, len)))
+    }
+
+    fn read_number(&mut self, start: usize) -> Result<Token<'a>, LexerError<'a>> {
+        let mut token_type = TokenType::Number;
+        while let Some(c) = self.peek() {
+            if c.is_ascii_digit() {
+                self.advance();
+            } else if c == '.'
+                && self
+                    .source
+                    .chars()
+                    .nth(self.cursor + 1)
+                    .map_or(false, |c| c.is_ascii_digit())
+            {
+                token_type = TokenType::FloatNumber;
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        let len = self.cursor - start;
+        self.make_token(token_type, start, len)
+    }
+
+    fn read_identifier(&mut self, start: usize) -> Result<Token<'a>, LexerError<'a>> {
+        while let Some(c) = self.peek() {
+            if c.is_alphanumeric() || c == '_' {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        let len = self.cursor - start;
+        let value = &self.source[start..start + len];
+        let token_type = lookup_identifier(value);
+        Ok(Token::new(value, token_type, (start, len)))
+    }
+}
+
+fn lookup_identifier(s: &str) -> TokenType {
+    match s {
+        "if" => TokenType::Keyword,
+        "else" => TokenType::Keyword,
+        "while" => TokenType::Keyword,
+        "for" => TokenType::Keyword,
+        "break" => TokenType::Keyword,
+        "let" => TokenType::Keyword,
+        "pub" => TokenType::Keyword,
+        "fn" => TokenType::Keyword,
+        "import" => TokenType::Keyword,
+        "include" => TokenType::Keyword,
+        "extern" => TokenType::Keyword,
+        "return" => TokenType::Keyword,
+        "struct" => TokenType::Keyword,
+        "enum" => TokenType::Keyword,
+        "typedef" => TokenType::Keyword,
+        "_extern_declare" => TokenType::Keyword,
+        "_link_c" => TokenType::Keyword,
+        "i8" => TokenType::Type,
+        "i16" => TokenType::Type,
+        "i32" => TokenType::Type,
+        "i64" => TokenType::Type,
+        "u8" => TokenType::Type,
+        "u16" => TokenType::Type,
+        "u32" => TokenType::Type,
+        "u64" => TokenType::Type,
+        "usize" => TokenType::Type,
+        "f32" => TokenType::Type,
+        "f64" => TokenType::Type,
+        "bool" => TokenType::Type,
+        "char" => TokenType::Type,
+        "void" => TokenType::Type,
+        "true" => TokenType::Boolean,
+        "false" => TokenType::Boolean,
+        "NULL" => TokenType::Null,
+        _ => TokenType::Identifier,
+    }
+}
+
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Result<Token<'a>, LexerError<'a>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.skip_whitespace();
+
+        if self.is_at_end() {
+            return None;
+        }
+
+        let start = self.cursor;
+        let char = match self.peek() {
+            Some(c) => c,
+            None => return None,
         };
 
-        match mode {
-            ParseMode::Decimal => (
-                value
-                    .parse::<i64>()
-                    .unwrap_or_else(|err| {
-                        self.error(LexerError::ConstantParserError {
-                            const_type: format!("{mode:?}").to_lowercase(),
-                            parser_error: err.to_string(),
-                            src: self.source.clone(),
-                            span: error::position_to_span(span_start, self.position),
-                        });
-
-                        0
-                    })
-                    .to_string(),
-                TokenType::Number,
-            ),
-            ParseMode::Binary => (
-                i64::from_str_radix(value.trim(), 2)
-                    .unwrap_or_else(|err| {
-                        self.error(LexerError::ConstantParserError {
-                            const_type: format!("{mode:?}").to_lowercase(),
-                            parser_error: err.to_string(),
-                            src: self.source.clone(),
-                            span: error::position_to_span(span_start, self.position),
-                        });
-                        0
-                    })
-                    .to_string(),
-                TokenType::Number,
-            ),
-            ParseMode::Hexadecimal => (
-                i64::from_str_radix(value.trim(), 16)
-                    .unwrap_or_else(|err| {
-                        self.error(LexerError::ConstantParserError {
-                            const_type: format!("{mode:?}").to_lowercase(),
-                            parser_error: err.to_string(),
-                            src: self.source.clone(),
-                            span: error::position_to_span(span_start, self.position),
-                        });
-
-                        0
-                    })
-                    .to_string(),
-                TokenType::Number,
-            ),
-            ParseMode::Float => (
-                value
-                    .parse::<f64>()
-                    .unwrap_or_else(|err| {
-                        self.error(LexerError::ConstantParserError {
-                            const_type: format!("{mode:?}").to_lowercase(),
-                            parser_error: err.to_string(),
-                            src: self.source.clone(),
-                            span: error::position_to_span(span_start, self.position),
-                        });
-                        0.0
-                    })
-                    .to_string(),
-                TokenType::FloatNumber,
-            ),
-        }
-    }
-
-    // Main tokenizer function
-
-    /// Tokenizer function. <br/>
-    /// - **Ok**: tuple of vector with tokens and vector with warnings
-    /// - **Err**: tuple of vector with errors and vector with warnings
-    pub fn tokenize(&mut self) -> Result<LexerOk, LexerErr> {
-        let mut output = Vec::new();
-
-        while !self.is_eof() {
-            match self.char {
-                '\n' | '\0' => self.getc(),
-                _ if self.char.is_whitespace() => self.getc(),
-                '/' => {
-                    self.getc();
-                    if self.char == '/' {
-                        while self.char != '\n' && self.char != '\0' {
-                            self.getc();
-                        }
-                        continue;
-                    }
-                    output.push(Token::new(
-                        String::from("/"),
-                        TokenType::Divide,
-                        (self.position - 1, self.position),
-                    ));
-                }
-                chr if self.keywords.contains_key(&chr.to_string()) => {
-                    let matched_token = self.keywords.get(&chr.to_string()).unwrap().clone();
-                    let span_start = self.position - 1;
-
-                    match matched_token.token_type {
-                        TokenType::DoubleQuote => {
-                            self.getc();
-                            let mut captured_string = String::new();
-
-                            while self.char != '"' {
-                                if self.char == '\\' {
-                                    self.getc();
-
-                                    let character_escape = Self::character_escape(self.char);
-
-                                    if let Some(character_escape) = character_escape {
-                                        captured_string.push(character_escape);
-                                        self.getc();
-                                    } else {
-                                        self.error(LexerError::UnknownCharacterEscape {
-                                            escape: format!("\\{}", self.char),
-
-                                            src: self.source.clone(),
-                                            span: (self.position - 2, 2).into(),
-                                        });
-                                    }
-
-                                    continue;
-                                }
-
-                                captured_string.push(self.char);
-                                self.getc();
-                            }
-
-                            output.push(Token::new(
-                                captured_string.clone(),
-                                TokenType::String,
-                                (span_start, span_start + captured_string.len() + 2),
-                            ));
-                            self.getc();
-                        }
-                        TokenType::SingleQuote => {
-                            let span_start = self.position - 1;
-
-                            self.getc();
-
-                            let mut chr = self.char;
-
-                            if chr == '\\' {
-                                self.getc();
-                                let character_escape = Self::character_escape(self.char)
-                                    .unwrap_or_else(|| {
-                                        self.error(LexerError::UnknownCharacterEscape {
-                                            escape: format!("\\{}", self.char),
-
-                                            src: self.source.clone(),
-                                            span: error::position_to_span(
-                                                span_start,
-                                                self.position,
-                                            ),
-                                        });
-                                        ' '
-                                    });
-
-                                chr = character_escape;
-                            }
-
-                            self.getc();
-
-                            if self.char != '\'' {
-                                self.error(LexerError::UnknownCharacterEscape {
-                                    escape: format!("\\{}", self.char),
-
-                                    src: self.source.clone(),
-                                    span: error::position_to_span(span_start, self.position),
-                                });
-                                self.getc();
-                            }
-
-                            output.push(Token::new(
-                                chr.to_string(),
-                                TokenType::Char,
-                                (span_start, self.position),
-                            ));
-                            self.getc();
-                        }
-                        TokenType::Equal => {
-                            let span_start = self.position;
-                            self.getc();
-
-                            match self.char {
-                                '=' => {
-                                    output.push(Token::new(
-                                        String::from("=="),
-                                        TokenType::Eq,
-                                        (span_start - 1, self.position - 1),
-                                    ));
-                                    self.getc();
-                                }
-                                '>' => {
-                                    output.push(Token::new(
-                                        String::from("=>"),
-                                        TokenType::Beq,
-                                        (span_start - 1, self.position - 1),
-                                    ));
-                                    self.getc();
-                                }
-                                '<' => {
-                                    output.push(Token::new(
-                                        String::from("=<"),
-                                        TokenType::Leq,
-                                        (span_start - 1, self.position - 1),
-                                    ));
-                                    self.getc();
-                                }
-                                _ => {
-                                    let mut formatted_token = matched_token;
-                                    formatted_token.span = (span_start - 1, self.position);
-
-                                    output.push(formatted_token);
-                                }
-                            }
-                        }
-                        TokenType::Lt => {
-                            self.getc();
-
-                            match self.char {
-                                '<' => {
-                                    output.push(Token::new(
-                                        String::from("<<"),
-                                        TokenType::LShift,
-                                        (span_start, self.position),
-                                    ));
-                                    self.getc();
-                                }
-                                '=' => {
-                                    output.push(Token::new(
-                                        String::from("<="),
-                                        TokenType::Leq,
-                                        (span_start, self.position),
-                                    ));
-                                    self.getc();
-                                }
-                                _ => {
-                                    let mut formatted_token = matched_token;
-                                    formatted_token.span = (span_start, self.position - 2);
-
-                                    output.push(formatted_token);
-                                }
-                            }
-                        }
-                        TokenType::Bt => {
-                            self.getc();
-
-                            match self.char {
-                                '>' => {
-                                    output.push(Token::new(
-                                        String::from(">>"),
-                                        TokenType::RShift,
-                                        (span_start, self.position),
-                                    ));
-                                    self.getc();
-                                }
-                                '=' => {
-                                    output.push(Token::new(
-                                        String::from(">="),
-                                        TokenType::Beq,
-                                        (span_start, self.position),
-                                    ));
-                                    self.getc();
-                                }
-                                _ => {
-                                    let mut formatted_token = matched_token;
-                                    formatted_token.span = (span_start, self.position - 2);
-
-                                    output.push(formatted_token);
-                                }
-                            }
-                        }
-                        TokenType::Not => {
-                            self.getc();
-
-                            if self.char == '=' {
-                                output.push(Token::new(
-                                    String::from("!="),
-                                    TokenType::Ne,
-                                    (span_start, self.position - 1),
-                                ));
-                                self.getc();
-                            } else {
-                                let mut formatted_token = matched_token;
-                                formatted_token.span = (span_start, self.position - 2);
-
-                                output.push(formatted_token);
-                            }
-                        }
-                        TokenType::Verbar => {
-                            self.getc();
-
-                            if self.char == '|' {
-                                output.push(Token::new(
-                                    String::from("||"),
-                                    TokenType::Or,
-                                    (span_start, self.position),
-                                ));
-                                self.getc();
-                            } else {
-                                let mut formatted_token = matched_token;
-                                formatted_token.span = (span_start, self.position - 1);
-
-                                output.push(formatted_token);
-                            }
-                        }
-                        TokenType::Ampersand => {
-                            self.getc();
-
-                            match self.char {
-                                '&' => {
-                                    self.getc();
-                                    if self.char == ' ' {
-                                        self.position -= 1;
-                                        output.push(Token::new(
-                                            String::from("&&"),
-                                            TokenType::And,
-                                            (span_start, self.position),
-                                        ));
-                                    } else {
-                                        output.push(Token::new(
-                                            String::from("&"),
-                                            TokenType::Ref,
-                                            (span_start, self.position - 2),
-                                        ));
-                                        output.push(Token::new(
-                                            String::from("&"),
-                                            TokenType::Ref,
-                                            (span_start + 1, self.position - 1),
-                                        ));
-                                    }
-                                }
-                                ' ' => {
-                                    let mut formatted_token = matched_token;
-                                    formatted_token.span = (span_start, self.position - 1);
-
-                                    output.push(formatted_token);
-                                }
-                                _ => {
-                                    output.push(Token::new(
-                                        String::from("&"),
-                                        TokenType::Ref,
-                                        (span_start, self.position - 1),
-                                    ));
-                                }
-                            }
-                        }
-                        _ => {
-                            let mut formatted_token = matched_token;
-                            formatted_token.span = (span_start, span_start + 1);
-
-                            output.push(formatted_token);
-                            self.getc();
-                        }
-                    }
-                }
-                _ if self.char.is_ascii_digit() => {
-                    let span_start = self.position - 1;
-                    let (value, tty) = self.get_number();
-
-                    output.push(Token::new(value, tty, (span_start, self.position - 1)));
-                }
-                _ if self.char.is_alphabetic() || self.char == '_' => {
-                    let allowed_id_chars = ['_'];
-
-                    let mut id = String::new();
-                    let start_span = self.position - 1;
-                    while self.char.is_alphanumeric() || allowed_id_chars.contains(&self.char) {
-                        id.push(self.char);
-                        self.getc();
-                    }
-
-                    if self.keywords.contains_key(&id) {
-                        let mut matched_token = self.keywords.get(&id).unwrap().clone();
-                        matched_token.span = (start_span, self.position - 1);
-                        output.push(matched_token);
-                    } else {
-                        output.push(Token::new(
-                            id,
-                            TokenType::Identifier,
-                            (start_span, self.position - 1),
-                        ));
-                    }
-                }
-                _ => {
-                    self.error(LexerError::UnknownCharacter {
-                        character: self.char,
-                        src: self.source.clone(),
-                        span: (self.position - 1, 1).into(),
-                    });
-                    self.getc();
+        let result = match char {
+            '(' => {
+                self.advance();
+                self.make_token(TokenType::LParen, start, 1)
+            }
+            ')' => {
+                self.advance();
+                self.make_token(TokenType::RParen, start, 1)
+            }
+            '{' => {
+                self.advance();
+                self.make_token(TokenType::LBrace, start, 1)
+            }
+            '}' => {
+                self.advance();
+                self.make_token(TokenType::RBrace, start, 1)
+            }
+            '[' => {
+                self.advance();
+                self.make_token(TokenType::LBrack, start, 1)
+            }
+            ']' => {
+                self.advance();
+                self.make_token(TokenType::RBrack, start, 1)
+            }
+            ',' => {
+                self.advance();
+                self.make_token(TokenType::Comma, start, 1)
+            }
+            '.' => {
+                self.advance();
+                self.make_token(TokenType::Dot, start, 1)
+            }
+            ';' => {
+                self.advance();
+                self.make_token(TokenType::Semicolon, start, 1)
+            }
+            ':' => {
+                self.advance();
+                self.make_token(TokenType::DoubleDots, start, 1)
+            }
+            '+' => {
+                self.advance();
+                self.make_token(TokenType::Plus, start, 1)
+            }
+            '-' => {
+                self.advance();
+                self.make_token(TokenType::Minus, start, 1)
+            }
+            '*' => {
+                self.advance();
+                self.make_token(TokenType::Multiply, start, 1)
+            }
+            '%' => {
+                self.advance();
+                self.make_token(TokenType::Modulus, start, 1)
+            }
+            '^' => {
+                self.advance();
+                self.make_token(TokenType::Xor, start, 1)
+            }
+            '|' => {
+                self.advance();
+                if self.match_char('|') {
+                    self.make_token(TokenType::Or, start, 2)
+                } else {
+                    self.make_token(TokenType::Verbar, start, 1)
                 }
             }
-        }
+            '&' => {
+                self.advance();
+                if self.match_char('&') {
+                    self.make_token(TokenType::And, start, 2)
+                } else {
+                    self.make_token(TokenType::Ampersand, start, 1)
+                }
+            }
+            '=' => {
+                self.advance();
+                if self.match_char('=') {
+                    self.make_token(TokenType::Eq, start, 2)
+                } else if self.match_char('>') {
+                    self.make_token(TokenType::Beq, start, 2)
+                } else {
+                    self.make_token(TokenType::Equal, start, 1)
+                }
+            }
+            '!' => {
+                self.advance();
+                if self.match_char('=') {
+                    self.make_token(TokenType::Ne, start, 2)
+                } else {
+                    self.make_token(TokenType::Not, start, 1)
+                }
+            }
+            '<' => {
+                self.advance();
+                if self.match_char('=') {
+                    self.make_token(TokenType::Leq, start, 2)
+                } else if self.match_char('<') {
+                    self.make_token(TokenType::LShift, start, 2)
+                } else {
+                    self.make_token(TokenType::Lt, start, 1)
+                }
+            }
+            '>' => {
+                self.advance();
+                if self.match_char('=') {
+                    self.make_token(TokenType::Beq, start, 2)
+                } else if self.match_char('>') {
+                    self.make_token(TokenType::RShift, start, 2)
+                } else {
+                    self.make_token(TokenType::Bt, start, 1)
+                }
+            }
+            '/' => {
+                self.advance();
+                if self.match_char('/') {
+                    self.skip_comment();
+                    return self.next(); // Recurse to get next token
+                } else {
+                    self.make_token(TokenType::Divide, start, 1)
+                }
+            }
+            '"' => {
+                self.advance();
+                self.read_string()
+            }
+            '\'' => {
+                self.advance();
+                self.read_char()
+            }
+            c if c.is_ascii_digit() => self.read_number(start),
+            c if c.is_alphabetic() || c == '_' => self.read_identifier(start),
+            _ => {
+                self.advance();
+                Err(LexerError::UnknownCharacter {
+                    character: char,
+                    span: (start, self.cursor - start),
+                })
+            }
+        };
 
-        if !output.contains(&Token::new(String::new(), TokenType::EOF, (0, 0))) {
-            output.push(Token::new(String::new(), TokenType::EOF, (0, 0)));
-        }
-
-        if !self.errors.is_empty() {
-            return Err((self.errors.clone(), self.warnings.clone()));
-        }
-
-        Ok((output, self.warnings.clone()))
+        Some(result)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Lexer, token::Token, token_type::TokenType};
+    use super::*;
 
     #[test]
-    fn getc_test() {
-        let mut lexer = Lexer::new("123456789", "test.dn");
+    fn basic_types() {
+        let input = "i8 i16 i32 i64 u8 u16 u32 u64 usize char bool void";
+        let lexer = Lexer::new(input);
+        let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
 
-        let mut chr = lexer.char;
-        let mut current = 1;
+        let expected = vec![
+            (TokenType::Type, "i8"),
+            (TokenType::Type, "i16"),
+            (TokenType::Type, "i32"),
+            (TokenType::Type, "i64"),
+            (TokenType::Type, "u8"),
+            (TokenType::Type, "u16"),
+            (TokenType::Type, "u32"),
+            (TokenType::Type, "u64"),
+            (TokenType::Type, "usize"),
+            (TokenType::Type, "char"),
+            (TokenType::Type, "bool"),
+            (TokenType::Type, "void"),
+        ];
 
-        while chr != '\0' {
-            assert_eq!(chr, char::from_digit(current, 10).unwrap_or(' '));
-            lexer.getc();
-
-            current += 1;
-            chr = lexer.char;
+        assert_eq!(tokens.len(), expected.len());
+        for (token, (expected_type, expected_value)) in tokens.iter().zip(expected.iter()) {
+            assert_eq!(token.token_type, *expected_type);
+            assert_eq!(token.value, *expected_value);
         }
     }
 
     #[test]
-    fn is_eof_test() {
-        let mut lexer = Lexer::new("1", "test.dn");
-        lexer.getc();
-
-        assert!(lexer.is_eof());
-    }
-
-    #[test]
-    fn is_hexadecimal_literal_test() {
-        let lexer = Lexer::new("", "test.dn");
-
-        ['a', 'b', 'c', 'd', 'e', 'f']
-            .iter()
-            .for_each(|chr| assert!(lexer.is_hexadecimal_literal(chr)));
-
-        assert!(!lexer.is_hexadecimal_literal(&' '));
-    }
-
-    #[test]
-    fn character_escape_test() {
-        [
-            ('0', '\0'),
-            ('n', '\n'),
-            ('r', '\r'),
-            ('t', '\t'),
-            ('\\', '\\'),
-        ]
-        .into_iter()
-        .for_each(|(chr, exp)| assert_eq!(Lexer::character_escape(chr), Some(exp)));
-
-        assert!(Lexer::character_escape(' ').is_none())
-    }
-
-    #[test]
-    fn basic_types() {
-        let input = String::from("i8 i16 i32 i64 u8 u16 u32 u64 usize char bool void");
-        let mut lexer = Lexer::new(&input, "tests.dn");
-
-        let tokens = lexer.tokenize().unwrap().0;
-        let expected = vec![
-            (TokenType::Type, String::from("i8")),
-            (TokenType::Type, String::from("i16")),
-            (TokenType::Type, String::from("i32")),
-            (TokenType::Type, String::from("i64")),
-            (TokenType::Type, String::from("u8")),
-            (TokenType::Type, String::from("u16")),
-            (TokenType::Type, String::from("u32")),
-            (TokenType::Type, String::from("u64")),
-            (TokenType::Type, String::from("usize")),
-            (TokenType::Type, String::from("char")),
-            (TokenType::Type, String::from("bool")),
-            (TokenType::Type, String::from("void")),
-        ];
-
-        tokens.iter().zip(expected).for_each(|(token, expected)| {
-            assert_eq!(token.token_type, expected.0);
-            assert_eq!(token.value, expected.1);
-        });
-    }
-
-    #[test]
     fn boolean_keywords() {
-        let input = String::from("true false");
-        let mut lexer = Lexer::new(&input, "tests.pay");
+        let input = "true false";
+        let lexer = Lexer::new(input);
+        let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
 
-        let tokens = lexer.tokenize().unwrap().0;
-        let expected = vec![
-            (TokenType::Boolean, String::from("true")),
-            (TokenType::Boolean, String::from("false")),
-        ];
+        let expected = vec![(TokenType::Boolean, "true"), (TokenType::Boolean, "false")];
 
-        tokens.iter().zip(expected).for_each(|(token, expected)| {
-            assert_eq!(token.token_type, expected.0);
-            assert_eq!(token.value, expected.1);
-        });
+        assert_eq!(tokens.len(), expected.len());
+        for (token, (expected_type, expected_value)) in tokens.iter().zip(expected.iter()) {
+            assert_eq!(token.token_type, *expected_type);
+            assert_eq!(token.value, *expected_value);
+        }
     }
 
     #[test]
     fn main_keywords() {
-        let input = String::from("let fn import return struct enum typedef");
-        let mut lexer = Lexer::new(&input, "tests.pay");
+        let input = "let fn import return struct enum typedef";
+        let lexer = Lexer::new(input);
+        let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
 
-        let tokens = lexer.tokenize().unwrap().0;
         let expected = vec![
-            (TokenType::Keyword, String::from("let")),
-            (TokenType::Keyword, String::from("fn")),
-            (TokenType::Keyword, String::from("import")),
-            (TokenType::Keyword, String::from("return")),
-            (TokenType::Keyword, String::from("struct")),
-            (TokenType::Keyword, String::from("enum")),
-            (TokenType::Keyword, String::from("typedef")),
+            (TokenType::Keyword, "let"),
+            (TokenType::Keyword, "fn"),
+            (TokenType::Keyword, "import"),
+            (TokenType::Keyword, "return"),
+            (TokenType::Keyword, "struct"),
+            (TokenType::Keyword, "enum"),
+            (TokenType::Keyword, "typedef"),
         ];
 
-        tokens.iter().zip(expected).for_each(|(token, expected)| {
-            assert_eq!(token.token_type, expected.0);
-            assert_eq!(token.value, expected.1);
-        });
-    }
-
-    #[test]
-    fn constructions_keywords() {
-        let input = String::from("if else while for break");
-        let mut lexer = Lexer::new(&input, "tests.pay");
-
-        let tokens = lexer.tokenize().unwrap().0;
-        let expected = vec![
-            (TokenType::Keyword, String::from("if")),
-            (TokenType::Keyword, String::from("else")),
-            (TokenType::Keyword, String::from("while")),
-            (TokenType::Keyword, String::from("for")),
-            (TokenType::Keyword, String::from("break")),
-        ];
-
-        tokens.iter().zip(expected).for_each(|(token, expected)| {
-            assert_eq!(token.token_type, expected.0);
-            assert_eq!(token.value, expected.1);
-        });
+        assert_eq!(tokens.len(), expected.len());
+        for (token, (expected_type, expected_value)) in tokens.iter().zip(expected.iter()) {
+            assert_eq!(token.token_type, *expected_type);
+            assert_eq!(token.value, *expected_value);
+        }
     }
 
     #[test]
     fn basic_number() {
-        let mut lexer = Lexer::new("123", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from("123"), TokenType::Number, (0, 2)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
-    }
-
-    #[test]
-    fn big_number() {
-        let mut lexer = Lexer::new("999999999999999", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from("999999999999999"), TokenType::Number, (0, 14)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
-    }
-
-    #[test]
-    fn negative_number() {
-        let mut lexer = Lexer::new("-15", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from("-"), TokenType::Minus, (0, 1)),
-                Token::new(String::from("15"), TokenType::Number, (1, 2)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
+        let input = "123";
+        let mut lexer = Lexer::new(input);
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::new("123", TokenType::Number, (0, 3)));
     }
 
     #[test]
     fn float_number() {
-        let mut lexer = Lexer::new("1.0", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from("1"), TokenType::FloatNumber, (0, 2)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
-    }
-
-    #[test]
-    fn advanced_float_number() {
-        let mut lexer = Lexer::new("1.89", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from("1.89"), TokenType::FloatNumber, (0, 3)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
-    }
-
-    #[test]
-    fn big_float_number() {
-        let mut lexer = Lexer::new("3.141592653589793", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(
-                    String::from("3.141592653589793"),
-                    TokenType::FloatNumber,
-                    (0, 16)
-                ),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
-    }
-
-    #[test]
-    fn negative_float_number() {
-        let mut lexer = Lexer::new("-1.89", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from("-"), TokenType::Minus, (0, 1)),
-                Token::new(String::from("1.89"), TokenType::FloatNumber, (1, 4)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
+        let input = "1.23";
+        let mut lexer = Lexer::new(input);
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::new("1.23", TokenType::FloatNumber, (0, 4)));
     }
 
     #[test]
     fn basic_string() {
-        let mut lexer = Lexer::new("\"hello\"", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from("hello"), TokenType::String, (0, 7)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
+        let input = "\"hello\"";
+        let mut lexer = Lexer::new(input);
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::new("hello", TokenType::String, (0, 7)));
     }
 
     #[test]
-    fn big_string() {
-        let mut lexer = Lexer::new(
-            "\"Hello, World! Here's an interesting thing: first LLVM initial release was in 2003 year. The original authors of core was Chris Lattner and Vikram Adve\"",
-            "test.dn",
+    fn string_with_escapes() {
+        let input = "\"hello\\\"world\"";
+        let mut lexer = Lexer::new(input);
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(
+            token,
+            Token::new("hello\\\"world", TokenType::String, (0, 14))
         );
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(
-                    String::from(
-                        "Hello, World! Here's an interesting thing: first LLVM initial release was in 2003 year. The original authors of core was Chris Lattner and Vikram Adve"
-                    ),
-                    TokenType::String,
-                    (0, 152)
-                ),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
-    }
-
-    #[test]
-    fn advanced_string() {
-        let mut lexer = Lexer::new("\"¿?👉👈🤠👀\"", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from("¿?👉👈🤠👀"), TokenType::String, (0, 21)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
     }
 
     #[test]
     fn basic_char() {
-        let mut lexer = Lexer::new("'a'", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from("a"), TokenType::Char, (0, 3)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
+        let input = "'a'";
+        let mut lexer = Lexer::new(input);
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::new("a", TokenType::Char, (0, 3)));
     }
 
     #[test]
-    fn advanced_char() {
-        let mut lexer = Lexer::new("'👀'", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
+    fn operators() {
+        let input = "+ - * / % = == != < > <= >= && || ! & | ^ << >>";
+        let lexer = Lexer::new(input);
+        let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
 
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from("👀"), TokenType::Char, (0, 3)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
+        let expected_tokens = vec![
+            Token::new("+", TokenType::Plus, (0, 1)),
+            Token::new("-", TokenType::Minus, (2, 1)),
+            Token::new("*", TokenType::Multiply, (4, 1)),
+            Token::new("/", TokenType::Divide, (6, 1)),
+            Token::new("%", TokenType::Modulus, (8, 1)),
+            Token::new("=", TokenType::Equal, (10, 1)),
+            Token::new("==", TokenType::Eq, (12, 2)),
+            Token::new("!=", TokenType::Ne, (15, 2)),
+            Token::new("<", TokenType::Lt, (18, 1)),
+            Token::new(">", TokenType::Bt, (20, 1)),
+            Token::new("<=", TokenType::Leq, (22, 2)),
+            Token::new(">=", TokenType::Beq, (25, 2)),
+            Token::new("&&", TokenType::And, (28, 2)),
+            Token::new("||", TokenType::Or, (31, 2)),
+            Token::new("!", TokenType::Not, (34, 1)),
+            Token::new("&", TokenType::Ampersand, (36, 1)),
+            Token::new("|", TokenType::Verbar, (38, 1)),
+            Token::new("^", TokenType::Xor, (40, 1)),
+            Token::new("<<", TokenType::LShift, (42, 2)),
+            Token::new(">>", TokenType::RShift, (45, 2)),
+        ];
+
+        assert_eq!(tokens, expected_tokens);
     }
 
     #[test]
-    fn binary_symbols() {
-        let mut lexer = Lexer::new("+-*/", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from("+"), TokenType::Plus, (0, 1)),
-                Token::new(String::from("-"), TokenType::Minus, (1, 2)),
-                Token::new(String::from("*"), TokenType::Multiply, (2, 3)),
-                Token::new(String::from("/"), TokenType::Divide, (3, 4)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
+    fn unterminated_string() {
+        let input = "\"hello";
+        let mut lexer = Lexer::new(input);
+        let result = lexer.next().unwrap();
+        assert!(matches!(
+            result,
+            Err(LexerError::UnterminatedString { .. })
+        ));
     }
 
     #[test]
-    fn boolean_symbols() {
-        let mut lexer = Lexer::new("> < ! && || == !=", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
+    fn comment() {
+        let input = "// this is a comment\nlet x = 1;";
+        let lexer = Lexer::new(input);
+        let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
 
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from(">"), TokenType::Bt, (0, 0)),
-                Token::new(String::from("<"), TokenType::Lt, (2, 2)),
-                Token::new(String::from("!"), TokenType::Not, (4, 4)),
-                Token::new(String::from("&&"), TokenType::And, (6, 8)),
-                Token::new(String::from("||"), TokenType::Or, (9, 11)),
-                Token::new(String::from("=="), TokenType::Eq, (12, 13)),
-                Token::new(String::from("!="), TokenType::Ne, (15, 16)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
-    }
+        let expected_tokens = vec![
+            Token::new("let", TokenType::Keyword, (21, 3)),
+            Token::new("x", TokenType::Identifier, (25, 1)),
+            Token::new("=", TokenType::Equal, (27, 1)),
+            Token::new("1", TokenType::Number, (29, 1)),
+            Token::new(";", TokenType::Semicolon, (30, 1)),
+        ];
 
-    #[test]
-    fn bitwise_symbols() {
-        let mut lexer = Lexer::new(">> << ^", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from(">>"), TokenType::RShift, (0, 2)),
-                Token::new(String::from("<<"), TokenType::LShift, (3, 5)),
-                Token::new(String::from("^"), TokenType::Xor, (6, 7)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
-    }
-
-    #[test]
-    fn parentheses_symbols() {
-        let mut lexer = Lexer::new("(){}[]", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from("("), TokenType::LParen, (0, 1)),
-                Token::new(String::from(")"), TokenType::RParen, (1, 2)),
-                Token::new(String::from("{"), TokenType::LBrace, (2, 3)),
-                Token::new(String::from("}"), TokenType::RBrace, (3, 4)),
-                Token::new(String::from("["), TokenType::LBrack, (4, 5)),
-                Token::new(String::from("]"), TokenType::RBrack, (5, 6)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
-    }
-
-    #[test]
-    fn other_symbols() {
-        let mut lexer = Lexer::new("&ref : ; & | _ . , =", "test.pay");
-        let tokens = lexer.tokenize().unwrap().0;
-
-        assert_eq!(
-            tokens,
-            vec![
-                Token::new(String::from("&"), TokenType::Ref, (0, 1)),
-                Token::new(String::from("ref"), TokenType::Identifier, (1, 4)),
-                Token::new(String::from(":"), TokenType::DoubleDots, (5, 6)),
-                Token::new(String::from(";"), TokenType::Semicolon, (7, 8)),
-                Token::new(String::from("&"), TokenType::Ampersand, (9, 10)),
-                Token::new(String::from("|"), TokenType::Verbar, (11, 12)),
-                Token::new(String::from("_"), TokenType::Identifier, (13, 14)),
-                Token::new(String::from("."), TokenType::Dot, (15, 16)),
-                Token::new(String::from(","), TokenType::Comma, (17, 18)),
-                Token::new(String::from("="), TokenType::Equal, (19, 20)),
-                Token::new(String::new(), TokenType::EOF, (0, 0))
-            ]
-        )
+        assert_eq!(tokens, expected_tokens);
     }
 }
