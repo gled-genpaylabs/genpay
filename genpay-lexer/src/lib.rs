@@ -1,4 +1,6 @@
 use crate::{error::LexerError, token::Token, token_type::TokenType};
+use lazy_static::lazy_static;
+use std::collections::HashMap;
 
 pub mod error;
 pub mod token;
@@ -155,44 +157,49 @@ impl<'a> Lexeme<'a> {
     }
 }
 
+lazy_static! {
+    static ref KEYWORDS: HashMap<&'static str, TokenType> = {
+        let mut map = HashMap::new();
+        map.insert("if", TokenType::Keyword);
+        map.insert("else", TokenType::Keyword);
+        map.insert("while", TokenType::Keyword);
+        map.insert("for", TokenType::Keyword);
+        map.insert("break", TokenType::Keyword);
+        map.insert("let", TokenType::Keyword);
+        map.insert("pub", TokenType::Keyword);
+        map.insert("fn", TokenType::Keyword);
+        map.insert("import", TokenType::Keyword);
+        map.insert("include", TokenType::Keyword);
+        map.insert("extern", TokenType::Keyword);
+        map.insert("return", TokenType::Keyword);
+        map.insert("struct", TokenType::Keyword);
+        map.insert("enum", TokenType::Keyword);
+        map.insert("typedef", TokenType::Keyword);
+        map.insert("_extern_declare", TokenType::Keyword);
+        map.insert("_link_c", TokenType::Keyword);
+        map.insert("i8", TokenType::Type);
+        map.insert("i16", TokenType::Type);
+        map.insert("i32", TokenType::Type);
+        map.insert("i64", TokenType::Type);
+        map.insert("u8", TokenType::Type);
+        map.insert("u16", TokenType::Type);
+        map.insert("u32", TokenType::Type);
+        map.insert("u64", TokenType::Type);
+        map.insert("usize", TokenType::Type);
+        map.insert("f32", TokenType::Type);
+        map.insert("f64", TokenType::Type);
+        map.insert("bool", TokenType::Type);
+        map.insert("char", TokenType::Type);
+        map.insert("void", TokenType::Type);
+        map.insert("true", TokenType::Boolean);
+        map.insert("false", TokenType::Boolean);
+        map.insert("NULL", TokenType::Null);
+        map
+    };
+}
+
 fn lookup_identifier(s: &str) -> TokenType {
-    match s {
-        "if" => TokenType::Keyword,
-        "else" => TokenType::Keyword,
-        "while" => TokenType::Keyword,
-        "for" => TokenType::Keyword,
-        "break" => TokenType::Keyword,
-        "let" => TokenType::Keyword,
-        "pub" => TokenType::Keyword,
-        "fn" => TokenType::Keyword,
-        "import" => TokenType::Keyword,
-        "include" => TokenType::Keyword,
-        "extern" => TokenType::Keyword,
-        "return" => TokenType::Keyword,
-        "struct" => TokenType::Keyword,
-        "enum" => TokenType::Keyword,
-        "typedef" => TokenType::Keyword,
-        "_extern_declare" => TokenType::Keyword,
-        "_link_c" => TokenType::Keyword,
-        "i8" => TokenType::Type,
-        "i16" => TokenType::Type,
-        "i32" => TokenType::Type,
-        "i64" => TokenType::Type,
-        "u8" => TokenType::Type,
-        "u16" => TokenType::Type,
-        "u32" => TokenType::Type,
-        "u64" => TokenType::Type,
-        "usize" => TokenType::Type,
-        "f32" => TokenType::Type,
-        "f64" => TokenType::Type,
-        "bool" => TokenType::Type,
-        "char" => TokenType::Type,
-        "void" => TokenType::Type,
-        "true" => TokenType::Boolean,
-        "false" => TokenType::Boolean,
-        "NULL" => TokenType::Null,
-        _ => TokenType::Identifier,
-    }
+    KEYWORDS.get(s).cloned().unwrap_or(TokenType::Identifier)
 }
 
 impl<'a> Iterator for Lexeme<'a> {
