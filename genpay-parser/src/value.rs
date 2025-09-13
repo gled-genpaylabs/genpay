@@ -1,12 +1,12 @@
-#[derive(Debug, Clone, PartialEq)]
-pub enum Value {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Value<'a> {
     Integer(i64),
     Float(f64),
-    String(String),
+    String(&'a str),
     Char(char),
     Boolean(bool),
-    Identifier(String),
-    Keyword(String),
+    Identifier(&'a str),
+    Keyword(&'a str),
     Null,
     Void,
 }
@@ -14,7 +14,7 @@ pub enum Value {
 #[cfg(test)]
 mod tests {
     use crate::{expressions::Expressions, statements::Statements, Parser};
-    use genpay_lexer::Lexer;
+    use genpay_lexer::Lexeme as Lexer;
     use crate::value::Value;
 
     #[test]
@@ -22,8 +22,8 @@ mod tests {
         const SRC: &str = "123; 5.0; 'a'; \"some\"; true";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
