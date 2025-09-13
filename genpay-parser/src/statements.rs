@@ -1,81 +1,82 @@
 use crate::{
-    END_STATEMENT, Parser,
+    END_STATEMENT,
     error::{self, ParserError},
     expressions::Expressions,
     types::Type,
     value::Value,
+    Parser,
 };
 use genpay_lexer::token_type::TokenType;
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Statements {
+pub enum Statements<'a> {
     /// `OBJECT = EXPRESSION`
     AssignStatement {
-        object: Expressions,
-        value: Expressions,
+        object: Expressions<'a>,
+        value: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `OBJECT BINOP= EXPRESSION`
     BinaryAssignStatement {
-        object: Expressions,
-        operand: String,
-        value: Expressions,
+        object: Expressions<'a>,
+        operand: &'a str,
+        value: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `*OBJECT = EXPRESSION`
     DerefAssignStatement {
-        object: Expressions,
-        value: Expressions,
+        object: Expressions<'a>,
+        value: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `OBJECT[EXPRESSION] = EXPRESSION`
     SliceAssignStatement {
-        object: Expressions,
-        index: Expressions,
-        value: Expressions,
+        object: Expressions<'a>,
+        index: Expressions<'a>,
+        value: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `OBJECT.FIELD= EXPRESSION`
     FieldAssignStatement {
-        object: Expressions,
-        value: Expressions,
+        object: Expressions<'a>,
+        value: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `let IDENTIFIER = EXPRESSION`
     AnnotationStatement {
-        identifier: String,
-        datatype: Option<Type>,
-        value: Option<Expressions>,
+        identifier: &'a str,
+        datatype: Option<Type<'a>>,
+        value: Option<Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `pub/NOTHING fn IDENTIFIER ( IDENTIFIER: TYPE, IDENTIFIER: TYPE, ... ) TYPE/NOTHING { STATEMENTS }`
     FunctionDefineStatement {
-        name: String,
-        datatype: Type,
-        arguments: Vec<(String, Type)>,
-        block: Vec<Statements>,
+        name: &'a str,
+        datatype: Type<'a>,
+        arguments: Vec<(&'a str, Type<'a>)>,
+        block: Vec<Statements<'a>>,
         public: bool,
         span: (usize, usize),
         header_span: (usize, usize),
     },
     /// `NAME ( EXPRESSION, EXPRESSION, ... )`
     FunctionCallStatement {
-        name: String,
-        arguments: Vec<Expressions>,
+        name: &'a str,
+        arguments: Vec<Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `MACRONAME! ( EXPRESSION, EXPRESSION, ... )`
     MacroCallStatement {
-        name: String,
-        arguments: Vec<Expressions>,
+        name: &'a str,
+        arguments: Vec<Expressions<'a>>,
         span: (usize, usize),
     },
 
@@ -88,9 +89,9 @@ pub enum Statements {
     /// }
     /// ```
     StructDefineStatement {
-        name: String,
-        fields: IndexMap<String, Type>,
-        functions: IndexMap<String, Statements>,
+        name: &'a str,
+        fields: IndexMap<&'a str, Type<'a>>,
+        functions: IndexMap<&'a str, Statements<'a>>,
         public: bool,
         span: (usize, usize),
     },
@@ -104,61 +105,61 @@ pub enum Statements {
     /// }
     /// ```
     EnumDefineStatement {
-        name: String,
-        fields: Vec<String>,
-        functions: IndexMap<String, Statements>,
+        name: &'a str,
+        fields: Vec<&'a str>,
+        functions: IndexMap<&'a str, Statements<'a>>,
         public: bool,
         span: (usize, usize),
     },
 
     /// `typedef IDENTIFIER TYPE`
     TypedefStatement {
-        alias: String,
-        datatype: Type,
+        alias: &'a str,
+        datatype: Type<'a>,
         span: (usize, usize),
     },
 
     /// `if EXPRESSION { STATEMENTS } else { STATEMENTS }`
     IfStatement {
-        condition: Expressions,
-        then_block: Vec<Statements>,
-        else_block: Option<Vec<Statements>>,
+        condition: Expressions<'a>,
+        then_block: Vec<Statements<'a>>,
+        else_block: Option<Vec<Statements<'a>>>,
         span: (usize, usize),
     },
 
     /// `while EXPRESSION { STATEMENTS }`
     WhileStatement {
-        condition: Expressions,
-        block: Vec<Statements>,
+        condition: Expressions<'a>,
+        block: Vec<Statements<'a>>,
         span: (usize, usize),
     },
 
     /// `for IDENTIFIER = OBJECT { STATEMENTS }`
     ForStatement {
-        binding: String,
-        iterator: Expressions,
-        block: Vec<Statements>,
+        binding: &'a str,
+        iterator: Expressions<'a>,
+        block: Vec<Statements<'a>>,
         span: (usize, usize),
     },
 
     /// `import "PATH"`
     ImportStatement {
-        path: Expressions,
+        path: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `include "PATH"`
     IncludeStatement {
-        path: Expressions,
+        path: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `extern "EXT_TYPE" pub/NOTHING fn IDENTIFIER ( TYPE, TYPE, ... ) TYPE/NOTHING`
     ExternStatement {
-        identifier: String,
-        arguments: Vec<Type>,
-        return_type: Type,
-        extern_type: String,
+        identifier: &'a str,
+        arguments: Vec<Type<'a>>,
+        return_type: Type<'a>,
+        extern_type: &'a str,
         is_var_args: bool,
         public: bool,
         span: (usize, usize),
@@ -166,14 +167,14 @@ pub enum Statements {
 
     /// `_extern_declare IDENTIFIER EXPRESSION`
     ExternDeclareStatement {
-        identifier: String,
-        datatype: Type,
+        identifier: &'a str,
+        datatype: Type<'a>,
         span: (usize, usize),
     },
 
     /// `_link_c "PATH"`
     LinkCStatement {
-        path: Expressions,
+        path: Expressions<'a>,
         span: (usize, usize),
     },
 
@@ -184,23 +185,23 @@ pub enum Statements {
 
     /// `return EXPRESSION`
     ReturnStatement {
-        value: Expressions,
+        value: Expressions<'a>,
         span: (usize, usize),
     },
 
     /// `{ STATEMENTS }`
     ScopeStatement {
-        block: Vec<Statements>,
+        block: Vec<Statements<'a>>,
         span: (usize, usize),
     },
 
-    Expression(Expressions),
+    Expression(Expressions<'a>),
     None,
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     #[inline]
-    pub fn get_span_statement(stmt: &Statements) -> (usize, usize) {
+    pub fn get_span_statement(stmt: &Statements<'a>) -> (usize, usize) {
         match stmt {
             Statements::AssignStatement { span, .. } => *span,
             Statements::BinaryAssignStatement { span, .. } => *span,
@@ -233,18 +234,18 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use genpay_lexer::Lexer;
     use crate::{
-        Parser, expressions::Expressions, statements::Statements, types::Type, value::Value,
+        expressions::Expressions, statements::Statements, types::Type, value::Value, Parser,
     };
+    use genpay_lexer::Lexeme;
 
     #[test]
     fn assign_statement() {
         const SRC: &str = "some_var = 5;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -256,7 +257,7 @@ mod tests {
                 span: _,
             }) => {
                 if let Expressions::Value(Value::Identifier(identifier), _) = object {
-                    assert_eq!(identifier, "some_var");
+                    assert_eq!(*identifier, "some_var");
                 } else {
                     panic!("Wrong obj expr parsed")
                 }
@@ -275,8 +276,8 @@ mod tests {
         const SRC: &str = "some_var += 5;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -289,10 +290,10 @@ mod tests {
                 span: _,
             }) => {
                 if let Expressions::Value(Value::Identifier(identifier), _) = object {
-                    assert_eq!(identifier, "some_var");
+                    assert_eq!(*identifier, "some_var");
                 }
 
-                assert_eq!(operand, "+");
+                assert_eq!(*operand, "+");
 
                 if let Expressions::Value(Value::Integer(5), _) = value {
                 } else {
@@ -308,8 +309,8 @@ mod tests {
         const SRC: &str = "*ptr = 5;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -321,7 +322,7 @@ mod tests {
                 span: _,
             }) => {
                 if let Expressions::Value(Value::Identifier(identifier), _) = object {
-                    assert_eq!(identifier, "ptr");
+                    assert_eq!(*identifier, "ptr");
                 }
 
                 if let Expressions::Value(Value::Integer(5), _) = value {
@@ -338,8 +339,8 @@ mod tests {
         const SRC: &str = "list[0] = 5;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -352,7 +353,7 @@ mod tests {
                 span: _,
             }) => {
                 if let Expressions::Value(Value::Identifier(identifier), _) = object {
-                    assert_eq!(identifier, "list");
+                    assert_eq!(*identifier, "list");
                 }
 
                 if let Expressions::Value(Value::Integer(0), _) = index {
@@ -373,8 +374,8 @@ mod tests {
         const SRC: &str = "some_struct.field = 12";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -391,13 +392,15 @@ mod tests {
                     span: _,
                 } = object
                 {
-                    if let Expressions::Value(Value::Identifier(id), _) = *head.clone() {
-                        assert_eq!(id, "some_struct")
+                    if let Expressions::Value(Value::Identifier(id), _) = &**head {
+                        assert_eq!(id, &"some_struct")
                     } else {
                         panic!("Wrong head expr found")
                     };
-                    if let Some(Expressions::Value(Value::Identifier(field), _)) = subelements.first() {
-                        assert_eq!(field, "field");
+                    if let Some(Expressions::Value(Value::Identifier(field), _)) =
+                        subelements.first()
+                    {
+                        assert_eq!(field, &"field");
                     } else {
                         panic!("Wrong subelement expr found")
                     }
@@ -418,8 +421,8 @@ mod tests {
         const SRC: &str = "let var;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -431,7 +434,7 @@ mod tests {
                 value,
                 span: _,
             }) => {
-                assert_eq!(identifier, "var");
+                assert_eq!(*identifier, "var");
                 assert!(datatype.is_none());
                 assert!(value.is_none());
             }
@@ -444,8 +447,8 @@ mod tests {
         const SRC: &str = "let var: i32;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -457,7 +460,7 @@ mod tests {
                 value,
                 span: _,
             }) => {
-                assert_eq!(identifier, "var");
+                assert_eq!(*identifier, "var");
                 assert!(datatype.is_some());
                 assert!(value.is_none());
 
@@ -472,8 +475,8 @@ mod tests {
         const SRC: &str = "let var = 15;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -485,7 +488,7 @@ mod tests {
                 value,
                 span: _,
             }) => {
-                assert_eq!(identifier, "var");
+                assert_eq!(*identifier, "var");
                 assert!(datatype.is_none());
                 assert!(value.is_some());
 
@@ -503,8 +506,8 @@ mod tests {
         const SRC: &str = "let var: usize = 15;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -516,7 +519,7 @@ mod tests {
                 value,
                 span: _,
             }) => {
-                assert_eq!(identifier, "var");
+                assert_eq!(*identifier, "var");
                 assert!(datatype.is_some());
                 assert!(value.is_some());
 
@@ -535,8 +538,8 @@ mod tests {
         const SRC: &str = "fn foo() {}";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -551,7 +554,7 @@ mod tests {
                 span: _,
                 header_span: _,
             }) => {
-                assert_eq!(name, "foo");
+                assert_eq!(*name, "foo");
                 assert_eq!(datatype, &Type::Void);
                 assert!(arguments.is_empty());
                 assert!(block.is_empty());
@@ -566,8 +569,8 @@ mod tests {
         const SRC: &str = "fn foo() usize {}";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -582,7 +585,7 @@ mod tests {
                 span: _,
                 header_span: _,
             }) => {
-                assert_eq!(name, "foo");
+                assert_eq!(*name, "foo");
                 assert_eq!(datatype, &Type::USIZE);
                 assert!(arguments.is_empty());
                 assert!(block.is_empty());
@@ -597,8 +600,8 @@ mod tests {
         const SRC: &str = "fn foo(a: i32, b: u64) usize {}";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -613,21 +616,21 @@ mod tests {
                 span: _,
                 header_span: _,
             }) => {
-                assert_eq!(name, "foo");
+                assert_eq!(*name, "foo");
                 assert_eq!(datatype, &Type::USIZE);
                 assert!(block.is_empty());
                 assert!(!arguments.is_empty());
                 assert!(!public);
 
                 if let Some((argname, argtype)) = arguments.first() {
-                    assert_eq!(argname, "a");
+                    assert_eq!(*argname, "a");
                     assert_eq!(argtype, &Type::I32);
                 } else {
                     panic!("Wrong argument expr parsed")
                 }
 
                 if let Some((argname, argtype)) = arguments.get(1) {
-                    assert_eq!(argname, "b");
+                    assert_eq!(*argname, "b");
                     assert_eq!(argtype, &Type::U64);
                 } else {
                     panic!("Wrong argument expr parsed")
@@ -642,8 +645,8 @@ mod tests {
         const SRC: &str = "fn foo(a: i32, b: u64) { return 1; }";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -658,21 +661,21 @@ mod tests {
                 span: _,
                 header_span: _,
             }) => {
-                assert_eq!(name, "foo");
+                assert_eq!(*name, "foo");
                 assert_eq!(datatype, &Type::Void);
                 assert!(!block.is_empty());
                 assert!(!arguments.is_empty());
                 assert!(!public);
 
                 if let Some((argname, argtype)) = arguments.first() {
-                    assert_eq!(argname, "a");
+                    assert_eq!(*argname, "a");
                     assert_eq!(argtype, &Type::I32);
                 } else {
                     panic!("Wrong argument expr parsed")
                 }
 
                 if let Some((argname, argtype)) = arguments.get(1) {
-                    assert_eq!(argname, "b");
+                    assert_eq!(*argname, "b");
                     assert_eq!(argtype, &Type::U64);
                 } else {
                     panic!("Wrong argument expr parsed")
@@ -696,8 +699,8 @@ mod tests {
         const SRC: &str = "pub fn foo(a: i32, b: u64) { return 1; }";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -712,21 +715,21 @@ mod tests {
                 span: _,
                 header_span: _,
             }) => {
-                assert_eq!(name, "foo");
+                assert_eq!(*name, "foo");
                 assert_eq!(datatype, &Type::Void);
                 assert!(!block.is_empty());
                 assert!(!arguments.is_empty());
                 assert!(public);
 
                 if let Some((argname, argtype)) = arguments.first() {
-                    assert_eq!(argname, "a");
+                    assert_eq!(*argname, "a");
                     assert_eq!(argtype, &Type::I32);
                 } else {
                     panic!("Wrong argument expr parsed")
                 }
 
                 if let Some((argname, argtype)) = arguments.get(1) {
-                    assert_eq!(argname, "b");
+                    assert_eq!(*argname, "b");
                     assert_eq!(argtype, &Type::U64);
                 } else {
                     panic!("Wrong argument expr parsed")
@@ -750,8 +753,8 @@ mod tests {
         const SRC: &str = "foo()";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -762,7 +765,7 @@ mod tests {
                 arguments,
                 span: _,
             }) => {
-                assert_eq!(name, "foo");
+                assert_eq!(*name, "foo");
                 assert!(arguments.is_empty());
             }
             _ => panic!("Wrong statement parsed"),
@@ -774,8 +777,8 @@ mod tests {
         const SRC: &str = "foo(1, 2)";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -786,7 +789,7 @@ mod tests {
                 arguments,
                 span: _,
             }) => {
-                assert_eq!(name, "foo");
+                assert_eq!(*name, "foo");
                 assert!(!arguments.is_empty());
 
                 if let Some(Expressions::Value(Value::Integer(1), _)) = arguments.first() {
@@ -807,8 +810,8 @@ mod tests {
         const SRC: &str = "struct Person { name: *char, age: u8 }";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -821,7 +824,7 @@ mod tests {
                 public,
                 span: _,
             }) => {
-                assert_eq!(name, "Person");
+                assert_eq!(*name, "Person");
                 assert!(!fields.is_empty());
                 assert!(!public);
                 assert!(functions.is_empty());
@@ -844,8 +847,8 @@ mod tests {
         const SRC: &str = "struct Person { name: *char, age: u8, fn foo() {} }";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -858,7 +861,7 @@ mod tests {
                 public,
                 span: _,
             }) => {
-                assert_eq!(name, "Person");
+                assert_eq!(*name, "Person");
                 assert!(!fields.is_empty());
                 assert!(!public);
                 assert!(!functions.is_empty());
@@ -882,7 +885,7 @@ mod tests {
                     header_span: _,
                 }) = functions.get("foo")
                 {
-                    assert_eq!(name, "foo");
+                    assert_eq!(*name, "foo");
                     assert_eq!(datatype, &Type::Void);
                 }
             }
@@ -895,8 +898,8 @@ mod tests {
         const SRC: &str = "pub struct Person { name: *char, age: u8, fn foo() {} }";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -909,7 +912,7 @@ mod tests {
                 public,
                 span: _,
             }) => {
-                assert_eq!(name, "Person");
+                assert_eq!(*name, "Person");
                 assert!(!fields.is_empty());
                 assert!(!functions.is_empty());
                 assert!(public);
@@ -933,7 +936,7 @@ mod tests {
                     header_span: _,
                 }) = functions.get("foo")
                 {
-                    assert_eq!(name, "foo");
+                    assert_eq!(*name, "foo");
                     assert_eq!(datatype, &Type::Void);
                 } else {
                     panic!("Wrong function define stmt parsed!")
@@ -948,8 +951,8 @@ mod tests {
         const SRC: &str = "enum ABC { A, B, C }";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -962,20 +965,20 @@ mod tests {
                 public,
                 span: _,
             }) => {
-                assert_eq!(name, "ABC");
+                assert_eq!(*name, "ABC");
                 assert!(!fields.is_empty());
                 assert!(!public);
                 assert!(functions.is_empty());
 
-                if let Some("A") = fields.first().map(|x| x.as_str()) {
+                if let Some("A") = fields.first().map(|x| *x) {
                 } else {
                     panic!("Wrong field parsed")
                 };
-                if let Some("B") = fields.get(1).map(|x| x.as_str()) {
+                if let Some("B") = fields.get(1).map(|x| *x) {
                 } else {
                     panic!("Wrong field parsed")
                 };
-                if let Some("C") = fields.get(2).map(|x| x.as_str()) {
+                if let Some("C") = fields.get(2).map(|x| *x) {
                 } else {
                     panic!("Wrong field parsed")
                 };
@@ -989,8 +992,8 @@ mod tests {
         const SRC: &str = "enum ABC { A, B, C, fn foo() {} }";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1003,20 +1006,20 @@ mod tests {
                 public,
                 span: _,
             }) => {
-                assert_eq!(name, "ABC");
+                assert_eq!(*name, "ABC");
                 assert!(!fields.is_empty());
                 assert!(!public);
                 assert!(!functions.is_empty());
 
-                if let Some("A") = fields.first().map(|x| x.as_str()) {
+                if let Some("A") = fields.first().map(|x| *x) {
                 } else {
                     panic!("Wrong field parsed")
                 };
-                if let Some("B") = fields.get(1).map(|x| x.as_str()) {
+                if let Some("B") = fields.get(1).map(|x| *x) {
                 } else {
                     panic!("Wrong field parsed")
                 };
-                if let Some("C") = fields.get(2).map(|x| x.as_str()) {
+                if let Some("C") = fields.get(2).map(|x| *x) {
                 } else {
                     panic!("Wrong field parsed")
                 };
@@ -1031,7 +1034,7 @@ mod tests {
                     header_span: _,
                 }) = functions.get("foo")
                 {
-                    assert_eq!(name, "foo");
+                    assert_eq!(*name, "foo");
                     assert_eq!(datatype, &Type::Void);
                 } else {
                     panic!("Wrong function define stmt parsed")
@@ -1046,8 +1049,8 @@ mod tests {
         const SRC: &str = "pub enum ABC { A, B, C }";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1060,20 +1063,20 @@ mod tests {
                 public,
                 span: _,
             }) => {
-                assert_eq!(name, "ABC");
+                assert_eq!(*name, "ABC");
                 assert!(!fields.is_empty());
                 assert!(public);
                 assert!(functions.is_empty());
 
-                if let Some("A") = fields.first().map(|x| x.as_str()) {
+                if let Some("A") = fields.first().map(|x| *x) {
                 } else {
                     panic!("Wrong field parsed")
                 };
-                if let Some("B") = fields.get(1).map(|x| x.as_str()) {
+                if let Some("B") = fields.get(1).map(|x| *x) {
                 } else {
                     panic!("Wrong field parsed")
                 };
-                if let Some("C") = fields.get(2).map(|x| x.as_str()) {
+                if let Some("C") = fields.get(2).map(|x| *x) {
                 } else {
                     panic!("Wrong field parsed")
                 };
@@ -1087,8 +1090,8 @@ mod tests {
         const SRC: &str = "typedef int i32";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1099,7 +1102,7 @@ mod tests {
                 datatype,
                 span: _,
             }) => {
-                assert_eq!(alias, "int");
+                assert_eq!(*alias, "int");
                 assert_eq!(datatype, &Type::I32);
             }
             _ => panic!("Wrong statement parsed"),
@@ -1111,8 +1114,8 @@ mod tests {
         const SRC: &str = "typedef array_ptr *[i32; 5]";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1123,7 +1126,7 @@ mod tests {
                 datatype,
                 span: _,
             }) => {
-                assert_eq!(alias, "array_ptr");
+                assert_eq!(*alias, "array_ptr");
                 assert_eq!(
                     datatype,
                     &Type::Pointer(Box::new(Type::Array(Box::new(Type::I32), 5)))
@@ -1138,8 +1141,8 @@ mod tests {
         const SRC: &str = "if true {};";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1168,8 +1171,8 @@ mod tests {
         const SRC: &str = "if true {} else {};";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1198,8 +1201,8 @@ mod tests {
         const SRC: &str = "while true {}";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1224,8 +1227,8 @@ mod tests {
         const SRC: &str = "for i = 5 {}";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1237,7 +1240,7 @@ mod tests {
                 block: _,
                 span: _,
             }) => {
-                assert_eq!(binding, "i");
+                assert_eq!(*binding, "i");
                 if let Expressions::Value(Value::Integer(5), _) = iterator {
                 } else {
                     panic!("Wrong iterator obj parsed")
@@ -1252,8 +1255,8 @@ mod tests {
         const SRC: &str = "import \"module.pay\"";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1261,7 +1264,7 @@ mod tests {
         match ast.first() {
             Some(Statements::ImportStatement { path, span: _ }) => {
                 if let Expressions::Value(Value::String(str), _) = path {
-                    assert_eq!(str, "module.pay")
+                    assert_eq!(*str, "module.pay")
                 } else {
                     panic!("Wrong import object expr parsed")
                 };
@@ -1275,8 +1278,8 @@ mod tests {
         const SRC: &str = "break";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1292,8 +1295,8 @@ mod tests {
         const SRC: &str = "return 15;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexeme::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1310,11 +1313,11 @@ mod tests {
     }
 }
 
-impl Parser {
-    pub fn annotation_statement(&mut self) -> Statements {
+impl<'a> Parser<'a> {
+    pub fn annotation_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
 
-        if self.current().value == *"let" {
+        if self.current().value == "let" {
             let _ = self.next();
         }
 
@@ -1349,7 +1352,7 @@ impl Parser {
                     identifier: id,
                     datatype,
                     value: Some(value.clone()),
-                    span: (span_start, self.span_expression(value).1),
+                    span: (span_start, self.span_expression(&value).1),
                 }
             }
             END_STATEMENT => {
@@ -1377,7 +1380,7 @@ impl Parser {
         }
     }
 
-    pub fn import_statement(&mut self) -> Statements {
+    pub fn import_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.current().token_type == TokenType::Keyword {
             let _ = self.next();
@@ -1407,7 +1410,7 @@ impl Parser {
         }
     }
 
-    pub fn include_statement(&mut self) -> Statements {
+    pub fn include_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.current().token_type == TokenType::Keyword {
             let _ = self.next();
@@ -1435,7 +1438,7 @@ impl Parser {
         }
     }
 
-    pub fn if_statement(&mut self) -> Statements {
+    pub fn if_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.current().token_type == TokenType::Keyword {
             let _ = self.next();
@@ -1498,7 +1501,7 @@ impl Parser {
 
                 match self.current().token_type {
                     TokenType::Keyword => {
-                        if self.current().value != *"if" {
+                        if self.current().value != "if" {
                             self.error(ParserError::UnknownExpression {
                                 exception: "unexpected keyword found after `else`".to_string(),
                                 help: "Consider opening new block, or using `if else` bundle"
@@ -1582,7 +1585,7 @@ impl Parser {
         }
     }
 
-    pub fn while_statement(&mut self) -> Statements {
+    pub fn while_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -1633,7 +1636,7 @@ impl Parser {
         }
     }
 
-    pub fn for_statement(&mut self) -> Statements {
+    pub fn for_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -1701,7 +1704,7 @@ impl Parser {
         }
     }
 
-    pub fn fn_statement(&mut self) -> Statements {
+    pub fn fn_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -1722,17 +1725,17 @@ impl Parser {
                     span: _,
                 } = arg
                 {
-                    (name.clone(), r#type.clone())
+                    (*name, r#type.clone())
                 } else {
                     // okay lets just skip this piece of code.
                     // I've made a mistake creating this embedded code, but we all make mistakes.
                     // Anyways I just wanted short code to unwrap and compare identifier inside
                     // embedded boxed expressions blocks, so...
 
-                    if let Expressions::Reference { object, span: _ } = arg {
-                        if let Expressions::Value(Value::Identifier(id), _) = *object.clone() {
-                            if id == "self" {
-                                return (id, Type::SelfRef);
+                    if let Expressions::Reference { object, .. } = arg {
+                        if let Expressions::Value(Value::Identifier(id), _) = &**object {
+                            if *id == "self" {
+                                return (*id, Type::SelfRef);
                             }
                         }
                     }
@@ -1741,10 +1744,10 @@ impl Parser {
                         exception: "unexpected argument declaration found".to_string(),
                         help: "Use right arguments syntax: `identifier: type`".to_string(),
                         src: self.source.clone(),
-                        span: error::position_to_span(self.span_expression(arg.clone())),
+                        span: error::position_to_span(self.span_expression(&arg.clone())),
                     });
 
-                    (String::new(), Type::Void)
+                    ("", Type::Void)
                 }
             })
             .collect();
@@ -1804,7 +1807,7 @@ impl Parser {
         }
     }
 
-    pub fn return_statement(&mut self) -> Statements {
+    pub fn return_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1819,11 +1822,11 @@ impl Parser {
 
         Statements::ReturnStatement {
             value: return_expr.clone(),
-            span: (span_start, self.span_expression(return_expr).1),
+            span: (span_start, self.span_expression(&return_expr).1),
         }
     }
 
-    pub fn break_statement(&mut self) -> Statements {
+    pub fn break_statement(&mut self) -> Statements<'a> {
         let span = self.current().span;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -1834,7 +1837,11 @@ impl Parser {
         Statements::BreakStatements { span }
     }
 
-    pub fn assign_statement(&mut self, object: Expressions, span: (usize, usize)) -> Statements {
+    pub fn assign_statement(
+        &mut self,
+        object: Expressions<'a>,
+        span: (usize, usize),
+    ) -> Statements<'a> {
         if self.expect(TokenType::Equal) {
             let _ = self.next();
         }
@@ -1851,10 +1858,10 @@ impl Parser {
 
     pub fn binary_assign_statement(
         &mut self,
-        object: Expressions,
-        op: String,
+        object: Expressions<'a>,
+        op: &'a str,
         span: (usize, usize),
-    ) -> Statements {
+    ) -> Statements<'a> {
         if self.expect(TokenType::Equal) {
             let _ = self.next();
         }
@@ -1873,9 +1880,9 @@ impl Parser {
 
     pub fn slice_assign_statement(
         &mut self,
-        object: Expressions,
+        object: Expressions<'a>,
         span: (usize, usize),
-    ) -> Statements {
+    ) -> Statements<'a> {
         let brackets_span_start = self.current().span.0;
         if self.expect(TokenType::LBrack) {
             let _ = self.next();
@@ -1922,7 +1929,7 @@ impl Parser {
         }
     }
 
-    pub fn call_statement(&mut self, id: String, span: (usize, usize)) -> Statements {
+    pub fn call_statement(&mut self, id: &'a str, span: (usize, usize)) -> Statements<'a> {
         match self.current().token_type {
             TokenType::Identifier => {
                 let _ = self.next();
@@ -1956,7 +1963,7 @@ impl Parser {
         }
     }
 
-    pub fn macrocall_statement(&mut self, id: String, span: (usize, usize)) -> Statements {
+    pub fn macrocall_statement(&mut self, id: &'a str, span: (usize, usize)) -> Statements<'a> {
         if self.expect(TokenType::Not) {
             let _ = self.next();
         }
@@ -1977,7 +1984,7 @@ impl Parser {
         }
     }
 
-    pub fn struct_statement(&mut self) -> Statements {
+    pub fn struct_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -2044,7 +2051,7 @@ impl Parser {
                         header_span: _,
                     } = &stmt
                     {
-                        functions.insert(name.to_owned(), stmt);
+                        functions.insert(*name, stmt.clone());
                     } else {
                         unreachable!()
                     }
@@ -2100,7 +2107,7 @@ impl Parser {
                         let _ = self.next();
                     }
 
-                    if fields.contains_key(&name) {
+                    if fields.contains_key(name) {
                         self.error(ParserError::DeclarationError {
                             exception: format!("field `{name}` defined multiple times"),
                             help: "Remove field duplicate".to_string(),
@@ -2148,7 +2155,7 @@ impl Parser {
         }
     }
 
-    pub fn enum_statement(&mut self) -> Statements {
+    pub fn enum_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
         if let TokenType::Keyword = self.current().token_type {
             let _ = self.next();
@@ -2210,7 +2217,7 @@ impl Parser {
                         header_span: _,
                     } = &stmt
                     {
-                        functions.insert(name.to_owned(), stmt);
+                        functions.insert(*name, stmt.clone());
                     } else {
                         unreachable!()
                     }
@@ -2266,7 +2273,7 @@ impl Parser {
         }
     }
 
-    pub fn typedef_statement(&mut self) -> Statements {
+    pub fn typedef_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -2295,7 +2302,7 @@ impl Parser {
         }
     }
 
-    pub fn extern_declare_statement(&mut self) -> Statements {
+    pub fn extern_declare_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -2327,7 +2334,7 @@ impl Parser {
         }
     }
 
-    pub fn link_c_statement(&mut self) -> Statements {
+    pub fn link_c_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -2356,7 +2363,7 @@ impl Parser {
         }
     }
 
-    pub fn extern_statement(&mut self) -> Statements {
+    pub fn extern_statement(&mut self) -> Statements<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Keyword) {
             let _ = self.next();
@@ -2401,7 +2408,7 @@ impl Parser {
                 span: error::position_to_span(self.current().span),
             });
 
-            "undefined".to_string()
+            "undefined"
         };
 
         let _ = self.next();

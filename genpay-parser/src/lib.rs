@@ -19,7 +19,7 @@ pub mod types;
 /// Basic Values Enum
 pub mod value;
 
-pub type ParserOk = (Vec<Statements>, Vec<ParserWarning>);
+pub type ParserOk<'a> = (Vec<Statements<'a>>, Vec<ParserWarning>);
 pub type ParserErr = (Vec<ParserError>, Vec<ParserWarning>);
 
 const BINARY_OPERATORS: [TokenType; 5] = [
@@ -64,10 +64,10 @@ const END_STATEMENT: TokenType = TokenType::Semicolon;
 /// Function [`Parser::get_span_expression`] is used to extract span tuple from
 /// [`expressions::Expressions`] enum
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Parser {
+pub struct Parser<'a> {
     source: NamedSource<String>,
 
-    tokens: Vec<Token>,
+    tokens: Vec<Token<'a>>,
     position: usize,
 
     errors: Vec<ParserError>,
@@ -75,13 +75,13 @@ pub struct Parser {
     eof: bool,
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     // main
 
     /// **Structure Builder** <br/>
     /// Requires full ownership for vector of tokens, and source code with filename for error
     /// handling
-    pub fn new(tokens: Vec<Token>, source: &str, filename: &str) -> Self {
+    pub fn new(tokens: Vec<Token<'a>>, source: &'a str, filename: &str) -> Self {
         Self {
             source: NamedSource::new(filename, source.to_owned()),
 
@@ -96,19 +96,17 @@ impl Parser {
 
     /// **Main Parser Function** <br/>
     /// Requires new created self instance. **Can be called only once!**
-    pub fn parse(&mut self) -> Result<ParserOk, ParserErr> {
+    pub fn parse(&mut self) -> Result<ParserOk<'a>, ParserErr> {
         let mut output = Vec::new();
 
-        while self.position < self.tokens.len() - 1 {
+        while !self.eof {
             output.push(self.statement());
-
-            if self.eof {
-                break;
-            };
         }
 
         if !self.errors.is_empty() {
-            return Err((self.errors.clone(), self.warnings.clone()));
+            let errors = self.errors.clone();
+            let warnings = self.warnings.clone();
+            return Err((errors, warnings));
         }
         Ok((output, self.warnings.clone()))
     }
@@ -128,8 +126,8 @@ impl Parser {
         })
     }
 
-    fn get_basic_type(&mut self, datatype: String, span: (usize, usize)) -> Type {
-        match datatype.as_str() {
+    fn get_basic_type(&mut self, datatype: &str, span: (usize, usize)) -> Type<'a> {
+        match datatype {
             "i8" => Type::I8,
             "i16" => Type::I16,
             "i32" => Type::I32,
@@ -161,7 +159,7 @@ impl Parser {
         }
     }
 
-    fn parse_type(&mut self) -> Type {
+    fn parse_type(&mut self) -> Type<'a> {
         let current = self.current();
 
         match current.token_type {
@@ -257,24 +255,17 @@ impl Parser {
 
     // fundamental
 
-    fn next(&mut self) -> Token {
+    fn next(&mut self) -> Token<'a> {
         self.position += 1;
-
-        if self.position < self.tokens.len() {
-            self.tokens[self.position].clone()
-        } else {
-            Token::new(String::from(""), TokenType::EOF, (0, 1))
-        }
+        self.current()
     }
 
-    fn current(&self) -> Token {
-        let mut cur = self.tokens[self.position].clone();
-
-        if let TokenType::EOF = cur.token_type {
-            cur.span = self.tokens[self.position - 1].clone().span;
+    fn current(&self) -> Token<'a> {
+        if self.position >= self.tokens.len() {
+            let last_span = self.tokens.last().map(|t| t.span).unwrap_or((0, 1));
+            return Token::new("", TokenType::EOF, last_span);
         }
-
-        cur
+        self.tokens[self.position]
     }
 
     fn expect(&self, expected: TokenType) -> bool {
@@ -295,8 +286,8 @@ impl Parser {
     }
 }
 
-impl Parser {
-    fn term(&mut self) -> Expressions {
+impl<'a> Parser<'a> {
+    fn term(&mut self) -> Expressions<'a> {
         let current = self.current();
         let _ = self.next();
 
@@ -326,7 +317,7 @@ impl Parser {
                 Expressions::Unary {
                     operand: current.value,
                     object: Box::new(object.clone()),
-                    span: (current.span.0, self.span_expression(object).1),
+                    span: (current.span.0, self.span_expression(&object).1),
                 }
             }
             TokenType::LParen => {
@@ -379,7 +370,7 @@ impl Parser {
 
             TokenType::Identifier => {
                 let output =
-                    Expressions::Value(Value::Identifier(current.value.clone()), current.span);
+                    Expressions::Value(Value::Identifier(current.value), current.span);
 
                 match self.current().token_type {
                     TokenType::LParen => return self.call_expression(current.value, current.span),
@@ -391,7 +382,7 @@ impl Parser {
                         let _ = self.next();
                         if self.expect(TokenType::Dot) {
                             self.position -= 2;
-                            return self.struct_expression(current.value.clone());
+                            return self.struct_expression(current.value);
                         }
                         self.position -= 1;
                         return output;
@@ -434,7 +425,7 @@ impl Parser {
                     let span_end = self.current().span.1;
 
                     return Expressions::Argument {
-                        name: String::from("@deen_type"),
+                        name: "@deen_type",
                         r#type: parsed_type,
                         span: (span_start, span_end),
                     };
@@ -504,7 +495,7 @@ impl Parser {
             TokenType::Type => {
                 let datatype = self.get_basic_type(current.value, current.span);
                 Expressions::Argument {
-                    name: "@deen_type".to_string(),
+                    name: "@deen_type",
                     r#type: datatype,
                     span: current.span,
                 }
@@ -523,7 +514,7 @@ impl Parser {
         }
     }
 
-    fn expression(&mut self) -> Expressions {
+    fn expression(&mut self) -> Expressions<'a> {
         let node = self.term();
         let current = self.current();
 
@@ -572,11 +563,11 @@ impl Parser {
         }
     }
 
-    fn statement(&mut self) -> Statements {
+    fn statement(&mut self) -> Statements<'a> {
         let current = self.current();
 
         match current.token_type {
-            TokenType::Keyword => match current.value.as_str() {
+            TokenType::Keyword => match current.value {
                 "let" => self.annotation_statement(),
                 "import" => self.import_statement(),
                 "include" => self.include_statement(),
@@ -653,8 +644,7 @@ impl Parser {
 
                         _ => {
                             self.error(ParserError::VisibilityError {
-                                exception: "visibility is not followed by provided item"
-                                    .to_string(),
+                                exception: "visibility is not followed by provided item".to_string(),
                                 help: "Remove public changer keyword".to_string(),
                                 src: self.source.clone(),
                                 span: error::position_to_span(current.span),
@@ -760,10 +750,8 @@ impl Parser {
                             },
                             _ => {
                                 self.error(ParserError::UnsupportedExpression {
-                                    exception: "unsupported for dereference statement kind"
-                                        .to_string(),
-                                    help: "If you didn't want to dereference, delete the operator"
-                                        .to_string(),
+                                    exception: "unsupported for dereference statement kind".to_string(),
+                                    help: "If you didn't want to dereference, delete the operator".to_string(),
                                     src: self.source.clone(),
                                     span: error::position_to_span((span_start, span_end)),
                                 });
@@ -775,8 +763,7 @@ impl Parser {
                     _ => {
                         self.error(ParserError::UnsupportedExpression {
                             exception: "unsupported for dereference statement kind".to_string(),
-                            help: "If you didn't want to dereference, delete the operator"
-                                .to_string(),
+                            help: "If you didn't want to dereference, delete the operator".to_string(),
                             src: self.source.clone(),
                             span: error::position_to_span(self.current().span),
                         });
@@ -824,8 +811,7 @@ impl Parser {
 
                                 if !self.expect(TokenType::Equal) {
                                     self.error(ParserError::UnknownExpression {
-                                        exception: "unexpected binary expression after subelement"
-                                            .to_string(),
+                                        exception: "unexpected binary expression after subelement".to_string(),
                                         help: "Consider adding `=` after subelement".to_string(),
                                         src: self.source.clone(),
                                         span: error::position_to_span((
@@ -860,8 +846,7 @@ impl Parser {
 
                                 self.error(ParserError::UnknownExpression {
                                     exception: "unknown subelement in statement found".to_string(),
-                                    help: "Remove subelement expression if it's not necessary"
-                                        .to_string(),
+                                    help: "Remove subelement expression if it's not necessary".to_string(),
                                     src: self.source.clone(),
                                     span: error::position_to_span((current.span.0, span_end)),
                                 });
@@ -889,11 +874,9 @@ impl Parser {
 
                             if op1 != op2 {
                                 self.error(ParserError::UnknownExpression {
-                                    exception: "unknown variation of increment/decrement found"
-                                        .to_string(),
+                                    exception: "unknown variation of increment/decrement found".to_string(),
                                     help:
-                                        "Consider using right increment/decrement syntax: a++ / a--"
-                                            .to_string(),
+                                        "Consider using right increment/decrement syntax: a++ / a--".to_string(),
                                     src: self.source.clone(),
                                     span: error::position_to_span((span_start, span_end)),
                                 });
@@ -919,8 +902,7 @@ impl Parser {
                         }
                         _ => {
                             self.error(ParserError::UnknownExpression {
-                                exception: "unknown binary operation in statement found"
-                                    .to_string(),
+                                exception: "unknown binary operation in statement found".to_string(),
                                 help: "Maybe you wanted to add assign operator?".to_string(),
                                 src: self.source.clone(),
                                 span: error::position_to_span((
@@ -939,7 +921,7 @@ impl Parser {
                     _ => {
                         self.error(ParserError::UnknownExpression {
                             exception: "unknown expression found after identifier".to_string(),
-                            help: String::new(),
+                            help: "".to_string(),
                             src: self.source.clone(),
                             span: error::position_to_span((current.span.0, next.span.1)),
                         });
@@ -983,7 +965,7 @@ mod tests {
         ]
         .into_iter()
         .for_each(|(typ, exp)| {
-            assert_eq!(parser.get_basic_type(String::from(typ), (0, 0)), exp);
+            assert_eq!(parser.get_basic_type(typ, (0, 0)), exp);
         });
     }
 }

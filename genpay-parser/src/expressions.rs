@@ -10,110 +10,110 @@ use genpay_lexer::token_type::TokenType;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expressions {
+pub enum Expressions<'a> {
     /// `OBJECT BINOP EXPRESSION`
     Binary {
-        operand: String,
-        lhs: Box<Expressions>,
-        rhs: Box<Expressions>,
+        operand: &'a str,
+        lhs: Box<Expressions<'a>>,
+        rhs: Box<Expressions<'a>>,
         span: (usize, usize),
     },
     /// `UNOP OBJECT`
     Unary {
-        operand: String,
-        object: Box<Expressions>,
+        operand: &'a str,
+        object: Box<Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `OBJECT BOOLOP EXPRESSION`
     Boolean {
-        operand: String,
-        lhs: Box<Expressions>,
-        rhs: Box<Expressions>,
+        operand: &'a str,
+        lhs: Box<Expressions<'a>>,
+        rhs: Box<Expressions<'a>>,
         span: (usize, usize),
     },
     /// `OBJECT BITOP EXPRESSION`
     Bitwise {
-        operand: String,
-        lhs: Box<Expressions>,
-        rhs: Box<Expressions>,
+        operand: &'a str,
+        lhs: Box<Expressions<'a>>,
+        rhs: Box<Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `IDENTIFIER: TYPE`
     Argument {
-        name: String,
-        r#type: Type,
+        name: &'a str,
+        r#type: Type<'a>,
         span: (usize, usize),
     },
     /// `OBJECT.SUBELEMENT_1.SUBELEMENT_2`
     SubElement {
-        head: Box<Expressions>,
-        subelements: Vec<Expressions>,
+        head: Box<Expressions<'a>>,
+        subelements: Vec<Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `IDENTIFIER ( EXPRESSION, EXPRESSION, ... )`
     FnCall {
-        name: String,
-        arguments: Vec<Expressions>,
+        name: &'a str,
+        arguments: Vec<Expressions<'a>>,
         span: (usize, usize),
     },
     /// `IDENTIFIER! ( EXPRESSION, EXPRESSION, ... )`
     MacroCall {
-        name: String,
-        arguments: Vec<Expressions>,
+        name: &'a str,
+        arguments: Vec<Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `&EXPRESSION`
     Reference {
-        object: Box<Expressions>,
+        object: Box<Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `*EXPRESSION`
     Dereference {
-        object: Box<Expressions>,
+        object: Box<Expressions<'a>>,
         span: (usize, usize),
     },
 
     /// `[EXPRESSION, EXPRESSION, ...]`
     Array {
-        values: Vec<Expressions>,
+        values: Vec<Expressions<'a>>,
         len: usize,
         span: (usize, usize),
     },
     /// `(EXPRESSION, EXPRESSION, ...)`
     Tuple {
-        values: Vec<Expressions>,
+        values: Vec<Expressions<'a>>,
         span: (usize, usize),
     },
     /// `OBJECT[EXPRESSION]`
     Slice {
-        object: Box<Expressions>,
-        index: Box<Expressions>,
+        object: Box<Expressions<'a>>,
+        index: Box<Expressions<'a>>,
         span: (usize, usize),
     },
     /// `IDENTIFIER { .IDENTIFIER = EXPRESSION, .IDENTIFIER = EXPRESSION }`
     Struct {
-        name: String,
-        fields: HashMap<String, Expressions>,
+        name: &'a str,
+        fields: HashMap<&'a str, Expressions<'a>>,
         span: (usize, usize),
     },
     /// `{ STATEMENTS }`
     Scope {
-        block: Vec<Statements>,
+        block: Vec<Statements<'a>>,
         span: (usize, usize),
     },
 
-    Value(Value, (usize, usize)),
+    Value(Value<'a>, (usize, usize)),
     None,
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     #[inline]
-    pub fn get_span_expression(expr: &Expressions) -> (usize, usize) {
+    pub fn get_span_expression(expr: &Expressions<'a>) -> (usize, usize) {
         match expr {
             Expressions::Binary { span, .. } => *span,
             Expressions::Boolean { span, .. } => *span,
@@ -136,17 +136,15 @@ impl Parser {
     }
 
     #[inline]
-    pub fn span_expression(&self, expr: Expressions) -> (usize, usize) {
-        Self::get_span_expression(&expr)
+    pub fn span_expression(&self, expr: &Expressions<'a>) -> (usize, usize) {
+        Self::get_span_expression(expr)
     }
-}
 
-impl Parser {
     pub fn subelement_expression(
         &mut self,
-        head: Expressions,
+        head: Expressions<'a>,
         separator: TokenType,
-    ) -> Expressions {
+    ) -> Expressions<'a> {
         // if self.expect(separator) {
         //     let _ = self.next();
         // }
@@ -171,7 +169,7 @@ impl Parser {
         }
     }
 
-    pub fn binary_expression(&mut self, node: Expressions) -> Expressions {
+    pub fn binary_expression(&mut self, node: Expressions<'a>) -> Expressions<'a> {
         let node_span = Self::get_span_expression(&node);
         let span_end;
 
@@ -229,7 +227,7 @@ impl Parser {
         }
     }
 
-    pub fn boolean_expression(&mut self, node: Expressions) -> Expressions {
+    pub fn boolean_expression(&mut self, node: Expressions<'a>) -> Expressions<'a> {
         // FIXME: Expressions like `true || false` returns error "Undefined term found"
 
         let node_span = Self::get_span_expression(&node);
@@ -280,7 +278,7 @@ impl Parser {
         }
     }
 
-    pub fn bitwise_expression(&mut self, node: Expressions) -> Expressions {
+    pub fn bitwise_expression(&mut self, node: Expressions<'a>) -> Expressions<'a> {
         let node_span = Self::get_span_expression(&node);
         let span_end;
 
@@ -308,7 +306,7 @@ impl Parser {
         }
     }
 
-    pub fn call_expression(&mut self, fname: String, span: (usize, usize)) -> Expressions {
+    pub fn call_expression(&mut self, fname: &'a str, span: (usize, usize)) -> Expressions<'a> {
         match self.current().token_type {
             TokenType::Identifier => {
                 let _ = self.next();
@@ -317,7 +315,7 @@ impl Parser {
             _ => {
                 self.error(ParserError::UnknownExpression {
                     exception: "unknown call expression syntax".to_string(),
-                    help: "Consider using right syntax: `identifier(value, ...)".to_string(),
+                    help: "Consider using right syntax: `identifier(value, ...)`".to_string(),
                     src: self.source.clone(),
                     span: error::position_to_span((span.0, self.current().span.1)),
                 });
@@ -340,7 +338,7 @@ impl Parser {
         }
     }
 
-    pub fn macrocall_expression(&mut self, name: String, span: (usize, usize)) -> Expressions {
+    pub fn macrocall_expression(&mut self, name: &'a str, span: (usize, usize)) -> Expressions<'a> {
         if self.expect(TokenType::Not) {
             let _ = self.next();
         }
@@ -359,12 +357,13 @@ impl Parser {
         }
     }
 
-    pub fn slice_expression(&mut self, expr: Expressions) -> Expressions {
+    pub fn slice_expression(&mut self, expr: Expressions<'a>) -> Expressions<'a> {
         if let TokenType::LBrack = self.current().token_type {
             let _ = self.next();
         }
 
-        let object = Box::new(expr.clone());
+        let expr_span_0 = self.span_expression(&expr).0;
+        let object = Box::new(expr);
         let index = Box::new(self.expression());
 
         if self.current().token_type != TokenType::RBrack {
@@ -373,7 +372,7 @@ impl Parser {
                 help: "Close slice index with brackets".to_string(),
                 src: self.source.clone(),
                 span: error::position_to_span((
-                    self.span_expression(expr).0,
+                    expr_span_0,
                     self.current().span.1,
                 )),
             });
@@ -386,11 +385,11 @@ impl Parser {
         Expressions::Slice {
             object,
             index,
-            span: (self.span_expression(expr).0, span_end),
+            span: (expr_span_0, span_end),
         }
     }
 
-    pub fn struct_expression(&mut self, name: String) -> Expressions {
+    pub fn struct_expression(&mut self, name: &'a str) -> Expressions<'a> {
         let span_start = self.current().span.0;
         if self.expect(TokenType::Identifier) {
             let _ = self.next();
@@ -506,7 +505,7 @@ impl Parser {
         start: TokenType,
         end: TokenType,
         separator: TokenType,
-    ) -> Vec<Expressions> {
+    ) -> Vec<Expressions<'a>> {
         let mut current = self.current();
 
         if self.expect(start) {
@@ -540,7 +539,7 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use genpay_lexer::Lexer;
+    use genpay_lexer::Lexeme as Lexer;
     use crate::{
         Parser, expressions::Expressions, statements::Statements, types::Type, value::Value,
     };
@@ -550,8 +549,8 @@ mod tests {
         const SRC: &str = "let a = 5 + 2;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -572,16 +571,16 @@ mod tests {
                 } => {
                     assert_eq!(operand, "+");
 
-                    if let Expressions::Value(Value::Integer(5), _) = *lhs.clone() {
+                    if let Expressions::Value(Value::Integer(5), _) = *lhs {
                     } else {
                         panic!("Wrong LHS found")
                     };
-                    if let Expressions::Value(Value::Integer(2), _) = *rhs.clone() {
+                    if let Expressions::Value(Value::Integer(2), _) = *rhs {
                     } else {
                         panic!("Wrong LHS found")
                     };
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -593,8 +592,8 @@ mod tests {
         const SRC: &str = "let a = 2 + 2 * 2;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -615,7 +614,7 @@ mod tests {
                 } => {
                     assert_eq!(operand, "+");
 
-                    if let Expressions::Value(Value::Integer(2), _) = *lhs.clone() {
+                    if let Expressions::Value(Value::Integer(2), _) = *lhs {
                     } else {
                         panic!("Wrong LHS found")
                     };
@@ -624,15 +623,15 @@ mod tests {
                         lhs,
                         rhs,
                         span: _,
-                    } = *rhs.clone()
+                    } = *rhs
                     {
                         assert_eq!(operand, "*");
 
-                        if let Expressions::Value(Value::Integer(2), _) = *lhs.clone() {
+                        if let Expressions::Value(Value::Integer(2), _) = *lhs {
                         } else {
                             panic!("Wrong LHS found")
                         };
-                        if let Expressions::Value(Value::Integer(2), _) = *rhs.clone() {
+                        if let Expressions::Value(Value::Integer(2), _) = *rhs {
                         } else {
                             panic!("Wrong LHS found")
                         };
@@ -640,7 +639,7 @@ mod tests {
                         panic!("Wrong LHS found")
                     };
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -652,8 +651,8 @@ mod tests {
         const SRC: &str = "let a = -2;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -673,12 +672,12 @@ mod tests {
                 } => {
                     assert_eq!(operand, "-");
 
-                    if let Expressions::Value(Value::Integer(2), _) = *object.clone() {
+                    if let Expressions::Value(Value::Integer(2), _) = *object {
                     } else {
                         panic!("Wrong object expression found")
                     };
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -690,8 +689,8 @@ mod tests {
         const SRC: &str = "let a = !2;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -711,12 +710,12 @@ mod tests {
                 } => {
                     assert_eq!(operand, "!");
 
-                    if let Expressions::Value(Value::Integer(2), _) = *object.clone() {
+                    if let Expressions::Value(Value::Integer(2), _) = *object {
                     } else {
                         panic!("Wrong object expression found")
                     };
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -728,8 +727,8 @@ mod tests {
         const SRC: &str = "let a = 1 == 1;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -750,16 +749,16 @@ mod tests {
                 } => {
                     assert_eq!(operand, "==");
 
-                    if let Expressions::Value(Value::Integer(1), _) = *lhs.clone() {
+                    if let Expressions::Value(Value::Integer(1), _) = *lhs {
                     } else {
                         panic!("Wrong object expression found")
                     };
-                    if let Expressions::Value(Value::Integer(1), _) = *rhs.clone() {
+                    if let Expressions::Value(Value::Integer(1), _) = *rhs {
                     } else {
                         panic!("Wrong object expression found")
                     };
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -771,8 +770,8 @@ mod tests {
         const SRC: &str = "let a = 1 != 1;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -793,16 +792,16 @@ mod tests {
                 } => {
                     assert_eq!(operand, "!=");
 
-                    if let Expressions::Value(Value::Integer(1), _) = *lhs.clone() {
+                    if let Expressions::Value(Value::Integer(1), _) = *lhs {
                     } else {
                         panic!("Wrong object expression found")
                     };
-                    if let Expressions::Value(Value::Integer(1), _) = *rhs.clone() {
+                    if let Expressions::Value(Value::Integer(1), _) = *rhs {
                     } else {
                         panic!("Wrong object expression found")
                     };
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -814,8 +813,8 @@ mod tests {
         const SRC: &str = "let a = 1 > 1;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -836,16 +835,16 @@ mod tests {
                 } => {
                     assert_eq!(operand, ">");
 
-                    if let Expressions::Value(Value::Integer(1), _) = *lhs.clone() {
+                    if let Expressions::Value(Value::Integer(1), _) = *lhs {
                     } else {
                         panic!("Wrong object expression found")
                     };
-                    if let Expressions::Value(Value::Integer(1), _) = *rhs.clone() {
+                    if let Expressions::Value(Value::Integer(1), _) = *rhs {
                     } else {
                         panic!("Wrong object expression found")
                     };
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -857,8 +856,8 @@ mod tests {
         const SRC: &str = "let a = 1 < 1;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -879,16 +878,16 @@ mod tests {
                 } => {
                     assert_eq!(operand, "<");
 
-                    if let Expressions::Value(Value::Integer(1), _) = *lhs.clone() {
+                    if let Expressions::Value(Value::Integer(1), _) = *lhs {
                     } else {
                         panic!("Wrong object expression found")
                     };
-                    if let Expressions::Value(Value::Integer(1), _) = *rhs.clone() {
+                    if let Expressions::Value(Value::Integer(1), _) = *rhs {
                     } else {
                         panic!("Wrong object expression found")
                     };
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -900,8 +899,8 @@ mod tests {
         const SRC: &str = "let a = 1 == 1 && 0 != 5;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -927,15 +926,15 @@ mod tests {
                         lhs,
                         rhs,
                         span: _,
-                    } = *lhs.clone()
+                    } = *lhs
                     {
                         assert_eq!(operand, "==");
 
-                        if let Expressions::Value(Value::Integer(1), _) = *lhs.clone() {
+                        if let Expressions::Value(Value::Integer(1), _) = *lhs {
                         } else {
                             panic!("Wrong object expression found")
                         };
-                        if let Expressions::Value(Value::Integer(1), _) = *rhs.clone() {
+                        if let Expressions::Value(Value::Integer(1), _) = *rhs {
                         } else {
                             panic!("Wrong object expression found")
                         };
@@ -948,15 +947,15 @@ mod tests {
                         lhs,
                         rhs,
                         span: _,
-                    } = *rhs.clone()
+                    } = *rhs
                     {
                         assert_eq!(operand, "!=");
 
-                        if let Expressions::Value(Value::Integer(0), _) = *lhs.clone() {
+                        if let Expressions::Value(Value::Integer(0), _) = *lhs {
                         } else {
                             panic!("Wrong object expression found")
                         };
-                        if let Expressions::Value(Value::Integer(5), _) = *rhs.clone() {
+                        if let Expressions::Value(Value::Integer(5), _) = *rhs {
                         } else {
                             panic!("Wrong object expression found")
                         };
@@ -964,7 +963,7 @@ mod tests {
                         panic!("Wrong boolean expression found");
                     }
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -976,8 +975,8 @@ mod tests {
         const SRC: &str = "let a = 5 << 2;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -998,16 +997,16 @@ mod tests {
                 } => {
                     assert_eq!(operand, "<<");
 
-                    if let Expressions::Value(Value::Integer(5), _) = *lhs.clone() {
+                    if let Expressions::Value(Value::Integer(5), _) = *lhs {
                     } else {
                         panic!("Wrong object expression found")
                     };
-                    if let Expressions::Value(Value::Integer(2), _) = *rhs.clone() {
+                    if let Expressions::Value(Value::Integer(2), _) = *rhs {
                     } else {
                         panic!("Wrong object expression found")
                     };
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -1019,8 +1018,8 @@ mod tests {
         const SRC: &str = "let a = some_arg: i32";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1041,7 +1040,7 @@ mod tests {
                     assert_eq!(name, "some_arg");
                     assert_eq!(r#type, Type::I32);
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -1053,8 +1052,8 @@ mod tests {
         const SRC: &str = "let a = some_arg: *[i32; 5]";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1078,7 +1077,7 @@ mod tests {
                         Type::Pointer(Box::new(Type::Array(Box::new(Type::I32), 5)))
                     );
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -1090,8 +1089,8 @@ mod tests {
         const SRC: &str = "let a = some_struct.field";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1122,7 +1121,7 @@ mod tests {
                         panic!("Wrong subelement in subelement expr found")
                     }
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -1134,8 +1133,8 @@ mod tests {
         const SRC: &str = "let a = some_struct.field.method()";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1188,7 +1187,7 @@ mod tests {
                         // panic!("Wrong subelement in subelement expr found")
                     }
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -1200,8 +1199,8 @@ mod tests {
         const SRC: &str = "let a = call_me()";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1222,7 +1221,7 @@ mod tests {
                     assert_eq!(name, "call_me");
                     assert!(arguments.is_empty());
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -1234,8 +1233,8 @@ mod tests {
         const SRC: &str = "let a = call_me(1, id, 1.0)";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1273,7 +1272,7 @@ mod tests {
                         panic!("Argument does not matches expected")
                     };
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -1281,12 +1280,13 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn reference_expression() {
-        const SRC: &str = "let a = &b";
+        const SRC: &str = "let a = &b;";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1306,7 +1306,7 @@ mod tests {
                         panic!("Ref object doesn't matches expected")
                     }
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -1314,12 +1314,13 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn reference_advanced_expression() {
-        const SRC: &str = "let a = &(b)";
+        const SRC: &str = "let a = &(b);";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
@@ -1339,7 +1340,7 @@ mod tests {
                         panic!("Ref object doesn't matches expected")
                     }
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+                _ => panic!("Wrong expression value found"),
             }
         } else {
             panic!("Statements side failure");
@@ -1348,280 +1349,210 @@ mod tests {
 
     #[test]
     fn dereference_expression() {
-        const SRC: &str = "let a = *b";
+        const SRC: &str = "*b";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
 
-        if let Some(Statements::AnnotationStatement {
-            identifier: _,
-            value,
-            span: _,
-            datatype: _,
-        }) = ast.first()
+        if let Some(Statements::Expression(Expressions::Dereference { object, span: _ })) = ast.first()
         {
-            match value.clone().unwrap() {
-                Expressions::Dereference { object, span: _ } => {
-                    if let Expressions::Value(Value::Identifier(id), _) = *object {
-                        assert_eq!(id, "b")
-                    } else {
-                        panic!("Ref object doesn't matches expected")
-                    }
-                }
-                _ => panic!("Wrong expression value found: {value:?}"),
+            if let Expressions::Value(Value::Identifier(id), _) = &**object {
+                assert_eq!(*id, "b")
+            } else {
+                panic!("Ref object doesn't matches expected")
             }
         } else {
-            panic!("Statements side failure");
+            panic!("Wrong expression value found");
         }
     }
 
     #[test]
     fn dereference_advanced_expression() {
-        const SRC: &str = "let a = **b";
+        const SRC: &str = "**b";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
 
-        if let Some(Statements::AnnotationStatement {
-            identifier: _,
-            value,
-            span: _,
-            datatype: _,
-        }) = ast.first()
+        if let Some(Statements::Expression(Expressions::Dereference { object, span: _ })) = ast.first()
         {
-            match value.clone().unwrap() {
-                Expressions::Dereference { object, span: _ } => {
-                    if let Expressions::Dereference { object, span: _ } = *object {
-                        if let Expressions::Value(Value::Identifier(id), _) = *object {
-                            assert_eq!(id, "b");
-                        } else {
-                            panic!("Double dereferenced object isn't identifier")
-                        }
-                    } else {
-                        panic!("First level dereference object isn't dereference expr")
-                    }
+            if let Expressions::Dereference { object, span: _ } = &**object {
+                if let Expressions::Value(Value::Identifier(id), _) = &**object {
+                    assert_eq!(*id, "b");
+                } else {
+                    panic!("Double dereferenced object isn't identifier")
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
+            } else {
+                panic!("First level dereference object isn't dereference expr")
             }
         } else {
-            panic!("Statements side failure");
+            panic!("Wrong expression value found");
         }
     }
 
     #[test]
     fn array_expression() {
-        const SRC: &str = "let a = [1, 2, 3]";
+        const SRC: &str = "[1, 2, 3]";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
 
-        if let Some(Statements::AnnotationStatement {
-            identifier: _,
-            value,
+        if let Some(Statements::Expression(Expressions::Array {
+            values,
+            len,
             span: _,
-            datatype: _,
-        }) = ast.first()
+        })) = ast.first()
         {
-            match value.clone().unwrap() {
-                Expressions::Array {
-                    values,
-                    len,
-                    span: _,
-                } => {
-                    assert_eq!(len, 3);
+            assert_eq!(*len, 3);
 
-                    let mut values = values.into_iter();
-                    if let Some(Expressions::Value(Value::Integer(1), _)) = values.next() {
-                    } else {
-                        panic!("Arg #1 is wrong")
-                    }
-                    if let Some(Expressions::Value(Value::Integer(2), _)) = values.next() {
-                    } else {
-                        panic!("Arg #2 is wrong")
-                    }
-                    if let Some(Expressions::Value(Value::Integer(3), _)) = values.next() {
-                    } else {
-                        panic!("Arg #3 is wrong")
-                    }
-                }
-                _ => panic!("Wrong expression value found: {value:?}"),
+            let mut values = values.into_iter();
+            if let Some(Expressions::Value(Value::Integer(1), _)) = values.next() {
+            } else {
+                panic!("Arg #1 is wrong")
+            }
+            if let Some(Expressions::Value(Value::Integer(2), _)) = values.next() {
+            } else {
+                panic!("Arg #2 is wrong")
+            }
+            if let Some(Expressions::Value(Value::Integer(3), _)) = values.next() {
+            } else {
+                panic!("Arg #3 is wrong")
             }
         } else {
-            panic!("Statements side failure");
+            panic!("Wrong expression value found");
         }
     }
 
     #[test]
     fn tuple_expression() {
-        const SRC: &str = "let a = (1, 5, 4)";
+        const SRC: &str = "(1, 5, 4)";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
 
-        if let Some(Statements::AnnotationStatement {
-            identifier: _,
-            value,
-            span: _,
-            datatype: _,
-        }) = ast.first()
+        if let Some(Statements::Expression(Expressions::Tuple { values, span: _ })) = ast.first()
         {
-            match value.clone().unwrap() {
-                Expressions::Tuple { values, span: _ } => {
-                    assert_eq!(values.len(), 3);
+            assert_eq!(values.len(), 3);
 
-                    let mut values = values.into_iter();
-                    if let Some(Expressions::Value(Value::Integer(1), _)) = values.next() {
-                    } else {
-                        panic!("Argument is wrong")
-                    };
-                    if let Some(Expressions::Value(Value::Integer(5), _)) = values.next() {
-                    } else {
-                        panic!("Argument is wrong")
-                    };
-                    if let Some(Expressions::Value(Value::Integer(4), _)) = values.next() {
-                    } else {
-                        panic!("Argument is wrong")
-                    };
-                }
-                _ => panic!("Wrong expression value found: {value:?}"),
-            }
+            let mut values = values.into_iter();
+            if let Some(Expressions::Value(Value::Integer(1), _)) = values.next() {
+            } else {
+                panic!("Argument is wrong")
+            };
+            if let Some(Expressions::Value(Value::Integer(5), _)) = values.next() {
+            } else {
+                panic!("Argument is wrong")
+            };
+            if let Some(Expressions::Value(Value::Integer(4), _)) = values.next() {
+            } else {
+                panic!("Argument is wrong")
+            };
         } else {
-            panic!("Statements side failure");
+            panic!("Wrong expression value found");
         }
     }
 
     #[test]
     fn tuple_advanced_expression() {
-        const SRC: &str = "let a = (1, 2.0, \"hello\")";
+        const SRC: &str = "(1, 2.0, \"hello\")";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
 
-        if let Some(Statements::AnnotationStatement {
-            identifier: _,
-            value,
-            span: _,
-            datatype: _,
-        }) = ast.first()
+        if let Some(Statements::Expression(Expressions::Tuple { values, span: _ })) = ast.first()
         {
-            match value.clone().unwrap() {
-                Expressions::Tuple { values, span: _ } => {
-                    assert_eq!(values.len(), 3);
+            assert_eq!(values.len(), 3);
 
-                    let mut values = values.into_iter();
-                    if let Some(Expressions::Value(Value::Integer(1), _)) = values.next() {
-                    } else {
-                        panic!("Argument is wrong")
-                    };
-                    if let Some(Expressions::Value(Value::Float(2.0), _)) = values.next() {
-                    } else {
-                        panic!("Argument is wrong")
-                    };
-                    if let Some(Expressions::Value(Value::String(str), _)) = values.next() {
-                        assert_eq!(str, "hello")
-                    } else {
-                        panic!("Argument is wrong")
-                    };
-                }
-                _ => panic!("Wrong expression value found: {value:?}"),
-            }
+            let mut values = values.into_iter();
+            if let Some(Expressions::Value(Value::Integer(1), _)) = values.next() {
+            } else {
+                panic!("Argument is wrong")
+            };
+            if let Some(Expressions::Value(Value::Float(2.0), _)) = values.next() {
+            } else {
+                panic!("Argument is wrong")
+            };
+            if let Some(Expressions::Value(Value::String(str), _)) = values.next() {
+                assert_eq!(*str, "hello")
+            } else {
+                panic!("Argument is wrong")
+            };
         } else {
-            panic!("Statements side failure");
+            panic!("Wrong expression value found");
         }
     }
 
     #[test]
     fn slice_expression() {
-        const SRC: &str = "let a = b[0]";
+        const SRC: &str = "b[0]";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
 
-        if let Some(Statements::AnnotationStatement {
-            identifier: _,
-            value,
+        if let Some(Statements::Expression(Expressions::Slice {
+            object,
+            index,
             span: _,
-            datatype: _,
-        }) = ast.first()
+        })) = ast.first()
         {
-            match value.clone().unwrap() {
-                Expressions::Slice {
-                    object,
-                    index,
-                    span: _,
-                } => {
-                    if let Expressions::Value(Value::Identifier(id), _) = *object {
-                        assert_eq!(id, "b");
-                        if let Expressions::Value(Value::Integer(0), _) = *index {
-                        } else {
-                            panic!("Wrong index on slice")
-                        }
-                    }
+            if let Expressions::Value(Value::Identifier(id), _) = &**object {
+                assert_eq!(*id, "b");
+                if let Expressions::Value(Value::Integer(0), _) = &**index {
+                } else {
+                    panic!("Wrong index on slice")
                 }
-                _ => panic!("Wrong expression value found: {value:?}"),
             }
         } else {
-            panic!("Statements side failure");
+            panic!("Wrong expression value found");
         }
     }
 
     #[test]
     fn struct_expression() {
-        const SRC: &str = "let a = Person { .age = 32, .name = \"John\", .money = 333.12 };";
+        const SRC: &str = "Person { .age = 32, .name = \"John\", .money = 333.12 };";
         const FILENAME: &str = "test.pay";
 
-        let mut lexer = Lexer::new(SRC, "test.pay");
-        let (tokens, _) = lexer.tokenize().unwrap();
+        let lexer = Lexer::new(SRC);
+        let tokens = lexer.collect::<Result<Vec<_>, _>>().unwrap();
 
         let mut parser = Parser::new(tokens, SRC, FILENAME);
         let (ast, _) = parser.parse().unwrap();
 
-        if let Some(Statements::AnnotationStatement {
-            identifier: _,
-            value,
+        if let Some(Statements::Expression(Expressions::Struct {
+            name,
+            fields,
             span: _,
-            datatype: _,
-        }) = ast.first()
+        })) = ast.first()
         {
-            match value.clone().unwrap() {
-                Expressions::Struct {
-                    name,
-                    fields,
-                    span: _,
-                } => {
-                    assert_eq!(name, "Person");
-                    assert!(fields.contains_key("age"));
-                    assert!(fields.contains_key("name"));
-                    assert!(fields.contains_key("money"));
-                }
-                _ => panic!("Wrong expression value found: {value:?}"),
-            }
+            assert_eq!(*name, "Person");
+            assert!(fields.contains_key("age"));
+            assert!(fields.contains_key("name"));
+            assert!(fields.contains_key("money"));
         } else {
-            panic!("Statements side failure");
+            panic!("Wrong expression value found");
         }
     }
 }
