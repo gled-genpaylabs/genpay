@@ -4,14 +4,14 @@ pub mod error;
 pub mod token;
 pub mod token_type;
 
-pub struct Lexer<'a> {
+pub struct Lexeme<'a> {
     source: &'a str,
     cursor: usize,
 }
 
-impl<'a> Lexer<'a> {
+impl<'a> Lexeme<'a> {
     pub fn new(source: &'a str) -> Self {
-        Lexer { source, cursor: 0 }
+        Lexeme { source, cursor: 0 }
     }
 
     fn is_at_end(&self) -> bool {
@@ -195,7 +195,7 @@ fn lookup_identifier(s: &str) -> TokenType {
     }
 }
 
-impl<'a> Iterator for Lexer<'a> {
+impl<'a> Iterator for Lexeme<'a> {
     type Item = Result<Token<'a>, LexerError<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -365,8 +365,8 @@ mod tests {
     #[test]
     fn basic_types() {
         let input = "i8 i16 i32 i64 u8 u16 u32 u64 usize char bool void";
-        let lexer = Lexer::new(input);
-        let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
+        let lexeme = Lexeme::new(input);
+        let tokens: Vec<_> = lexeme.collect::<Result<_, _>>().unwrap();
 
         let expected = vec![
             (TokenType::Type, "i8"),
@@ -393,8 +393,8 @@ mod tests {
     #[test]
     fn boolean_keywords() {
         let input = "true false";
-        let lexer = Lexer::new(input);
-        let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
+        let lexeme = Lexeme::new(input);
+        let tokens: Vec<_> = lexeme.collect::<Result<_, _>>().unwrap();
 
         let expected = vec![(TokenType::Boolean, "true"), (TokenType::Boolean, "false")];
 
@@ -408,8 +408,8 @@ mod tests {
     #[test]
     fn main_keywords() {
         let input = "let fn import return struct enum typedef";
-        let lexer = Lexer::new(input);
-        let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
+        let lexeme = Lexeme::new(input);
+        let tokens: Vec<_> = lexeme.collect::<Result<_, _>>().unwrap();
 
         let expected = vec![
             (TokenType::Keyword, "let"),
@@ -431,32 +431,32 @@ mod tests {
     #[test]
     fn basic_number() {
         let input = "123";
-        let mut lexer = Lexer::new(input);
-        let token = lexer.next().unwrap().unwrap();
+        let mut lexeme = Lexeme::new(input);
+        let token = lexeme.next().unwrap().unwrap();
         assert_eq!(token, Token::new("123", TokenType::Number, (0, 3)));
     }
 
     #[test]
     fn float_number() {
         let input = "1.23";
-        let mut lexer = Lexer::new(input);
-        let token = lexer.next().unwrap().unwrap();
+        let mut lexeme = Lexeme::new(input);
+        let token = lexeme.next().unwrap().unwrap();
         assert_eq!(token, Token::new("1.23", TokenType::FloatNumber, (0, 4)));
     }
 
     #[test]
     fn basic_string() {
         let input = "\"hello\"";
-        let mut lexer = Lexer::new(input);
-        let token = lexer.next().unwrap().unwrap();
+        let mut lexeme = Lexeme::new(input);
+        let token = lexeme.next().unwrap().unwrap();
         assert_eq!(token, Token::new("hello", TokenType::String, (0, 7)));
     }
 
     #[test]
     fn string_with_escapes() {
         let input = "\"hello\\\"world\"";
-        let mut lexer = Lexer::new(input);
-        let token = lexer.next().unwrap().unwrap();
+        let mut lexeme = Lexeme::new(input);
+        let token = lexeme.next().unwrap().unwrap();
         assert_eq!(
             token,
             Token::new("hello\\\"world", TokenType::String, (0, 14))
@@ -466,16 +466,16 @@ mod tests {
     #[test]
     fn basic_char() {
         let input = "'a'";
-        let mut lexer = Lexer::new(input);
-        let token = lexer.next().unwrap().unwrap();
+        let mut lexeme = Lexeme::new(input);
+        let token = lexeme.next().unwrap().unwrap();
         assert_eq!(token, Token::new("a", TokenType::Char, (0, 3)));
     }
 
     #[test]
     fn operators() {
         let input = "+ - * / % = == != < > <= >= && || ! & | ^ << >>";
-        let lexer = Lexer::new(input);
-        let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
+        let lexeme = Lexeme::new(input);
+        let tokens: Vec<_> = lexeme.collect::<Result<_, _>>().unwrap();
 
         let expected_tokens = vec![
             Token::new("+", TokenType::Plus, (0, 1)),
@@ -506,8 +506,8 @@ mod tests {
     #[test]
     fn unterminated_string() {
         let input = "\"hello";
-        let mut lexer = Lexer::new(input);
-        let result = lexer.next().unwrap();
+        let mut lexeme = Lexeme::new(input);
+        let result = lexeme.next().unwrap();
         assert!(matches!(
             result,
             Err(LexerError::UnterminatedString { .. })
@@ -517,8 +517,8 @@ mod tests {
     #[test]
     fn comment() {
         let input = "// this is a comment\nlet x = 1;";
-        let lexer = Lexer::new(input);
-        let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
+        let lexeme = Lexeme::new(input);
+        let tokens: Vec<_> = lexeme.collect::<Result<_, _>>().unwrap();
 
         let expected_tokens = vec![
             Token::new("let", TokenType::Keyword, (21, 3)),
