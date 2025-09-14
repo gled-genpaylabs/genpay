@@ -6,9 +6,14 @@ pub mod types;
 
 use self::types::Type;
 
+use crate::error::ParserError;
+use miette::NamedSource;
+
 struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Token<'a>,
+    source: NamedSource<String>,
+    errors: Vec<ParserError<'a>>,
 }
 
 #[derive(PartialEq, PartialOrd)]
@@ -22,7 +27,7 @@ enum Precedence {
 use genpay_lexer::token_type::TokenType;
 
 impl<'a> Parser<'a> {
-    pub fn new(source: &'a str) -> Self {
+    pub fn new(source: &'a str, filename: &'a str) -> Self {
         let mut lexer = Lexer::new(source);
         let current_token = lexer.next().unwrap_or(Ok(Token {
             value: "",
@@ -32,15 +37,28 @@ impl<'a> Parser<'a> {
         Self {
             lexer,
             current_token,
+            source: NamedSource::new(filename, source.to_string()),
+            errors: Vec::new(),
         }
     }
 
-    pub fn parse(&mut self) -> Type<'a> {
+    pub fn parse(&mut self) -> Result<Type<'a>, Vec<ParserError<'a>>> {
         let result = self.parse_type(Precedence::LOWEST);
+
         if self.current_token.token_type != TokenType::EOF {
-            panic!("Expected EOF, found {:?}", self.current_token);
+            self.errors.push(ParserError {
+                exception: "Unexpected token",
+                help: "Expected end of input",
+                src: self.source.clone(),
+                span: self.current_token.span,
+            });
         }
-        result
+
+        if self.errors.is_empty() {
+            Ok(result)
+        } else {
+            Err(self.errors.clone())
+        }
     }
 
     fn next_token(&mut self) {
@@ -90,7 +108,15 @@ impl<'a> Parser<'a> {
             }
             TokenType::LBrack => self.parse_array_type(),
             TokenType::LParen => self.parse_tuple_type(),
-            _ => panic!("Unexpected token in prefix position: {:?}", self.current_token),
+            _ => {
+                self.errors.push(ParserError {
+                    exception: "Unexpected token in prefix position",
+                    help: "Expected a type",
+                    src: self.source.clone(),
+                    span: self.current_token.span,
+                });
+                Type::Void // Return a dummy type
+            }
         }
     }
 
@@ -108,18 +134,36 @@ impl<'a> Parser<'a> {
         let inner_type = self.parse_type(Precedence::LOWEST);
 
         if self.current_token.token_type != TokenType::Semicolon {
-            panic!("Expected semicolon in array type");
+            self.errors.push(ParserError {
+                exception: "Expected semicolon in array type",
+                help: "Expected ';'",
+                src: self.source.clone(),
+                span: self.current_token.span,
+            });
+            return Type::Void;
         }
         self.next_token(); // Consume ';'
 
         if self.current_token.token_type != TokenType::Number {
-            panic!("Expected number for array size");
+            self.errors.push(ParserError {
+                exception: "Expected number for array size",
+                help: "Expected an integer literal",
+                src: self.source.clone(),
+                span: self.current_token.span,
+            });
+            return Type::Void;
         }
-        let size = self.current_token.value.parse().unwrap();
+        let size = self.current_token.value.parse().unwrap(); // TODO: handle parse error
         self.next_token(); // Consume size
 
         if self.current_token.token_type != TokenType::RBrack {
-            panic!("Expected ']'");
+            self.errors.push(ParserError {
+                exception: "Expected ']' at the end of array type",
+                help: "Expected ']'",
+                src: self.source.clone(),
+                span: self.current_token.span,
+            });
+            return Type::Void;
         }
         self.next_token(); // Consume ']'
 
@@ -143,7 +187,12 @@ impl<'a> Parser<'a> {
         }
 
         if self.current_token.token_type != TokenType::RParen {
-            panic!("Expected ')'");
+            self.errors.push(ParserError {
+                exception: "Expected ')' at the end of tuple type",
+                help: "Expected ')'",
+                src: self.source.clone(),
+                span: self.current_token.span,
+            });
         }
         self.next_token(); // Consume ')'
 
@@ -157,43 +206,43 @@ mod tests {
 
     #[test]
     fn test_primitive_types() {
-        let mut parser = Parser::new("i32");
-        let parsed_type = parser.parse();
+        let mut parser = Parser::new("i32", "test.pay");
+        let parsed_type = parser.parse().unwrap();
         assert_eq!(parsed_type, Type::I32);
     }
 
     #[test]
     fn test_pointer_type() {
-        let mut parser = Parser::new("*i32");
-        let parsed_type = parser.parse();
+        let mut parser = Parser::new("*i32", "test.pay");
+        let parsed_type = parser.parse().unwrap();
         assert_eq!(parsed_type, Type::Pointer(Box::new(Type::I32)));
     }
 
     #[test]
     fn test_array_type() {
-        let mut parser = Parser::new("[i32; 5]");
-        let parsed_type = parser.parse();
+        let mut parser = Parser::new("[i32; 5]", "test.pay");
+        let parsed_type = parser.parse().unwrap();
         assert_eq!(parsed_type, Type::Array(Box::new(Type::I32), 5));
     }
 
     #[test]
     fn test_dynamic_array_type() {
-        let mut parser = Parser::new("[]i32");
-        let parsed_type = parser.parse();
+        let mut parser = Parser::new("[]i32", "test.pay");
+        let parsed_type = parser.parse().unwrap();
         assert_eq!(parsed_type, Type::DynamicArray(Box::new(Type::I32)));
     }
 
     #[test]
     fn test_tuple_type() {
-        let mut parser = Parser::new("(i32, bool)");
-        let parsed_type = parser.parse();
+        let mut parser = Parser::new("(i32, bool)", "test.pay");
+        let parsed_type = parser.parse().unwrap();
         assert_eq!(parsed_type, Type::Tuple(vec![Type::I32, Type::Bool]));
     }
 
     #[test]
     fn test_nested_type() {
-        let mut parser = Parser::new("*([i32; 5], *u8)");
-        let parsed_type = parser.parse();
+        let mut parser = Parser::new("*([i32; 5], *u8)", "test.pay");
+        let parsed_type = parser.parse().unwrap();
         let expected_type = Type::Pointer(Box::new(Type::Tuple(vec![
             Type::Array(Box::new(Type::I32), 5),
             Type::Pointer(Box::new(Type::U8)),
