@@ -1,34 +1,34 @@
 use crate::element::ScopeElement;
-use genpay_parser::types::Type;
+use genpay_parse_two::types::Type;
 use std::collections::HashMap;
 
 type UnusedVariable = (String, (usize, usize));
 
 #[derive(Debug, Clone)]
-pub struct Scope {
-    pub expected: Type,
-    pub returned: Type,
-    pub parent: Option<Box<Scope>>,
+pub struct Scope<'a> {
+    pub expected: Type<'a>,
+    pub returned: Type<'a>,
+    pub parent: Option<Box<Scope<'a>>>,
 
     pub is_loop: bool,
     pub is_main: bool,
 
-    pub variables: HashMap<String, Variable>,
-    pub functions: HashMap<String, ScopeElement>,
-    pub structures: HashMap<String, ScopeElement>,
-    pub enums: HashMap<String, ScopeElement>,
-    pub typedefs: HashMap<String, Type>,
+    pub variables: HashMap<String, Variable<'a>>,
+    pub functions: HashMap<String, ScopeElement<'a>>,
+    pub structures: HashMap<String, ScopeElement<'a>>,
+    pub enums: HashMap<String, ScopeElement<'a>>,
+    pub typedefs: HashMap<String, Type<'a>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Variable {
-    pub datatype: Type,
+pub struct Variable<'a> {
+    pub datatype: Type<'a>,
     pub initialized: bool,
     pub span: (usize, usize),
     pub used: bool,
 }
 
-impl Scope {
+impl<'a> Scope<'a> {
     pub fn new() -> Self {
         Scope {
             expected: Type::Void,
@@ -51,7 +51,7 @@ impl Scope {
     pub fn add_var(
         &mut self,
         name: String,
-        datatype: Type,
+        datatype: Type<'a>,
         initialized: bool,
         span: (usize, usize),
     ) {
@@ -70,7 +70,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_var(&mut self, name: &str) -> Option<Variable> {
+    pub fn get_var(&mut self, name: &str) -> Option<Variable<'a>> {
         if name == "_" {
             return Some(Variable {
                 datatype: Type::Void,
@@ -86,7 +86,7 @@ impl Scope {
         })
     }
 
-    pub fn get_mut_var(&mut self, name: &str) -> Option<&mut Variable> {
+    pub fn get_mut_var(&mut self, name: &str) -> Option<&mut Variable<'a>> {
         if name == "_" {
             return None;
         }
@@ -134,7 +134,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn add_fn(&mut self, name: String, return_type: Type, public: bool) -> Result<(), String> {
+    pub fn add_fn(&mut self, name: String, return_type: Type<'a>, public: bool) -> Result<(), String> {
         if self.functions.contains_key(&name) {
             return Err(format!("function `{name}` already declared"));
         }
@@ -149,7 +149,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_fn(&self, name: &str) -> Option<Type> {
+    pub fn get_fn(&self, name: &str) -> Option<Type<'a>> {
         self.functions
             .get(name)
             .map(|elem| elem.datatype.clone())
@@ -161,7 +161,7 @@ impl Scope {
     pub fn add_struct(
         &mut self,
         name: String,
-        struct_type: Type,
+        struct_type: Type<'a>,
         public: bool,
     ) -> Result<(), String> {
         if self.structures.contains_key(&name) {
@@ -178,7 +178,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_struct(&self, name: &str) -> Option<Type> {
+    pub fn get_struct(&self, name: &str) -> Option<Type<'a>> {
         self.structures
             .get(name)
             .map(|elem| elem.datatype.clone())
@@ -190,7 +190,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_mut_struct(&mut self, name: &str) -> Option<&mut ScopeElement> {
+    pub fn get_mut_struct(&mut self, name: &str) -> Option<&mut ScopeElement<'a>> {
         self.structures.get_mut(name).or_else(|| {
             self.parent
                 .as_mut()
@@ -199,7 +199,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn add_enum(&mut self, name: String, enum_type: Type, public: bool) -> Result<(), String> {
+    pub fn add_enum(&mut self, name: String, enum_type: Type<'a>, public: bool) -> Result<(), String> {
         if self.enums.contains_key(&name) {
             return Err(format!("enum `{name}` already declared"));
         }
@@ -214,7 +214,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_enum(&self, name: &str) -> Option<Type> {
+    pub fn get_enum(&self, name: &str) -> Option<Type<'a>> {
         self.enums
             .get(name)
             .map(|elem| elem.datatype.clone())
@@ -226,7 +226,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn add_typedef(&mut self, name: String, typ: Type) -> Result<(), String> {
+    pub fn add_typedef(&mut self, name: String, typ: Type<'a>) -> Result<(), String> {
         if self.typedefs.contains_key(&name) {
             return Err(format!("type `{name}` already declared"));
         }
@@ -235,7 +235,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_typedef(&self, name: &str) -> Option<Type> {
+    pub fn get_typedef(&self, name: &str) -> Option<Type<'a>> {
         self.typedefs.get(name).cloned().or_else(|| {
             self.parent
                 .as_ref()

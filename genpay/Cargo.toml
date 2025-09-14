@@ -16,7 +16,7 @@ colored = "3.0.0"
 thiserror = "2.0.12"
 
 genpay-lexer = { path = "../genpay-lexer" }
-genpay-parser = { path = "../genpay-parser" }
+genpay-parse-two = { path = "../genpay-parse-two" }
 genpay-semantic = { path = "../genpay-semantic" }
 genpay-codegen = { path = "../genpay-codegen" }
 genpay-linker = { path = "../genpay-linker" }

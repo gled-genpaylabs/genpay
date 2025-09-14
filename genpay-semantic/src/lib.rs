@@ -5,8 +5,8 @@ use crate::{
     scope::Scope,
     symtable::{Include, SymbolTable},
 };
-use genpay_parser::{
-    Parser, expressions::Expressions, statements::Statements, types::Type, value::Value,
+use genpay_parse_two::{
+    expressions::Expressions, statements::Statements, types::Type, value::Value, Parser,
 };
 use indexmap::IndexMap;
 use miette::NamedSource;
@@ -23,26 +23,26 @@ mod scope;
 /// Semantic Analyzer Symbol Table
 pub mod symtable;
 
-pub type SemanticOk = (SymbolTable, Vec<SemanticWarning>);
-pub type SemanticErr = (Vec<SemanticError>, Vec<SemanticWarning>);
+pub type SemanticOk<'a> = (SymbolTable<'a>, Vec<SemanticWarning<'a>>);
+pub type SemanticErr<'a> = (Vec<SemanticError<'a>>, Vec<SemanticWarning<'a>>);
 
 const STANDARD_LIBRARY_VAR: &str = "GENPAY_LIB";
 
 /// Main Analyzer Struct
 #[derive(Debug)]
-pub struct Analyzer {
-    scope: Scope,
+pub struct Analyzer<'a> {
+    scope: Scope<'a>,
     source: NamedSource<String>,
     source_path: PathBuf,
 
-    errors: Vec<SemanticError>,
-    warnings: Vec<SemanticWarning>,
+    errors: Vec<SemanticError<'a>>,
+    warnings: Vec<SemanticWarning<'a>>,
 
-    symtable: SymbolTable,
+    symtable: SymbolTable<'a>,
     compiler_macros: HashMap<String, CompilerMacros>,
 }
 
-impl Analyzer {
+impl<'a> Analyzer<'a> {
     pub fn new(src: &str, filename: &str, source_path: PathBuf, is_main: bool) -> Self {
         let compiler_macros = HashMap::from([
             (
@@ -85,7 +85,7 @@ impl Analyzer {
         }
     }
 
-    pub fn analyze(&mut self, ast: &[Statements]) -> Result<SemanticOk, SemanticErr> {
+    pub fn analyze(&mut self, ast: &[Statements<'a>]) -> Result<SemanticOk<'a>, SemanticErr<'a>> {
        
         ast.iter().for_each(|stmt| self.visit_statement(stmt));
 
@@ -118,18 +118,18 @@ impl Analyzer {
         Ok((self.symtable.clone(), self.warnings.clone()))
     }
 
-    fn error(&mut self, error: SemanticError) {
+    fn error(&mut self, error: SemanticError<'a>) {
         self.errors.push(error);
     }
 
     #[allow(unused)]
-    fn warning(&mut self, warning: SemanticWarning) {
+    fn warning(&mut self, warning: SemanticWarning<'a>) {
         self.warnings.push(warning)
     }
 }
 
-impl Analyzer {
-    fn visit_statement(&mut self, statement: &Statements) {
+impl<'a> Analyzer<'a> {
+    fn visit_statement(&mut self, statement: &Statements<'a>) {
         // checking for allowed global scope statements
         if self.scope.parent.is_none() {
             match statement {
@@ -141,6 +141,7 @@ impl Analyzer {
                     public: _,
                     span: _,
                     header_span: _,
+                    ..
                 } => {}
                 Statements::ImportStatement { path: _, span: _ } => {}
                 Statements::IncludeStatement { path: _, span: _ } => {}
@@ -189,7 +190,7 @@ impl Analyzer {
                         exception: "This item is not allowed in global scope".to_string(),
                         help: Some("Consider removing this item from global scope".to_string()),
                         src: self.source.clone(),
-                        span: error::position_to_span(Parser::get_span_statement(statement)),
+                        span: error::position_to_span(statement.get_span()),
                     });
 
                     return;
@@ -575,7 +576,7 @@ impl Analyzer {
 
                 match (datatype, value) {
                     (Some(datatype), Some(value)) => {
-                        let value_span = Parser::get_span_expression(value);
+                        let value_span = value.get_span();
                         let value_type = self.visit_expression(value, Some(datatype.clone()));
 
                         if &value_type != datatype {
@@ -624,16 +625,16 @@ impl Analyzer {
                         }
 
                         self.scope
-                            .add_var(identifier.clone(), datatype.clone(), true, *span);
+                            .add_var(identifier.to_string(), datatype.clone(), true, *span);
                     }
                     (Some(datatype), None) => {
                         self.scope
-                            .add_var(identifier.clone(), datatype.clone(), false, *span);
+                            .add_var(identifier.to_string(), datatype.clone(), false, *span);
                     }
                     (None, Some(value)) => {
                         let value_type = self.visit_expression(value, None);
                         self.scope
-                            .add_var(identifier.clone(), value_type, true, *span);
+                            .add_var(identifier.to_string(), value_type, true, *span);
                     }
                     (None, None) => {
                         self.error(SemanticError::UnknownObject {
@@ -655,8 +656,9 @@ impl Analyzer {
                 public,
                 span,
                 header_span,
+                ..
             } => {
-                if !self.scope.is_main && name == "main" {
+                if !self.scope.is_main && *name == "main" {
                     self.error(SemanticError::MainFunctionError {
                         exception: "`main()` function is not allowed in non-global scope"
                             .to_string(),
@@ -685,7 +687,7 @@ impl Analyzer {
 
                 self.scope
                     .add_fn(
-                        name.clone(),
+                        name.to_string(),
                         Type::Function(
                             arguments
                                 .iter()
@@ -702,7 +704,7 @@ impl Analyzer {
                 function_scope.expected = datatype.clone();
 
                 arguments.iter().for_each(|arg| {
-                    function_scope.add_var(arg.0.clone(), arg.1.clone(), true, *header_span)
+                    function_scope.add_var(arg.0.to_string(), arg.1.clone(), true, *header_span)
                 });
                 self.scope = function_scope;
 
@@ -759,7 +761,7 @@ impl Analyzer {
 
                 self.scope = *self.scope.parent.clone().unwrap();
 
-                if *public && name == "main" {
+                if *public && *name == "main" {
                     self.error(SemanticError::VisibilityError {
                         exception: "`main()` function is not allowed to be public".to_string(),
                         help: Some("Consider removing `pub` keyword".to_string()),
@@ -843,9 +845,9 @@ impl Analyzer {
                                     ),
                                     help: Some("Consider verifying provided argument".to_string()),
                                     src: self.source.clone(),
-                                    span: error::position_to_span(Parser::get_span_expression(
-                                        &arguments[ind],
-                                    )),
+                                    span: error::position_to_span(
+                                        arguments[ind].get_span(),
+                                    ),
                                 });
                             }
                         },
@@ -916,6 +918,7 @@ impl Analyzer {
                         public,
                         span,
                         header_span,
+                        ..
                     } = wrapped_statement.clone()
                     {
                         function_name = format!("@!{function_name}");
@@ -1619,23 +1622,11 @@ impl Analyzer {
                     return;
                 }
 
-                // Lexical Analyzer
-                let mut lexer = genpay_lexer::Lexer::new(&src, fname);
-                let (tokens, _) = match lexer.tokenize() {
-                    Ok(result) => result,
-                    Err((errors, _)) => {
-                        errors
-                            .into_iter()
-                            .for_each(|err| self.errors.push(err.into()));
-                        return;
-                    }
-                };
-
                 // Syntax Analyzer
-                let mut parser = Parser::new(tokens, &src, fname);
-                let (ast, _) = match parser.parse() {
+                let mut parser = Parser::new(&src, fname);
+                let ast = match parser.parse() {
                     Ok(ast) => ast,
-                    Err((errors, _)) => {
+                    Err(errors) => {
                         errors
                             .into_iter()
                             .for_each(|err| self.errors.push(err.into()));
@@ -1915,7 +1906,7 @@ impl Analyzer {
                     self.warning(SemanticWarning::UnusedResult {
                         message: format!("unused result with type `{expr_type}`"),
                         src: self.source.clone(),
-                        span: error::position_to_span(Parser::get_span_expression(expr)),
+                        span: error::position_to_span(expr.get_span()),
                     });
                 }
             }
@@ -1923,7 +1914,7 @@ impl Analyzer {
         }
     }
 
-    fn visit_expression(&mut self, expr: &Expressions, expected: Option<Type>) -> Type {
+    fn visit_expression(&mut self, expr: &Expressions<'a>, expected: Option<Type<'a>>) -> Type<'a> {
         match expr {
             Expressions::Binary {
                 operand,
@@ -2500,7 +2491,7 @@ impl Analyzer {
                                                 let self_arg = if is_pointed_struct {
                                                     prev_expr.clone()
                                                 } else {
-                                                    Expressions::Reference { object: Box::new(prev_expr.clone()), span: (Parser::get_span_expression(&prev_expr)) }
+                                                    Expressions::Reference { object: Box::new(prev_expr.clone()), span: (prev_expr.get_span()) }
                                                 };
 
                                                 arguments.push(self_arg);
@@ -2566,7 +2557,7 @@ impl Analyzer {
                                                         exception: format!("argument #{} has type `{}`, but found `{}`", index + 1, raw_expected, raw_expr_type),
                                                         help: None,
                                                         src: self.source.clone(),
-                                                        span: error::position_to_span(Parser::get_span_expression(expr))
+                                                        span: error::position_to_span(expr.get_span())
                                                     });
                                                 }
                                             }
@@ -2629,7 +2620,7 @@ impl Analyzer {
                                                     exception: format!("argument #{} has type `{}`, but found `{}`", index + 1, expected, expr_type),
                                                     help: None,
                                                     src: self.source.clone(),
-                                                    span: error::position_to_span(Parser::get_span_expression(expr))
+                                                    span: error::position_to_span(expr.get_span())
                                                 });
                                             }
                                         });
@@ -2801,9 +2792,7 @@ impl Analyzer {
                                     ),
                                     help: None,
                                     src: self.source.clone(),
-                                    span: error::position_to_span(Parser::get_span_expression(
-                                        &arguments[ind].clone(),
-                                    )),
+                                    span: error::position_to_span(arguments[ind].get_span()),
                                 });
                             }
                         },
@@ -2933,7 +2922,7 @@ impl Analyzer {
                             ),
                             help: None,
                             src: self.source.clone(),
-                            span: error::position_to_span(Parser::get_span_expression(val)),
+                            span: error::position_to_span(val.get_span()),
                         });
                     }
                 });
@@ -2979,9 +2968,9 @@ impl Analyzer {
                                     exception: "tuple index must be unsigned".to_string(),
                                     help: None,
                                     src: self.source.clone(),
-                                    span: error::position_to_span(Parser::get_span_expression(
-                                        index,
-                                    )),
+                                    span: error::position_to_span(
+                                        index.get_span(),
+                                    ),
                                 });
 
                                 return expected.unwrap_or(Type::Void);
@@ -2996,7 +2985,7 @@ impl Analyzer {
                                         .to_string(),
                                 ),
                                 src: self.source.clone(),
-                                span: error::position_to_span(Parser::get_span_expression(index)),
+                                span: error::position_to_span(index.get_span()),
                             });
 
                             expected.unwrap_or(Type::Void)
@@ -3198,7 +3187,7 @@ impl Analyzer {
         }
     }
 
-    fn visit_value(&mut self, value: Value, expected: Option<Type>) -> Result<Type, String> {
+    fn visit_value(&mut self, value: Value<'a>, expected: Option<Type<'a>>) -> Result<Type<'a>, String> {
         match value {
             Value::Integer(int) => {
                 if expected.is_some()
@@ -3331,9 +3320,65 @@ impl Analyzer {
     }
 }
 
+impl<'a> Statements<'a> {
+    pub fn get_span(&self) -> (usize, usize) {
+        match self {
+            Statements::AssignStatement { span, .. } => *span,
+            Statements::BinaryAssignStatement { span, .. } => *span,
+            Statements::DerefAssignStatement { span, .. } => *span,
+            Statements::SliceAssignStatement { span, .. } => *span,
+            Statements::FieldAssignStatement { span, .. } => *span,
+            Statements::AnnotationStatement { span, .. } => *span,
+            Statements::FunctionDefineStatement { span, .. } => *span,
+            Statements::FunctionCallStatement { span, .. } => *span,
+            Statements::MacroCallStatement { span, .. } => *span,
+            Statements::StructDefineStatement { span, .. } => *span,
+            Statements::EnumDefineStatement { span, .. } => *span,
+            Statements::TypedefStatement { span, .. } => *span,
+            Statements::IfStatement { span, .. } => *span,
+            Statements::WhileStatement { span, .. } => *span,
+            Statements::ForStatement { span, .. } => *span,
+            Statements::ImportStatement { span, .. } => *span,
+            Statements::IncludeStatement { span, .. } => *span,
+            Statements::ExternDeclareStatement { span, .. } => *span,
+            Statements::LinkCStatement { span, .. } => *span,
+            Statements::ExternStatement { span, .. } => *span,
+            Statements::BreakStatements { span, .. } => *span,
+            Statements::ReturnStatement { value: _, span } => *span,
+            Statements::ScopeStatement { span, .. } => *span,
+            Statements::Expression(expr) => expr.get_span(),
+            Statements::None => (0, 0),
+        }
+    }
+}
+
+impl<'a> Expressions<'a> {
+    pub fn get_span(&self) -> (usize, usize) {
+        match self {
+            Expressions::Binary { span, .. } => *span,
+            Expressions::Unary { span, .. } => *span,
+            Expressions::Boolean { span, .. } => *span,
+            Expressions::Bitwise { span, .. } => *span,
+            Expressions::Argument { span, .. } => *span,
+            Expressions::SubElement { span, .. } => *span,
+            Expressions::FnCall { span, .. } => *span,
+            Expressions::MacroCall { span, .. } => *span,
+            Expressions::Reference { span, .. } => *span,
+            Expressions::Dereference { span, .. } => *span,
+            Expressions::Array { span, .. } => *span,
+            Expressions::Tuple { span, .. } => *span,
+            Expressions::Slice { span, .. } => *span,
+            Expressions::Struct { span, .. } => *span,
+            Expressions::Scope { span, .. } => *span,
+            Expressions::Value(_, span) => *span,
+            Expressions::None => (0, 0),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use genpay_parser::types::Type;
+    use genpay_parse_two::types::Type;
     use crate::Analyzer;
 
     #[test]
@@ -3395,13 +3440,13 @@ mod tests {
     }
 }
 
-impl Analyzer {
+impl<'a> Analyzer<'a> {
     pub fn verify_macrocall(
         &mut self,
         name: &String,
-        arguments: &[Expressions],
+        arguments: &[Expressions<'a>],
         span: &(usize, usize),
-    ) -> Type {
+    ) -> Type<'a> {
         let macro_object = self.compiler_macros.get(name).cloned().unwrap_or_else(|| {
             self.error(SemanticError::UnresolvedName {
                 exception: format!("there's no macro called `{name}!()`"),
@@ -3416,7 +3461,7 @@ impl Analyzer {
         macro_object.verify_call(self, arguments, span)
     }
 
-    fn verify_cast(&self, from: &Type, to: &Type) -> Result<(), String> {
+    fn verify_cast(&self, from: &Type<'a>, to: &Type<'a>) -> Result<(), String> {
         match (from, to) {
             // integers types casts
             _ if Self::is_integer(from) && Self::is_integer(to) => Ok(()),
@@ -3460,10 +3505,10 @@ impl Analyzer {
     }
 }
 
-impl Analyzer {
+impl<'a> Analyzer<'a> {
     /// Returns true if provided type is integer
     #[inline]
-    pub fn is_integer(typ: &Type) -> bool {
+    pub fn is_integer(typ: &Type<'a>) -> bool {
         [
             Type::I8,
             Type::I16,
@@ -3480,13 +3525,13 @@ impl Analyzer {
 
     /// Returns true if provided type is **unsigned** integer
     #[inline]
-    pub fn is_unsigned_integer(typ: &Type) -> bool {
+    pub fn is_unsigned_integer(typ: &Type<'a>) -> bool {
         [Type::U8, Type::U16, Type::U32, Type::U64, Type::USIZE].contains(typ)
     }
 
     /// Converts unsigned integer type to its signed analogue
     #[inline]
-    pub fn unsigned_to_signed_integer(typ: &Type) -> Type {
+    pub fn unsigned_to_signed_integer(typ: &Type<'a>) -> Type<'a> {
         match typ {
             Type::U8 => Type::I8,
             Type::U16 => Type::I16,
@@ -3506,7 +3551,7 @@ impl Analyzer {
 
     /// Returns integer order position
     #[inline]
-    pub fn integer_order(typ: &Type) -> usize {
+    pub fn integer_order(typ: &Type<'a>) -> usize {
         match typ {
             Type::Bool => 0,
             Type::Char => 0,
@@ -3527,13 +3572,13 @@ impl Analyzer {
     }
 
     #[inline]
-    pub fn is_float(typ: &Type) -> bool {
+    pub fn is_float(typ: &Type<'a>) -> bool {
         [Type::F32, Type::F64].contains(typ)
     }
 
     /// Returns float order position
     #[inline]
-    pub fn float_order(typ: &Type) -> usize {
+    pub fn float_order(typ: &Type<'a>) -> usize {
         match typ {
             Type::F32 => 1,
             Type::F64 => 2,
@@ -3543,7 +3588,7 @@ impl Analyzer {
     }
 
     #[inline]
-    fn unwrap_alias(&self, typ: &Type) -> Result<Type, String> {
+    fn unwrap_alias(&self, typ: &Type<'a>) -> Result<Type<'a>, String> {
         match typ {
             Type::Alias(alias) => {
                 let struct_type = self.scope.get_struct(alias);

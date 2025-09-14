@@ -1,4 +1,4 @@
-use genpay_parser::{expressions::Expressions, types::Type, value::Value};
+use genpay_parse_two::{expressions::Expressions, types::Type, value::Value};
 use inkwell::{
     AddressSpace,
     module::Linkage,

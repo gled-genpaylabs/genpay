@@ -3,7 +3,7 @@ use crate::{
     Analyzer,
     error::{self, SemanticError},
 };
-use genpay_parser::{expressions::Expressions, types::Type, value::Value};
+use genpay_parse_two::{expressions::Expressions, types::Type, value::Value};
 
 /// **Formats literal and args into single string**
 /// `format!(LITERAL, ...)` -> `*char`
@@ -100,7 +100,7 @@ impl MacroObject for FormatMacro {
                                     exception: format!("type `{expr_type}` has wrong implementation for display"),
                                     help: Some(format!("Consider using right format: {DISPLAY_IMPLEMENTATION_FORMAT}")),
                                     src: analyzer.source.clone(),
-                                    span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
+                                    span: error::position_to_span(expr.get_span())
                                 }
                             );
                         }
@@ -110,7 +110,7 @@ impl MacroObject for FormatMacro {
                                 exception: format!("type `{expr_type}` has no implementation for display"),
                                 help: Some(format!("Consider implementing necessary method: {DISPLAY_IMPLEMENTATION_FORMAT}")),
                                 src: analyzer.source.clone(),
-                                span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
+                                span: error::position_to_span(expr.get_span())
                             }
                         );
                     }
@@ -128,7 +128,7 @@ impl MacroObject for FormatMacro {
                                         exception: format!("type `{expr_type}` has wrong implementation for display"),
                                         help: Some(format!("Consider using right format: {DISPLAY_IMPLEMENTATION_FORMAT}")),
                                         src: analyzer.source.clone(),
-                                        span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
+                                        span: error::position_to_span(expr.get_span())
                                     }
                                 );
                             }
@@ -138,7 +138,7 @@ impl MacroObject for FormatMacro {
                                 exception: format!("type `{expr_type}` has no implementation for display"),
                                 help: Some(format!("Consider implementing necessary method: {DISPLAY_IMPLEMENTATION_FORMAT}")),
                                 src: analyzer.source.clone(),
-                                span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
+                                span: error::position_to_span(expr.get_span())
                             }
                         );
                         }
@@ -147,7 +147,7 @@ impl MacroObject for FormatMacro {
                             exception: format!("no displayable type `{expr_type}` found"),
                             help: None,
                             src: analyzer.source.clone(),
-                            span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
+                            span: error::position_to_span(expr.get_span())
                         });
                     }
                 }
@@ -157,7 +157,7 @@ impl MacroObject for FormatMacro {
                         exception: format!("type `{expr_type}` is not supported for display"),
                         help: None,
                         src: analyzer.source.clone(),
-                        span: error::position_to_span(genpay_parser::Parser::get_span_expression(expr))
+                        span: error::position_to_span(expr.get_span())
                     });
                 }
             }

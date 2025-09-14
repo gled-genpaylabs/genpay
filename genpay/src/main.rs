@@ -100,64 +100,17 @@ fn main() {
         &format!("tokens ({} lines of code)", src.lines().count()),
     );
 
-    // Lexical Analyzer Initialization
-    let mut lexer = genpay_lexer::Lexer::new(&src, fname);
-
     // `miette` graphical reporter (for this amazing error reports).
-    // "total_warns" variable made just for reporting how much warnings we've got at the end
     let handler = miette::GraphicalReportHandler::new();
     let mut total_warns = 0;
 
-    let (tokens, warns) = match lexer.tokenize() {
-        Ok(res) => res,
-        Err((errors, warns)) => {
-            println!();
-            errors.iter().for_each(|e| {
-                let mut buf = String::new();
-                handler.render_report(&mut buf, e).unwrap();
-
-                eprintln!("{buf}");
-            });
-
-            if !no_warns {
-                warns.iter().for_each(|w| {
-                    let mut buf = String::new();
-                    handler.render_report(&mut buf, w).unwrap();
-
-                    eprintln!("{buf}");
-                });
-            }
-
-            cli::error(&format!("`{}` returned {} errors", &fname, errors.len()));
-            if !warns.is_empty() && !no_warns {
-                cli::warn(&format!("`{}` generated {} warnings", &fname, warns.len()))
-            }
-
-            std::process::exit(1);
-        }
-    };
-
-    if !no_warns {
-        warns.iter().for_each(|w| {
-            let mut buf = String::new();
-            handler.render_report(&mut buf, w).unwrap();
-
-            eprintln!("{buf}");
-        });
-    }
-
-    total_warns += warns.len();
-
-    cli::info("Parsing", &format!("syntax tree ({} tokens)", tokens.len()));
+    cli::info("Parsing", "syntax tree");
 
     // Syntax Analyzer initialization.
-    // It takes full ownership for tokens vector (because we don't need them anymore)
-    let mut parser = genpay_parser::Parser::new(tokens, &src, fname);
-    let (ast, warns) = match parser.parse() {
+    let mut parser = genpay_parse_two::Parser::new(&src, fname);
+    let ast = match parser.parse() {
         Ok(ast) => ast,
-        Err(e) => {
-            let (errors, warns) = e;
-
+        Err(errors) => {
             errors.iter().for_each(|e| {
                 let mut buf = String::new();
                 handler.render_report(&mut buf, e).unwrap();
@@ -165,38 +118,10 @@ fn main() {
                 eprintln!("{buf}");
             });
 
-            if !no_warns {
-                warns.iter().for_each(|w| {
-                    let mut buf = String::new();
-                    handler.render_report(&mut buf, w).unwrap();
-
-                    eprintln!("{buf}");
-                });
-            }
-
             cli::error(&format!("`{}` returned {} errors", &fname, errors.len()));
-            if (!warns.is_empty() || total_warns > 0) && !no_warns {
-                cli::warn(&format!(
-                    "`{}` generated {} warnings",
-                    &fname,
-                    warns.len() + total_warns
-                ));
-            }
-
             std::process::exit(1);
         }
     };
-
-    if !no_warns {
-        warns.iter().for_each(|w| {
-            let mut buf = String::new();
-            handler.render_report(&mut buf, w).unwrap();
-
-            eprintln!("{buf}");
-        });
-    }
-
-    total_warns += warns.len();
 
     cli::info(
         "Analyzing",
