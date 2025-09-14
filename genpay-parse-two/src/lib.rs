@@ -1958,4 +1958,98 @@ mod tests {
             panic!("Wrong statement type");
         }
     }
+
+    #[test]
+    fn test_pointer_related_parsing() {
+        // Test let statement with pointer type
+        let input = "let x: *i32 = &y;";
+        let mut parser = Parser::new(input, "test.pay");
+        let program = parser.parse().unwrap();
+        assert_eq!(program.len(), 1);
+        let statement = &program[0];
+        if let Statements::AnnotationStatement {
+            identifier,
+            datatype,
+            value,
+            ..
+        } = statement
+        {
+            assert_eq!(*identifier, "x");
+            assert_eq!(datatype, &Some(Type::Pointer(Box::new(Type::I32))));
+            assert!(matches!(
+                value,
+                Some(Expressions::Reference { .. })
+            ));
+        } else {
+            panic!("Failed to parse let statement with pointer type. Got: {:?}", statement);
+        }
+
+        // Test dereference expression
+        let input = "*x;";
+        let mut parser = Parser::new(input, "test.pay");
+        let program = parser.parse().unwrap();
+        assert_eq!(program.len(), 1);
+        let statement = &program[0];
+        assert!(matches!(statement, Statements::Expression(Expressions::Dereference { .. })));
+
+
+        // Test reference expression
+        let input = "&y;";
+        let mut parser = Parser::new(input, "test.pay");
+        let program = parser.parse().unwrap();
+        assert_eq!(program.len(), 1);
+        let statement = &program[0];
+        assert!(matches!(statement, Statements::Expression(Expressions::Reference { .. })));
+
+        // Test assignment to dereferenced pointer
+        let input = "*x = 10;";
+        let mut parser = Parser::new(input, "test.pay");
+        let program = parser.parse().unwrap();
+        assert_eq!(program.len(), 1);
+        let statement = &program[0];
+        if let Statements::AssignStatement { object, value, .. } = statement {
+            assert!(matches!(object, Expressions::Dereference { .. }));
+            if let Expressions::Value(val, ..) = value {
+                assert_eq!(val, &crate::value::Value::Integer(10));
+            } else {
+                panic!("Wrong value in assignment");
+            }
+        } else {
+            panic!("Failed to parse assignment to dereferenced pointer. Got: {:?}", statement);
+        }
+
+        // Test function with pointer argument and return type
+        let input = "fn foo(p: *i32) *i32 { return p; }";
+        let mut parser = Parser::new(input, "test.pay");
+        let program = parser.parse().unwrap();
+        assert_eq!(program.len(), 1);
+        let statement = &program[0];
+        if let Statements::FunctionDefineStatement {
+            arguments,
+            datatype,
+            ..
+        } = statement
+        {
+            assert_eq!(arguments[0].1, Type::Pointer(Box::new(Type::I32)));
+            assert_eq!(*datatype, Type::Pointer(Box::new(Type::I32)));
+        } else {
+            panic!("Failed to parse function with pointer. Got: {:?}", statement);
+        }
+
+        // Test let statement with double pointer type
+        let input = "let x: **i32;";
+        let mut parser = Parser::new(input, "test.pay");
+        let program = parser.parse().unwrap();
+        assert_eq!(program.len(), 1);
+        let statement = &program[0];
+        if let Statements::AnnotationStatement {
+            datatype,
+            ..
+        } = statement
+        {
+            assert_eq!(datatype, &Some(Type::Pointer(Box::new(Type::Pointer(Box::new(Type::I32))))));
+        } else {
+            panic!("Failed to parse let statement with double pointer. Got: {:?}", statement);
+        }
+    }
 }

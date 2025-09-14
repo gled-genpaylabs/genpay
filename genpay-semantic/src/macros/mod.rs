@@ -1,5 +1,5 @@
 use crate::Analyzer;
-use genpay_parser::{expressions::Expressions, types::Type};
+use genpay_parse_two::{expressions::Expressions, types::Type};
 
 pub use cast::CastMacro;
 pub use format::FormatMacro;

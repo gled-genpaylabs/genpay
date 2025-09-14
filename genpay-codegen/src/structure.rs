@@ -1,5 +1,5 @@
 use crate::function::Function;
-use genpay_parser::types::Type;
+use genpay_parse_two::types::Type;
 use inkwell::types::BasicTypeEnum;
 use std::collections::HashMap;
 

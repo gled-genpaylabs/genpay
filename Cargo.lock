@@ -266,7 +266,7 @@ dependencies = [
  "genpay-codegen",
  "genpay-lexer",
  "genpay-linker",
- "genpay-parser",
+ "genpay-parse-two",
  "genpay-semantic",
  "inkwell",
  "llvm-sys",
@@ -278,7 +278,7 @@ dependencies = [
 name = "genpay-codegen"
 version = "1.1.1"
 dependencies = [
- "genpay-parser",
+ "genpay-parse-two",
  "genpay-semantic",
  "inkwell",
  "llvm-sys",
@@ -328,7 +328,7 @@ name = "genpay-semantic"
 version = "1.1.1"
 dependencies = [
  "genpay-lexer",
- "genpay-parser",
+ "genpay-parse-two",
  "indexmap",
  "miette",
  "shellexpand",

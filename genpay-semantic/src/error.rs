@@ -6,13 +6,26 @@ pub fn position_to_span(span: (usize, usize)) -> SourceSpan {
     span.into()
 }
 
+impl<'a> From<genpay_parse_two::error::LexerError<'a>> for SemanticError<'a> {
+    fn from(error: genpay_parse_two::error::LexerError<'a>) -> Self {
+        SemanticError::ModuleLexerError(error)
+    }
+}
+
+impl<'a> From<genpay_parse_two::error::ParserError<'a>> for SemanticError<'a> {
+    fn from(error: genpay_parse_two::error::ParserError<'a>) -> Self {
+        SemanticError::ModuleParserError(error)
+    }
+}
+
+
 #[derive(Debug, Error, Diagnostic, Clone, PartialEq, Eq)]
-pub enum SemanticError {
+pub enum SemanticError<'a> {
     #[error("Lexical Analyzer error")]
-    ModuleLexerError(#[from] genpay_lexer::error::LexerError),
+    ModuleLexerError(genpay_parse_two::error::LexerError<'a>),
 
     #[error("Syntax Analyzer error")]
-    ModuleParserError(#[from] genpay_parser::error::ParserError),
+    ModuleParserError(genpay_parse_two::error::ParserError<'a>),
 
     #[error("{message}")]
     #[diagnostic(severity(Error), code(genpay::parser::global_error))]
@@ -245,15 +258,7 @@ pub enum SemanticError {
 }
 
 #[derive(Debug, Error, Diagnostic, Clone, PartialEq, Eq)]
-pub enum SemanticWarning {
-    #[error("Lexical Analyzer warning")]
-    #[diagnostic(severity(Warning))]
-    ModuleLexerWarning(#[from] genpay_lexer::error::LexerWarning),
-
-    #[error("Syntax Analyzer warning")]
-    #[diagnostic(severity(Warning))]
-    ModuleParserWarning(#[from] genpay_parser::error::ParserWarning),
-
+pub enum SemanticWarning<'a> {
     #[error("Unused variable `{varname}` found")]
     #[diagnostic(
         severity(Warning),
