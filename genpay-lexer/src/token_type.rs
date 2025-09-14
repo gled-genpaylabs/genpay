@@ -18,6 +18,11 @@ pub enum TokenType {
     Divide,   // /
     Modulus,  // %
 
+    PlusAssign,
+    MinusAssign,
+    MultiplyAssign,
+    DivideAssign,
+
     Lt,  // <
     Bt,  // >
     Leq, // <=, =<

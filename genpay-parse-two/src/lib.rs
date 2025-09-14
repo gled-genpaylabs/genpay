@@ -26,7 +26,6 @@ pub struct Parser<'a> {
 #[derive(PartialEq, PartialOrd, Debug, Clone, Copy)]
 enum Precedence {
     LOWEST,
-    ASSIGN,
     LOGICALOR,
     LOGICALAND,
     BITWISEOR,
@@ -90,6 +89,23 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn next_token(&mut self) {
+        self.current_token = self.peek_token.clone();
+        match self.lexer.next() {
+            Some(Ok(token)) => self.peek_token = token,
+            Some(Err(_)) => {
+                // TODO: Handle lexer error
+            }
+            None => {
+                self.peek_token = Token {
+                    value: "",
+                    token_type: TokenType::EOF,
+                    span: (0, 0),
+                };
+            }
+        }
+    }
+
     fn parse_statement(&mut self) -> Option<Statements<'a>> {
         match self.current_token.token_type {
             TokenType::Keyword if self.current_token.value == "let" => self.parse_let_statement(),
@@ -117,6 +133,18 @@ impl<'a> Parser<'a> {
             TokenType::Keyword if self.current_token.value == "extern" => {
                 self.parse_extern_statement()
             }
+            TokenType::Keyword if self.current_token.value == "typedef" => {
+                self.parse_typedef_statement()
+            }
+            TokenType::Keyword if self.current_token.value == "_extern_declare" => {
+                self.parse_extern_declare_statement()
+            }
+            TokenType::Keyword if self.current_token.value == "_link_c" => {
+                self.parse_link_c_statement()
+            }
+            TokenType::Keyword if self.current_token.value == "break" => {
+                self.parse_break_statement()
+            }
             TokenType::LBrace => self.parse_block_statement(),
             _ => self.parse_expression_statement(),
         }
@@ -124,6 +152,46 @@ impl<'a> Parser<'a> {
 
     fn parse_expression_statement(&mut self) -> Option<Statements<'a>> {
         let expression = self.parse_expression(Precedence::LOWEST)?;
+
+        if self.peek_token.token_type == TokenType::Equal {
+            self.next_token(); // current is now '='
+            self.next_token(); // current is now the start of the value expression
+            let value = self.parse_expression(Precedence::LOWEST)?;
+            let span = (expression.get_span().0, value.get_span().1);
+
+            if self.peek_token.token_type == TokenType::Semicolon {
+                self.next_token();
+            }
+
+            return Some(Statements::AssignStatement {
+                object: expression,
+                value,
+                span,
+            });
+        }
+
+        if self.peek_token.token_type == TokenType::PlusAssign
+            || self.peek_token.token_type == TokenType::MinusAssign
+            || self.peek_token.token_type == TokenType::MultiplyAssign
+            || self.peek_token.token_type == TokenType::DivideAssign
+        {
+            self.next_token(); // current is now the operator
+            let operator = self.current_token.value;
+            self.next_token(); // current is now the start of the value expression
+            let value = self.parse_expression(Precedence::LOWEST)?;
+            let span = (expression.get_span().0, value.get_span().1);
+
+            if self.peek_token.token_type == TokenType::Semicolon {
+                self.next_token();
+            }
+
+            return Some(Statements::BinaryAssignStatement {
+                object: expression,
+                operand: operator,
+                value,
+                span,
+            });
+        }
 
         if self.peek_token.token_type == TokenType::Semicolon {
             self.next_token();
@@ -738,21 +806,75 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn next_token(&mut self) {
-        self.current_token = self.peek_token.clone();
-        match self.lexer.next() {
-            Some(Ok(token)) => self.peek_token = token,
-            Some(Err(_)) => {
-                // TODO: Handle lexer error
-            }
-            None => {
-                self.peek_token = Token {
-                    value: "",
-                    token_type: TokenType::EOF,
-                    span: (0, 0),
-                };
-            }
+    fn parse_typedef_statement(&mut self) -> Option<Statements<'a>> {
+        let span_start = self.current_token.span.0;
+        self.next_token(); // consume 'typedef'
+
+        if self.current_token.token_type != TokenType::Identifier {
+            self.errors.push(ParserError {
+                exception: "Expected alias name",
+                help: "Expected identifier",
+                src: self.source.clone(),
+                span: self.current_token.span,
+            });
+            return None;
         }
+        let alias = self.current_token.value;
+        self.next_token();
+
+        let datatype = self.parse_type()?;
+        let span_end = self.current_token.span.1;
+
+        Some(Statements::TypedefStatement {
+            alias,
+            datatype,
+            span: (span_start, span_end),
+        })
+    }
+
+    fn parse_extern_declare_statement(&mut self) -> Option<Statements<'a>> {
+        let span_start = self.current_token.span.0;
+        self.next_token(); // consume '_extern_declare'
+
+        if self.current_token.token_type != TokenType::Identifier {
+            self.errors.push(ParserError {
+                exception: "Expected identifier",
+                help: "Expected identifier",
+                src: self.source.clone(),
+                span: self.current_token.span,
+            });
+            return None;
+        }
+        let identifier = self.current_token.value;
+        self.next_token();
+
+        let datatype = self.parse_type()?;
+        let span_end = self.current_token.span.1;
+
+        Some(Statements::ExternDeclareStatement {
+            identifier,
+            datatype,
+            span: (span_start, span_end),
+        })
+    }
+
+    fn parse_link_c_statement(&mut self) -> Option<Statements<'a>> {
+        let span_start = self.current_token.span.0;
+        self.next_token(); // consume '_link_c'
+
+        let path = self.parse_expression(Precedence::LOWEST)?;
+        let span_end = path.get_span().1;
+
+        Some(Statements::LinkCStatement {
+            path,
+            span: (span_start, span_end),
+        })
+    }
+
+    fn parse_break_statement(&mut self) -> Option<Statements<'a>> {
+        let span = self.current_token.span;
+        self.next_token(); // consume 'break'
+        Some(Statements::BreakStatements { span })
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Expressions<'a>> {
@@ -885,20 +1007,20 @@ impl<'a> Parser<'a> {
             | TokenType::Minus
             | TokenType::Multiply
             | TokenType::Divide
-            | TokenType::Modulus => self.parse_infix_expression(left),
+            | TokenType::Modulus => self.parse_binary_expression(left),
             TokenType::Eq
             | TokenType::Ne
             | TokenType::Lt
             | TokenType::Bt
             | TokenType::Leq
-            | TokenType::Beq => self.parse_infix_expression(left),
+            | TokenType::Beq => self.parse_binary_expression(left),
             TokenType::And
             | TokenType::Or
             | TokenType::LShift
             | TokenType::RShift
             | TokenType::Ampersand
             | TokenType::Verbar
-            | TokenType::Xor => self.parse_infix_expression(left),
+            | TokenType::Xor => self.parse_binary_expression(left),
             TokenType::LParen => self.parse_call_expression(left),
             TokenType::LBrack => self.parse_slice_expression(left),
             TokenType::Dot => self.parse_sub_element_expression(left),
@@ -907,7 +1029,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_infix_expression(&mut self, left: Expressions<'a>) -> Option<Expressions<'a>> {
+    fn parse_binary_expression(&mut self, left: Expressions<'a>) -> Option<Expressions<'a>> {
         let precedence = self.current_precedence();
         let operator = self.current_token.value;
         self.next_token();
@@ -1220,7 +1342,6 @@ impl<'a> Parser<'a> {
 
     fn get_precedence(&self, token_type: &TokenType) -> Precedence {
         match token_type {
-            TokenType::Equal => Precedence::ASSIGN,
             TokenType::Plus | TokenType::Minus => Precedence::SUM,
             TokenType::Divide | TokenType::Multiply | TokenType::Modulus => Precedence::PRODUCT,
             TokenType::Eq | TokenType::Ne => Precedence::EQUALS,
@@ -1690,6 +1811,149 @@ mod tests {
         if let Statements::EnumDefineStatement { name, fields, .. } = statement {
             assert_eq!(*name, "Color");
             assert_eq!(fields.len(), 3);
+        } else {
+            panic!("Wrong statement type");
+        }
+    }
+
+    #[test]
+    fn test_binary_assign_statement() {
+        let input = "x += 5;";
+        let mut parser = Parser::new(input, "test.pay");
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.len(), 1);
+        let statement = &program[0];
+
+        if let Statements::BinaryAssignStatement {
+            object,
+            operand,
+            value,
+            ..
+        } = statement
+        {
+            if let Expressions::Value(crate::value::Value::Identifier("x"), _) = object {
+                // pass
+            } else {
+                panic!("Wrong object in binary assign statement");
+            }
+
+            assert_eq!(*operand, "+=");
+
+            if let Expressions::Value(crate::value::Value::Integer(5), _) = value {
+                // pass
+            } else {
+                panic!("Wrong value in binary assign statement");
+            }
+        } else {
+            panic!("Wrong statement type");
+        }
+    }
+
+    #[test]
+    fn test_assign_statement() {
+        let input = "x = 5;";
+        let mut parser = Parser::new(input, "test.pay");
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.len(), 1);
+        let statement = &program[0];
+
+        if let Statements::AssignStatement { object, value, .. } = statement {
+            if let Expressions::Value(crate::value::Value::Identifier("x"), _) = object {
+                // pass
+            } else {
+                panic!("Wrong object in assign statement");
+            }
+
+            if let Expressions::Value(crate::value::Value::Integer(5), _) = value {
+                // pass
+            } else {
+                panic!("Wrong value in assign statement");
+            }
+        } else {
+            panic!("Wrong statement type");
+        }
+    }
+
+    #[test]
+    fn test_typedef_statement() {
+        let input = "typedef my_int i32;";
+        let mut parser = Parser::new(input, "test.pay");
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.len(), 1);
+        let statement = &program[0];
+
+        if let Statements::TypedefStatement { alias, datatype, .. } = statement {
+            assert_eq!(*alias, "my_int");
+            if let Type::I32 = datatype {
+                // pass
+            } else {
+                panic!("Wrong type in typedef");
+            }
+        } else {
+            panic!("Wrong statement type");
+        }
+    }
+
+    #[test]
+    fn test_extern_declare_statement() {
+        let input = "_extern_declare my_var i32;";
+        let mut parser = Parser::new(input, "test.pay");
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.len(), 1);
+        let statement = &program[0];
+
+        if let Statements::ExternDeclareStatement {
+            identifier,
+            datatype,
+            ..
+        } = statement
+        {
+            assert_eq!(*identifier, "my_var");
+            if let Type::I32 = datatype {
+                // pass
+            } else {
+                panic!("Wrong type in extern declare");
+            }
+        } else {
+            panic!("Wrong statement type");
+        }
+    }
+
+    #[test]
+    fn test_link_c_statement() {
+        let input = "_link_c \"mylib.a\";";
+        let mut parser = Parser::new(input, "test.pay");
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.len(), 1);
+        let statement = &program[0];
+
+        if let Statements::LinkCStatement { path, .. } = statement {
+            if let Expressions::Value(crate::value::Value::String("mylib.a"), _) = path {
+                // pass
+            } else {
+                panic!("Wrong path in link_c");
+            }
+        } else {
+            panic!("Wrong statement type");
+        }
+    }
+
+    #[test]
+    fn test_break_statement() {
+        let input = "break;";
+        let mut parser = Parser::new(input, "test.pay");
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.len(), 1);
+        let statement = &program[0];
+
+        if let Statements::BreakStatements { .. } = statement {
+            // pass
         } else {
             panic!("Wrong statement type");
         }

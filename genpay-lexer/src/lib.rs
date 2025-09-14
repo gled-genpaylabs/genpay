@@ -261,15 +261,27 @@ impl<'a> Iterator for Lexer<'a> {
             }
             '+' => {
                 self.advance();
-                self.make_token(TokenType::Plus, start, 1)
+                if self.match_char('=') {
+                    self.make_token(TokenType::PlusAssign, start, 2)
+                } else {
+                    self.make_token(TokenType::Plus, start, 1)
+                }
             }
             '-' => {
                 self.advance();
-                self.make_token(TokenType::Minus, start, 1)
+                if self.match_char('=') {
+                    self.make_token(TokenType::MinusAssign, start, 2)
+                } else {
+                    self.make_token(TokenType::Minus, start, 1)
+                }
             }
             '*' => {
                 self.advance();
-                self.make_token(TokenType::Multiply, start, 1)
+                if self.match_char('=') {
+                    self.make_token(TokenType::MultiplyAssign, start, 2)
+                } else {
+                    self.make_token(TokenType::Multiply, start, 1)
+                }
             }
             '%' => {
                 self.advance();
@@ -338,6 +350,8 @@ impl<'a> Iterator for Lexer<'a> {
                 if self.match_char('/') {
                     self.skip_comment();
                     return self.next(); // Recurse to get next token
+                } else if self.match_char('=') {
+                    self.make_token(TokenType::DivideAssign, start, 2)
                 } else {
                     self.make_token(TokenType::Divide, start, 1)
                 }
