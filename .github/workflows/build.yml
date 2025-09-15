@@ -1,7 +1,7 @@
 permissions:
   contents: write
 
-name: Build Deen Release
+name: Build GenPay Release
 
 on:
   workflow_dispatch:
