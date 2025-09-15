@@ -7,13 +7,13 @@ pub fn position_to_span(span: (usize, usize)) -> SourceSpan {
 }
 
 impl<'a> From<genpay_parser::error::LexerError<'a>> for SemanticError<'a> {
-    fn from(error: genpay_parse_two::error::LexerError<'a>) -> Self {
+    fn from(error: genpay_parser::error::LexerError<'a>) -> Self {
         SemanticError::ModuleLexerError(error)
     }
 }
 
 impl<'a> From<genpay_parser::error::ParserError<'a>> for SemanticError<'a> {
-    fn from(error: genpay_parse_two::error::ParserError<'a>) -> Self {
+    fn from(error: genpay_parser::error::ParserError<'a>) -> Self {
         SemanticError::ModuleParserError(error)
     }
 }
