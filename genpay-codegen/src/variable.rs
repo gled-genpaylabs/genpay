@@ -1,4 +1,4 @@
-use genpay_parse_two::types::Type;
+use genpay_parser::types::Type;
 use inkwell::{types::BasicTypeEnum, values::PointerValue};
 
 #[derive(Debug, Clone)]
