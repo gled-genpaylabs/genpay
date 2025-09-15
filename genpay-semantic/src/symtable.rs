@@ -1,4 +1,4 @@
-use genpay_parse_two::{statements::Statements, types::Type};
+use genpay_parser::{statements::Statements, types::Type};
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
