@@ -3,7 +3,7 @@ use crate::{
     Analyzer,
     error::{self, SemanticError},
 };
-use genpay_parse_two::{expressions::Expressions, types::Type, value::Value};
+use genpay_parser::{expressions::Expressions, types::Type, value::Value};
 
 /// **Formats literal and args into single string**
 /// `format!(LITERAL, ...)` -> `*char`
