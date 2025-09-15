@@ -1,6 +1,6 @@
 use super::MacroObject;
 use crate::Analyzer;
-use genpay_parse_two::{expressions::Expressions, types::Type};
+use genpay_parser::{expressions::Expressions, types::Type};
 
 /// **Calls panic exit with formatted message from program**
 /// `panic!(LITERAL, ...)` -> `void`
