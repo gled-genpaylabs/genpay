@@ -6,13 +6,13 @@ pub fn position_to_span(span: (usize, usize)) -> SourceSpan {
     span.into()
 }
 
-impl<'a> From<genpay_parse_two::error::LexerError<'a>> for SemanticError<'a> {
+impl<'a> From<genpay_parser::error::LexerError<'a>> for SemanticError<'a> {
     fn from(error: genpay_parse_two::error::LexerError<'a>) -> Self {
         SemanticError::ModuleLexerError(error)
     }
 }
 
-impl<'a> From<genpay_parse_two::error::ParserError<'a>> for SemanticError<'a> {
+impl<'a> From<genpay_parser::error::ParserError<'a>> for SemanticError<'a> {
     fn from(error: genpay_parse_two::error::ParserError<'a>) -> Self {
         SemanticError::ModuleParserError(error)
     }
@@ -22,10 +22,10 @@ impl<'a> From<genpay_parse_two::error::ParserError<'a>> for SemanticError<'a> {
 #[derive(Debug, Error, Diagnostic, Clone, PartialEq, Eq)]
 pub enum SemanticError<'a> {
     #[error("Lexical Analyzer error")]
-    ModuleLexerError(genpay_parse_two::error::LexerError<'a>),
+    ModuleLexerError(genpay_parser::error::LexerError<'a>),
 
     #[error("Syntax Analyzer error")]
-    ModuleParserError(genpay_parse_two::error::ParserError<'a>),
+    ModuleParserError(genpay_parser::error::ParserError<'a>),
 
     #[error("{message}")]
     #[diagnostic(severity(Error), code(genpay::parser::global_error))]
