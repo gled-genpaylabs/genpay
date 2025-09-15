@@ -30,8 +30,8 @@ const STANDARD_LIBRARY_VAR: &str = "GENPAY_LIB";
 
 /// Main Analyzer Struct
 #[derive(Debug)]
-pub struct Analyzer<'a> {
-    scope: Scope<'a>,
+pub struct Analyzer {
+    scope: Scope,
     source: NamedSource<String>,
     source_path: PathBuf,
 
@@ -42,7 +42,7 @@ pub struct Analyzer<'a> {
     compiler_macros: HashMap<String, CompilerMacros>,
 }
 
-impl<'a> Analyzer<'a> {
+impl Analyzer {
     pub fn new(src: &str, filename: &str, source_path: PathBuf, is_main: bool) -> Self {
         let compiler_macros = HashMap::from([
             (
@@ -85,7 +85,7 @@ impl<'a> Analyzer<'a> {
         }
     }
 
-    pub fn analyze(&mut self, ast: &[Statements<'a>]) -> Result<SemanticOk<'a>, SemanticErr<'a>> {
+    pub fn analyze(&mut self, ast: &[Statements]) -> Result<SemanticOk, SemanticErr> {
         ast.iter().for_each(|stmt| self.visit_statement(stmt));
 
         if self.scope.get_fn("main").is_none() && self.scope.is_main {
@@ -127,8 +127,8 @@ impl<'a> Analyzer<'a> {
     }
 }
 
-impl<'a> Analyzer<'a> {
-    fn visit_statement(&mut self, statement: &Statements<'a>) {
+impl Analyzer {
+    fn visit_statement(&mut self, statement: &Statements) {
         // checking for allowed global scope statements
         if self.scope.parent.is_none() {
             match statement {
@@ -3319,7 +3319,7 @@ impl<'a> Analyzer<'a> {
     }
 }
 
-impl<'a> Statements<'a> {
+impl Statements {
     pub fn get_span(&self) -> (usize, usize) {
         match self {
             Statements::AssignStatement { span, .. } => *span,
@@ -3351,7 +3351,7 @@ impl<'a> Statements<'a> {
     }
 }
 
-impl<'a> Expressions<'a> {
+impl Expressions {
     pub fn get_span(&self) -> (usize, usize) {
         match self {
             Expressions::Binary { span, .. } => *span,

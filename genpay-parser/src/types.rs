@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Type<'a> {
+pub enum Type {
     SelfRef,
     Undefined,
     NoDrop,
@@ -25,22 +25,22 @@ pub enum Type<'a> {
     Null,
     Char,
 
-    Pointer(Box<Type<'a>>),
-    Array(Box<Type<'a>>, usize),
-    DynamicArray(Box<Type<'a>>),
+    Pointer(Box<Type>),
+    Array(Box<Type>, usize),
+    DynamicArray(Box<Type>),
 
-    Tuple(Vec<Type<'a>>),
-    Alias(&'a str),
+    Tuple(Vec<Type>),
+    Alias(String),
 
     // for semantical analyzer
-    Function(Vec<Type<'a>>, Box<Type<'a>>, bool), // fn foo(a: i32, b: u32) string  --->  Function([I32, U32], String)
-    Struct(IndexMap<&'a str, Type<'a>>, IndexMap<&'a str, Type<'a>>), // struct Abc { a: i32, b: bool, c: *u64 }  ---> Struct([I32, Bool, Pointer(U64)])
-    Enum(Vec<&'a str>, IndexMap<&'a str, Type<'a>>), // enum Abc { A, B, C } -> Enum([A, B, C])
+    Function(Vec<Type>, Box<Type>, bool), // fn foo(a: i32, b: u32) string  --->  Function([I32, U32], String)
+    Struct(IndexMap<String, Type>, IndexMap<String, Type>), // struct Abc { a: i32, b: bool, c: *u64 }  ---> Struct([I32, Bool, Pointer(U64)])
+    Enum(Vec<String>, IndexMap<String, Type>), // enum Abc { A, B, C } -> Enum([A, B, C])
 
-    ImportObject(&'a str),
+    ImportObject(String),
 }
 
-impl<'a> std::fmt::Display for Type<'a> {
+impl<'a> std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Type::SelfRef => write!(f, "&self"),

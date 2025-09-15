@@ -6,13 +6,13 @@ pub mod error;
 pub mod token;
 pub mod token_type;
 
-pub struct Lexer<'a> {
-    source: &'a str,
+pub struct Lexer {
+    source: String,
     cursor: usize,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn new(source: &'a str) -> Self {
+impl Lexer {
+    pub fn new(source: String) -> Self {
         Lexer { source, cursor: 0 }
     }
 
@@ -21,7 +21,9 @@ impl<'a> Lexer<'a> {
     }
 
     fn peek(&self) -> Option<char> {
-        self.source.get(self.cursor..).and_then(|s| s.chars().next())
+        self.source
+            .get(self.cursor..)
+            .and_then(|s| s.chars().next())
     }
 
     fn advance(&mut self) -> Option<char> {
@@ -46,9 +48,9 @@ impl<'a> Lexer<'a> {
         token_type: TokenType,
         start: usize,
         len: usize,
-    ) -> Result<Token<'a>, LexerError<'a>> {
+    ) -> Result<Token, LexerError> {
         let value = &self.source[start..start + len];
-        Ok(Token::new(value, token_type, (start, len)))
+        Ok(Token::new(value.to_string(), token_type, (start, len)))
     }
 
     fn skip_whitespace(&mut self) {
@@ -70,7 +72,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_string(&mut self) -> Result<Token<'a>, LexerError<'a>> {
+    fn read_string(&mut self) -> Result<Token, LexerError> {
         let start = self.cursor - 1; // The opening quote has already been consumed
         while let Some(c) = self.peek() {
             if c == '"' {
@@ -93,10 +95,14 @@ impl<'a> Lexer<'a> {
 
         let value = &self.source[start + 1..self.cursor - 1];
         let len = self.cursor - start;
-        Ok(Token::new(value, TokenType::String, (start, len)))
+        Ok(Token::new(
+            value.to_string(),
+            TokenType::String,
+            (start, len),
+        ))
     }
 
-    fn read_char(&mut self) -> Result<Token<'a>, LexerError<'a>> {
+    fn read_char(&mut self) -> Result<Token, LexerError> {
         let start = self.cursor - 1; // The opening quote has already been consumed
 
         // Handle escaped char
@@ -117,10 +123,10 @@ impl<'a> Lexer<'a> {
 
         let value = &self.source[start + 1..self.cursor - 1];
         let len = self.cursor - start;
-        Ok(Token::new(value, TokenType::Char, (start, len)))
+        Ok(Token::new(value.to_string(), TokenType::Char, (start, len)))
     }
 
-    fn read_number(&mut self, start: usize) -> Result<Token<'a>, LexerError<'a>> {
+    fn read_number(&mut self, start: usize) -> Result<Token, LexerError> {
         let mut token_type = TokenType::Number;
         while let Some(c) = self.peek() {
             if c.is_ascii_digit() {
@@ -142,7 +148,7 @@ impl<'a> Lexer<'a> {
         self.make_token(token_type, start, len)
     }
 
-    fn read_identifier(&mut self, start: usize) -> Result<Token<'a>, LexerError<'a>> {
+    fn read_identifier(&mut self, start: usize) -> Result<Token, LexerError> {
         while let Some(c) = self.peek() {
             if c.is_alphanumeric() || c == '_' {
                 self.advance();
@@ -153,7 +159,7 @@ impl<'a> Lexer<'a> {
         let len = self.cursor - start;
         let value = &self.source[start..start + len];
         let token_type = lookup_identifier(value);
-        Ok(Token::new(value, token_type, (start, len)))
+        Ok(Token::new(value.to_string(), token_type, (start, len)))
     }
 }
 
@@ -202,8 +208,8 @@ fn lookup_identifier(s: &str) -> TokenType {
     KEYWORDS.get(s).cloned().unwrap_or(TokenType::Identifier)
 }
 
-impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Token<'a>, LexerError<'a>>;
+impl<'a> Iterator for Lexer {
+    type Item = Result<Token, LexerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.skip_whitespace();
@@ -385,7 +391,7 @@ mod tests {
 
     #[test]
     fn basic_types() {
-        let input = "i8 i16 i32 i64 u8 u16 u32 u64 usize char bool void";
+        let input = "i8 i16 i32 i64 u8 u16 u32 u64 usize char bool void".to_string();
         let lexer = Lexer::new(input);
         let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
 
@@ -413,7 +419,7 @@ mod tests {
 
     #[test]
     fn boolean_keywords() {
-        let input = "true false";
+        let input = "true false".to_string();
         let lexer = Lexer::new(input);
         let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
 
@@ -428,7 +434,7 @@ mod tests {
 
     #[test]
     fn main_keywords() {
-        let input = "let fn import return struct enum typedef";
+        let input = "let fn import return struct enum typedef".to_string();
         let lexer = Lexer::new(input);
         let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
 
@@ -451,74 +457,83 @@ mod tests {
 
     #[test]
     fn basic_number() {
-        let input = "123";
-        let mut lexer = Lexer::new(input);
-        let token = lexer.next().unwrap().unwrap();
-        assert_eq!(token, Token::new("123", TokenType::Number, (0, 3)));
-    }
-
-    #[test]
-    fn float_number() {
-        let input = "1.23";
-        let mut lexer = Lexer::new(input);
-        let token = lexer.next().unwrap().unwrap();
-        assert_eq!(token, Token::new("1.23", TokenType::FloatNumber, (0, 4)));
-    }
-
-    #[test]
-    fn basic_string() {
-        let input = "\"hello\"";
-        let mut lexer = Lexer::new(input);
-        let token = lexer.next().unwrap().unwrap();
-        assert_eq!(token, Token::new("hello", TokenType::String, (0, 7)));
-    }
-
-    #[test]
-    fn string_with_escapes() {
-        let input = "\"hello\\\"world\"";
+        let input = "123".to_string();
         let mut lexer = Lexer::new(input);
         let token = lexer.next().unwrap().unwrap();
         assert_eq!(
             token,
-            Token::new("hello\\\"world", TokenType::String, (0, 14))
+            Token::new("123".to_string(), TokenType::Number, (0, 3))
+        );
+    }
+
+    #[test]
+    fn float_number() {
+        let input = "1.23".to_string();
+        let mut lexer = Lexer::new(input);
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(
+            token,
+            Token::new("1.23".to_string(), TokenType::FloatNumber, (0, 4))
+        );
+    }
+
+    #[test]
+    fn basic_string() {
+        let input = "\"hello\"".to_string();
+        let mut lexer = Lexer::new(input);
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(
+            token,
+            Token::new("hello".to_string(), TokenType::String, (0, 7))
+        );
+    }
+
+    #[test]
+    fn string_with_escapes() {
+        let input = "\"hello\\\"world\"".to_string();
+        let mut lexer = Lexer::new(input);
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(
+            token,
+            Token::new("hello\\\"world".to_string(), TokenType::String, (0, 14))
         );
     }
 
     #[test]
     fn basic_char() {
-        let input = "'a'";
+        let input = "'a'".to_string();
         let mut lexer = Lexer::new(input);
         let token = lexer.next().unwrap().unwrap();
-        assert_eq!(token, Token::new("a", TokenType::Char, (0, 3)));
+        assert_eq!(token, Token::new("a".to_string(), TokenType::Char, (0, 3)));
     }
 
     #[test]
     fn operators() {
-        let input = "+ - * / % = == != < > <= >= && || ! & | ^ << >>";
+        let input = "+ - * / % = == != < > <= >= && || ! & | ^ << >>".to_string();
         let lexer = Lexer::new(input);
         let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
 
         let expected_tokens = vec![
-            Token::new("+", TokenType::Plus, (0, 1)),
-            Token::new("-", TokenType::Minus, (2, 1)),
-            Token::new("*", TokenType::Multiply, (4, 1)),
-            Token::new("/", TokenType::Divide, (6, 1)),
-            Token::new("%", TokenType::Modulus, (8, 1)),
-            Token::new("=", TokenType::Equal, (10, 1)),
-            Token::new("==", TokenType::Eq, (12, 2)),
-            Token::new("!=", TokenType::Ne, (15, 2)),
-            Token::new("<", TokenType::Lt, (18, 1)),
-            Token::new(">", TokenType::Bt, (20, 1)),
-            Token::new("<=", TokenType::Leq, (22, 2)),
-            Token::new(">=", TokenType::Beq, (25, 2)),
-            Token::new("&&", TokenType::And, (28, 2)),
-            Token::new("||", TokenType::Or, (31, 2)),
-            Token::new("!", TokenType::Not, (34, 1)),
-            Token::new("&", TokenType::Ampersand, (36, 1)),
-            Token::new("|", TokenType::Verbar, (38, 1)),
-            Token::new("^", TokenType::Xor, (40, 1)),
-            Token::new("<<", TokenType::LShift, (42, 2)),
-            Token::new(">>", TokenType::RShift, (45, 2)),
+            Token::new("+".to_string(), TokenType::Plus, (0, 1)),
+            Token::new("-".to_string(), TokenType::Minus, (2, 1)),
+            Token::new("*".to_string(), TokenType::Multiply, (4, 1)),
+            Token::new("/".to_string(), TokenType::Divide, (6, 1)),
+            Token::new("%.".to_string(), TokenType::Modulus, (8, 1)),
+            Token::new("=".to_string(), TokenType::Equal, (10, 1)),
+            Token::new("==.".to_string(), TokenType::Eq, (12, 2)),
+            Token::new("!=".to_string(), TokenType::Ne, (15, 2)),
+            Token::new("<.".to_string(), TokenType::Lt, (18, 1)),
+            Token::new(">".to_string(), TokenType::Bt, (20, 1)),
+            Token::new("<=".to_string(), TokenType::Leq, (22, 2)),
+            Token::new(">=".to_string(), TokenType::Beq, (25, 2)),
+            Token::new("&&.".to_string(), TokenType::And, (28, 2)),
+            Token::new("||".to_string(), TokenType::Or, (31, 2)),
+            Token::new("!".to_string(), TokenType::Not, (34, 1)),
+            Token::new("&".to_string(), TokenType::Ampersand, (36, 1)),
+            Token::new("|".to_string(), TokenType::Verbar, (38, 1)),
+            Token::new("^".to_string(), TokenType::Xor, (40, 1)),
+            Token::new("<<".to_string(), TokenType::LShift, (42, 2)),
+            Token::new(">>".to_string(), TokenType::RShift, (45, 2)),
         ];
 
         assert_eq!(tokens, expected_tokens);
@@ -526,27 +541,24 @@ mod tests {
 
     #[test]
     fn unterminated_string() {
-        let input = "\"hello";
+        let input = "\"hello".to_string();
         let mut lexer = Lexer::new(input);
         let result = lexer.next().unwrap();
-        assert!(matches!(
-            result,
-            Err(LexerError::UnterminatedString { .. })
-        ));
+        assert!(matches!(result, Err(LexerError::UnterminatedString { .. })));
     }
 
     #[test]
     fn comment() {
-        let input = "// this is a comment\nlet x = 1;";
+        let input = "// this is a comment\nlet x = 1;".to_string();
         let lexer = Lexer::new(input);
         let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
 
         let expected_tokens = vec![
-            Token::new("let", TokenType::Keyword, (21, 3)),
-            Token::new("x", TokenType::Identifier, (25, 1)),
-            Token::new("=", TokenType::Equal, (27, 1)),
-            Token::new("1", TokenType::Number, (29, 1)),
-            Token::new(";", TokenType::Semicolon, (30, 1)),
+            Token::new("let".to_string(), TokenType::Keyword, (21, 3)),
+            Token::new("x".to_string(), TokenType::Identifier, (25, 1)),
+            Token::new("=".to_string(), TokenType::Equal, (27, 1)),
+            Token::new("1".to_string(), TokenType::Number, (29, 1)),
+            Token::new(";".to_string(), TokenType::Semicolon, (30, 1)),
         ];
 
         assert_eq!(tokens, expected_tokens);
