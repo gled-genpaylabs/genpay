@@ -1,4 +1,4 @@
-use genpay_parse_two::types::Type;
+use genpay_parser::types::Type;
 
 #[derive(Debug, Clone)]
 pub struct ScopeElement<'a> {
