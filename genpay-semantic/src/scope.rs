@@ -1,5 +1,5 @@
 use crate::element::ScopeElement;
-use genpay_parse_two::types::Type;
+use genpay_parser::types::Type;
 use std::collections::HashMap;
 
 type UnusedVariable = (String, (usize, usize));
