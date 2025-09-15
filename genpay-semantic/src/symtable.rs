@@ -5,30 +5,30 @@ use std::{
 };
 
 #[derive(Debug, Clone, Default)]
-pub struct SymbolTable<'a> {
-    pub imports: HashMap<String, Import<'a>>,
-    pub included: HashMap<String, Include<'a>>,
+pub struct SymbolTable {
+    pub imports: HashMap<String, Import>,
+    pub included: HashMap<String, Include>,
     pub linked: HashSet<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Import<'a> {
-    pub functions: HashMap<String, Type<'a>>,
-    pub structs: HashMap<String, Type<'a>>,
-    pub enums: HashMap<String, Type<'a>>,
+pub struct Import {
+    pub functions: HashMap<String, Type>,
+    pub structs: HashMap<String, Type>,
+    pub enums: HashMap<String, Type>,
 
-    pub embedded_symtable: SymbolTable<'a>,
+    pub embedded_symtable: SymbolTable,
     pub source: String,
-    pub ast: Vec<Statements<'a>>,
+    pub ast: Vec<Statements>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Include<'a> {
-    pub ast: Vec<Statements<'a>>,
+pub struct Include {
+    pub ast: Vec<Statements>,
 }
 
-impl<'a> Import<'a> {
-    pub fn new(ast: Vec<Statements<'a>>, source: &str) -> Self {
+impl Import {
+    pub fn new(ast: Vec<Statements>, source: &str) -> Self {
         Self {
             functions: HashMap::new(),
             structs: HashMap::new(),
@@ -40,32 +40,32 @@ impl<'a> Import<'a> {
         }
     }
 
-    pub fn add_fn(&mut self, name: String, typ: Type<'a>) {
+    pub fn add_fn(&mut self, name: String, typ: Type) {
         self.functions.insert(name, typ);
     }
 
-    pub fn add_struct(&mut self, name: String, typ: Type<'a>) {
+    pub fn add_struct(&mut self, name: String, typ: Type) {
         self.structs.insert(name, typ);
     }
 
-    pub fn add_enum(&mut self, name: String, typ: Type<'a>) {
+    pub fn add_enum(&mut self, name: String, typ: Type) {
         self.enums.insert(name, typ);
     }
 
-    pub fn get_struct(&self, name: impl std::convert::AsRef<str>) -> Option<Type<'a>> {
+    pub fn get_struct(&self, name: impl std::convert::AsRef<str>) -> Option<Type> {
         self.structs.get(name.as_ref()).cloned()
     }
 
-    pub fn get_enum(&self, name: impl std::convert::AsRef<str>) -> Option<Type<'a>> {
+    pub fn get_enum(&self, name: impl std::convert::AsRef<str>) -> Option<Type> {
         self.enums.get(name.as_ref()).cloned()
     }
 
-    pub fn get_fn(&self, name: impl std::convert::AsRef<str>) -> Option<Type<'a>> {
+    pub fn get_fn(&self, name: impl std::convert::AsRef<str>) -> Option<Type> {
         self.functions.get(name.as_ref()).cloned()
     }
 }
 
-impl<'a> Default for Import<'a> {
+impl Default for Import {
     fn default() -> Self {
         Self::new(Vec::new(), "")
     }

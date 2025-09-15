@@ -1,109 +1,109 @@
 use crate::{statements::Statements, types::Type, value::Value};
-use std::collections::HashMap;
+use std::{collections::HashMap, string::String};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expressions<'a> {
+pub enum Expressions {
     /// `OBJECT BINOP EXPRESSION`
     Binary {
-        operand: &'a str,
-        lhs: Box<Expressions<'a>>,
-        rhs: Box<Expressions<'a>>,
+        operand: String,
+        lhs: Box<Expressions>,
+        rhs: Box<Expressions>,
         span: (usize, usize),
     },
     /// `UNOP OBJECT`
     Unary {
-        operand: &'a str,
-        object: Box<Expressions<'a>>,
+        operand: String,
+        object: Box<Expressions>,
         span: (usize, usize),
     },
 
     /// `OBJECT BOOLOP EXPRESSION`
     Boolean {
-        operand: &'a str,
-        lhs: Box<Expressions<'a>>,
-        rhs: Box<Expressions<'a>>,
+        operand: String,
+        lhs: Box<Expressions>,
+        rhs: Box<Expressions>,
         span: (usize, usize),
     },
     /// `OBJECT BITOP EXPRESSION`
     Bitwise {
-        operand: &'a str,
-        lhs: Box<Expressions<'a>>,
-        rhs: Box<Expressions<'a>>,
+        operand: String,
+        lhs: Box<Expressions>,
+        rhs: Box<Expressions>,
         span: (usize, usize),
     },
 
     /// `IDENTIFIER: TYPE`
     Argument {
-        name: &'a str,
-        r#type: Type<'a>,
+        name: String,
+        r#type: Type,
         span: (usize, usize),
     },
     /// `OBJECT.SUBELEMENT_1.SUBELEMENT_2`
     SubElement {
-        head: Box<Expressions<'a>>,
-        subelements: Vec<Expressions<'a>>,
+        head: Box<Expressions>,
+        subelements: Vec<Expressions>,
         span: (usize, usize),
     },
 
     /// `IDENTIFIER ( EXPRESSION, EXPRESSION, ... )`
     FnCall {
-        name: &'a str,
-        arguments: Vec<Expressions<'a>>,
+        name: String,
+        arguments: Vec<Expressions>,
         span: (usize, usize),
     },
     /// `IDENTIFIER! ( EXPRESSION, EXPRESSION, ... )`
     MacroCall {
-        name: &'a str,
-        arguments: Vec<Expressions<'a>>,
+        name: String,
+        arguments: Vec<Expressions>,
         span: (usize, usize),
     },
 
     /// `&EXPRESSION`
     Reference {
-        object: Box<Expressions<'a>>,
+        object: Box<Expressions>,
         span: (usize, usize),
     },
 
     /// `*EXPRESSION`
     Dereference {
-        object: Box<Expressions<'a>>,
+        object: Box<Expressions>,
         span: (usize, usize),
     },
 
     /// `[EXPRESSION, EXPRESSION, ...]`
     Array {
-        values: Vec<Expressions<'a>>,
+        values: Vec<Expressions>,
         len: usize,
         span: (usize, usize),
     },
     /// `(EXPRESSION, EXPRESSION, ...)`
     Tuple {
-        values: Vec<Expressions<'a>>,
+        values: Vec<Expressions>,
         span: (usize, usize),
     },
     /// `OBJECT[EXPRESSION]`
     Slice {
-        object: Box<Expressions<'a>>,
-        index: Box<Expressions<'a>>,
+        object: Box<Expressions>,
+        index: Box<Expressions>,
         span: (usize, usize),
     },
     /// `IDENTIFIER { .IDENTIFIER = EXPRESSION, .IDENTIFIER = EXPRESSION }`
     Struct {
-        name: &'a str,
-        fields: HashMap<&'a str, Expressions<'a>>,
+        name: String,
+        fields: HashMap<String, Expressions>,
         span: (usize, usize),
     },
     /// `{ STATEMENTS }`
     Scope {
-        block: Vec<Statements<'a>>,
+        block: Vec<Statements>,
         span: (usize, usize),
     },
 
-    Value(Value<'a>, (usize, usize)),
+    Value(Value, (usize, usize)),
     None,
 }
 
-impl<'a> Expressions<'a> {
+impl Expressions {
     pub fn get_span(&self) -> (usize, usize) {
         match self {
             Expressions::Binary { span, .. } => *span,

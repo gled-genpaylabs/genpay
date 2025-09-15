@@ -1,17 +1,17 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LexerError<'a> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LexerError {
     InvalidNumberConstant {
-        const_type: &'static str,
+        const_type: String,
         span: (usize, usize),
     },
 
     ConstantParserError {
-        const_type: &'static str,
+        const_type: String,
         span: (usize, usize),
     },
 
     UnknownCharacterEscape {
-        escape: &'a str,
+        escape: String,
         span: (usize, usize),
     },
 

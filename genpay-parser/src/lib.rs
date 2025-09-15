@@ -1,5 +1,5 @@
-use genpay_lexer::token::Token;
 use genpay_lexer::Lexer;
+use genpay_lexer::token::Token;
 
 pub mod error;
 pub mod expressions;
@@ -13,14 +13,14 @@ use crate::statements::Statements;
 use crate::types::Type;
 use miette::NamedSource;
 
-pub type Program<'a> = Vec<Statements<'a>>;
+pub type Program = Vec<Statements>;
 
-pub struct Parser<'a> {
-    lexer: Lexer<'a>,
-    current_token: Token<'a>,
-    peek_token: Token<'a>,
+pub struct Parser {
+    lexer: Lexer,
+    current_token: Token,
+    peek_token: Token,
     source: NamedSource<String>,
-    errors: Vec<ParserError<'a>>,
+    errors: Vec<ParserError>,
 }
 
 #[derive(PartialEq, PartialOrd, Debug, Clone, Copy)]
@@ -44,13 +44,13 @@ enum Precedence {
 
 use genpay_lexer::token_type::TokenType;
 
-impl<'a> Parser<'a> {
-    pub fn new(source: &'a str, filename: &'a str) -> Self {
-        let mut lexer = Lexer::new(source);
+impl Parser {
+    pub fn new(source: String, filename: String) -> Self {
+        let mut lexer = Lexer::new(source.clone());
         let current_token = match lexer.next() {
             Some(Ok(token)) => token,
             _ => Token {
-                value: "",
+                value: "".to_string(),
                 token_type: TokenType::EOF,
                 span: (0, 0),
             },
@@ -58,7 +58,7 @@ impl<'a> Parser<'a> {
         let peek_token = match lexer.next() {
             Some(Ok(token)) => token,
             _ => Token {
-                value: "",
+                value: "".to_string(),
                 token_type: TokenType::EOF,
                 span: (0, 0),
             },
@@ -67,12 +67,12 @@ impl<'a> Parser<'a> {
             lexer,
             current_token,
             peek_token,
-            source: NamedSource::new(filename, source.to_string()),
+            source: NamedSource::new(filename, source),
             errors: Vec::new(),
         }
     }
 
-    pub fn parse(&mut self) -> Result<Program<'a>, Vec<ParserError<'a>>> {
+    pub fn parse(&mut self) -> Result<Program, Vec<ParserError>> {
         let mut program: Program = Vec::new();
 
         while self.current_token.token_type != TokenType::EOF {
@@ -98,7 +98,7 @@ impl<'a> Parser<'a> {
             }
             None => {
                 self.peek_token = Token {
-                    value: "",
+                    value: "".to_string(),
                     token_type: TokenType::EOF,
                     span: (0, 0),
                 };
@@ -106,7 +106,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_statement(&mut self) -> Option<Statements> {
         match self.current_token.token_type {
             TokenType::Keyword if self.current_token.value == "let" => self.parse_let_statement(),
             TokenType::Keyword if self.current_token.value == "return" => {
@@ -150,7 +150,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_expression_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_expression_statement(&mut self) -> Option<Statements> {
         let expression = self.parse_expression(Precedence::LOWEST)?;
 
         if self.peek_token.token_type == TokenType::Equal {
@@ -176,7 +176,7 @@ impl<'a> Parser<'a> {
             || self.peek_token.token_type == TokenType::DivideAssign
         {
             self.next_token(); // current is now the operator
-            let operator = self.current_token.value;
+            let operator = self.current_token.value.clone();
             self.next_token(); // current is now the start of the value expression
             let value = self.parse_expression(Precedence::LOWEST)?;
             let span = (expression.get_span().0, value.get_span().1);
@@ -200,7 +200,7 @@ impl<'a> Parser<'a> {
         Some(Statements::Expression(expression))
     }
 
-    fn parse_return_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_return_statement(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'return'
 
@@ -218,7 +218,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_block_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_block_statement(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume '{'
 
@@ -240,7 +240,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_if_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_if_statement(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'if'
 
@@ -248,8 +248,8 @@ impl<'a> Parser<'a> {
 
         if self.peek_token.token_type != TokenType::LBrace {
             self.errors.push(ParserError {
-                exception: "Expected '{' after if condition",
-                help: "Expected '{'",
+                exception: "Expected '{' after if condition".to_string(),
+                help: "Expected '{'".to_string(),
                 src: self.source.clone(),
                 span: self.peek_token.span,
             });
@@ -283,7 +283,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_while_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_while_statement(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'while'
 
@@ -291,8 +291,8 @@ impl<'a> Parser<'a> {
 
         if self.peek_token.token_type != TokenType::LBrace {
             self.errors.push(ParserError {
-                exception: "Expected '{' after while condition",
-                help: "Expected '{'",
+                exception: "Expected '{' after while condition".to_string(),
+                help: "Expected '{'".to_string(),
                 src: self.source.clone(),
                 span: self.peek_token.span,
             });
@@ -314,26 +314,26 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_for_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_for_statement(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'for'
 
         if self.current_token.token_type != TokenType::Identifier {
             self.errors.push(ParserError {
-                exception: "Expected identifier after 'for'",
-                help: "Expected identifier",
+                exception: "Expected identifier after 'for'".to_string(),
+                help: "Expected identifier".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
             return None;
         }
-        let binding = self.current_token.value;
+        let binding = self.current_token.value.clone();
         self.next_token();
 
         if self.current_token.token_type != TokenType::Equal {
             self.errors.push(ParserError {
-                exception: "Expected '=' after identifier in for loop",
-                help: "Expected '='",
+                exception: "Expected '=' after identifier in for loop".to_string(),
+                help: "Expected '='".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
@@ -345,8 +345,8 @@ impl<'a> Parser<'a> {
 
         if self.peek_token.token_type != TokenType::LBrace {
             self.errors.push(ParserError {
-                exception: "Expected '{' after for loop iterator",
-                help: "Expected '{'",
+                exception: "Expected '{' after for loop iterator".to_string(),
+                help: "Expected '{'".to_string(),
                 src: self.source.clone(),
                 span: self.peek_token.span,
             });
@@ -369,7 +369,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_fn_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_fn_statement(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         let public = self.current_token.value == "pub";
         if public {
@@ -379,20 +379,20 @@ impl<'a> Parser<'a> {
 
         if self.current_token.token_type != TokenType::Identifier {
             self.errors.push(ParserError {
-                exception: "Expected function name",
-                help: "Expected identifier",
+                exception: "Expected function name".to_string(),
+                help: "Expected identifier".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
             return None;
         }
-        let name = self.current_token.value;
+        let name = self.current_token.value.clone();
         self.next_token();
 
         if self.current_token.token_type != TokenType::LParen {
             self.errors.push(ParserError {
-                exception: "Expected '(' after function name",
-                help: "Expected '('",
+                exception: "Expected '(' after function name".to_string(),
+                help: "Expected '('".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
@@ -411,8 +411,8 @@ impl<'a> Parser<'a> {
 
         if self.current_token.token_type != TokenType::LBrace {
             self.errors.push(ParserError {
-                exception: "Expected '{' before function body",
-                help: "Expected '{'",
+                exception: "Expected '{' before function body".to_string(),
+                help: "Expected '{'".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
@@ -438,7 +438,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_function_parameters(&mut self) -> Option<(Vec<(&'a str, Type<'a>)>, bool)> {
+    fn parse_function_parameters(&mut self) -> Option<(Vec<(String, Type)>, bool)> {
         let mut params = Vec::new();
         let mut is_var_args = false;
 
@@ -449,20 +449,20 @@ impl<'a> Parser<'a> {
 
         if self.current_token.token_type != TokenType::Identifier {
             self.errors.push(ParserError {
-                exception: "Expected parameter name",
-                help: "Expected identifier",
+                exception: "Expected parameter name".to_string(),
+                help: "Expected identifier".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
             return None;
         }
-        let name = self.current_token.value;
+        let name = self.current_token.value.clone();
         self.next_token();
 
         if self.current_token.token_type != TokenType::DoubleDots {
             self.errors.push(ParserError {
-                exception: "Expected ':' after parameter name",
-                help: "Expected ':'",
+                exception: "Expected ':' after parameter name".to_string(),
+                help: "Expected ':'".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
@@ -489,20 +489,20 @@ impl<'a> Parser<'a> {
 
             if self.current_token.token_type != TokenType::Identifier {
                 self.errors.push(ParserError {
-                    exception: "Expected parameter name",
-                    help: "Expected identifier",
+                    exception: "Expected parameter name".to_string(),
+                    help: "Expected identifier".to_string(),
                     src: self.source.clone(),
                     span: self.current_token.span,
                 });
                 return None;
             }
-            let name = self.current_token.value;
+            let name = self.current_token.value.clone();
             self.next_token();
 
             if self.current_token.token_type != TokenType::DoubleDots {
                 self.errors.push(ParserError {
-                    exception: "Expected ':' after parameter name",
-                    help: "Expected ':'",
+                    exception: "Expected ':' after parameter name".to_string(),
+                    help: "Expected ':'".to_string(),
                     src: self.source.clone(),
                     span: self.current_token.span,
                 });
@@ -516,8 +516,8 @@ impl<'a> Parser<'a> {
 
         if self.current_token.token_type != TokenType::RParen {
             self.errors.push(ParserError {
-                exception: "Expected ')' after parameters",
-                help: "Expected ')'",
+                exception: "Expected ')' after parameters".to_string(),
+                help: "Expected ')".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
@@ -528,7 +528,7 @@ impl<'a> Parser<'a> {
         Some((params, is_var_args))
     }
 
-    fn parse_import_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_import_statement(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'import'
 
@@ -546,7 +546,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_include_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_include_statement(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'include'
 
@@ -564,24 +564,24 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_extern_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_extern_statement(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'extern'
 
         if self.current_token.token_type != TokenType::String {
             self.errors.push(ParserError {
-                exception: "Expected extern type string",
-                help: "Expected string literal",
+                exception: "Expected extern type string".to_string(),
+                help: "Expected string literal".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
             return None;
         }
-        let extern_type = self.current_token.value;
+        let extern_type = self.current_token.value.clone();
         self.next_token();
 
-        let public =
-            self.current_token.token_type == TokenType::Keyword && self.current_token.value == "pub";
+        let public = self.current_token.token_type == TokenType::Keyword
+            && self.current_token.value == "pub";
         if public {
             self.next_token();
         }
@@ -611,7 +611,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_struct_definition(&mut self) -> Option<Statements<'a>> {
+    fn parse_struct_definition(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         let public = self.current_token.value == "pub";
         if public {
@@ -621,20 +621,20 @@ impl<'a> Parser<'a> {
 
         if self.current_token.token_type != TokenType::Identifier {
             self.errors.push(ParserError {
-                exception: "Expected struct name",
-                help: "Expected identifier",
+                exception: "Expected struct name".to_string(),
+                help: "Expected identifier".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
             return None;
         }
-        let name = self.current_token.value;
+        let name = self.current_token.value.clone();
         self.next_token();
 
         if self.current_token.token_type != TokenType::LBrace {
             self.errors.push(ParserError {
-                exception: "Expected '{' after struct name",
-                help: "Expected '{'",
+                exception: "Expected '{' after struct name".to_string(),
+                help: "Expected '{'".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
@@ -643,22 +643,26 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         let mut fields = indexmap::IndexMap::new();
-        let mut functions = indexmap::IndexMap::new();
+        let mut functions: indexmap::IndexMap<String, Vec<Statements>> = indexmap::IndexMap::new();
 
-        while self.current_token.token_type != TokenType::RBrace && self.current_token.token_type != TokenType::EOF {
-            if self.current_token.token_type == TokenType::Keyword && self.current_token.value == "fn" {
+        while self.current_token.token_type != TokenType::RBrace
+            && self.current_token.token_type != TokenType::EOF
+        {
+            if self.current_token.token_type == TokenType::Keyword
+                && self.current_token.value == "fn"
+            {
                 let function = self.parse_fn_statement()?;
-                if let Statements::FunctionDefineStatement { name, .. } = function.clone() {
-                    functions.insert(name, function);
+                if let Statements::FunctionDefineStatement { ref name, .. } = function {
+                    functions.entry(name.clone()).or_default().push(function);
                 }
             } else if self.current_token.token_type == TokenType::Identifier {
-                let field_name = self.current_token.value;
+                let field_name = self.current_token.value.clone();
                 self.next_token();
 
                 if self.current_token.token_type != TokenType::DoubleDots {
                     self.errors.push(ParserError {
-                        exception: "Expected ':' after field name",
-                        help: "Expected ':'",
+                        exception: "Expected ':' after field name".to_string(),
+                        help: "Expected ':'".to_string(),
                         src: self.source.clone(),
                         span: self.current_token.span,
                     });
@@ -667,15 +671,15 @@ impl<'a> Parser<'a> {
                 self.next_token();
 
                 let field_type = self.parse_type()?;
-                fields.insert(field_name, field_type);
+                fields.insert(field_name.clone(), field_type);
             }
 
             if self.current_token.token_type == TokenType::Comma {
                 self.next_token();
             } else if self.current_token.token_type != TokenType::RBrace {
                 self.errors.push(ParserError {
-                    exception: "Expected ',' or '}' after field",
-                    help: "Expected ',' or '}'",
+                    exception: "Expected ',' or '}' after field".to_string(),
+                    help: "Expected ',' or '}'".to_string(),
                     src: self.source.clone(),
                     span: self.current_token.span,
                 });
@@ -694,7 +698,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_enum_definition(&mut self) -> Option<Statements<'a>> {
+    fn parse_enum_definition(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         let public = self.current_token.value == "pub";
         if public {
@@ -704,20 +708,20 @@ impl<'a> Parser<'a> {
 
         if self.current_token.token_type != TokenType::Identifier {
             self.errors.push(ParserError {
-                exception: "Expected enum name",
-                help: "Expected identifier",
+                exception: "Expected enum name".to_string(),
+                help: "Expected identifier".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
             return None;
         }
-        let name = self.current_token.value;
+        let name = self.current_token.value.clone();
         self.next_token();
 
         if self.current_token.token_type != TokenType::LBrace {
             self.errors.push(ParserError {
-                exception: "Expected '{' after enum name",
-                help: "Expected '{'",
+                exception: "Expected '{' after enum name".to_string(),
+                help: "Expected '{'".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
@@ -726,16 +730,21 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         let mut fields = vec![];
-        let mut functions = indexmap::IndexMap::new();
+        let mut functions: indexmap::IndexMap<String, Vec<Statements>> =
+            indexmap::IndexMap::new();
 
-        while self.current_token.token_type != TokenType::RBrace && self.current_token.token_type != TokenType::EOF {
-            if self.current_token.token_type == TokenType::Keyword && self.current_token.value == "fn" {
+        while self.current_token.token_type != TokenType::RBrace
+            && self.current_token.token_type != TokenType::EOF
+        {
+            if self.current_token.token_type == TokenType::Keyword
+                && self.current_token.value == "fn"
+            {
                 let function = self.parse_fn_statement()?;
-                if let Statements::FunctionDefineStatement { name, .. } = function.clone() {
-                    functions.insert(name, function);
+                if let Statements::FunctionDefineStatement { ref name, .. } = function {
+                    functions.entry(name.clone()).or_default().push(function);
                 }
             } else if self.current_token.token_type == TokenType::Identifier {
-                let field_name = self.current_token.value;
+                let field_name = self.current_token.value.clone();
                 fields.push(field_name);
                 self.next_token();
             }
@@ -744,8 +753,8 @@ impl<'a> Parser<'a> {
                 self.next_token();
             } else if self.current_token.token_type != TokenType::RBrace {
                 self.errors.push(ParserError {
-                    exception: "Expected ',' or '}' after variant",
-                    help: "Expected ',' or '}'",
+                    exception: "Expected ',' or '}' after variant".to_string(),
+                    help: "Expected ',' or '}'".to_string(),
                     src: self.source.clone(),
                     span: self.current_token.span,
                 });
@@ -764,20 +773,20 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_let_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_let_statement(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'let'
 
         if self.current_token.token_type != TokenType::Identifier {
             self.errors.push(ParserError {
-                exception: "Expected identifier after 'let'",
-                help: "Expected identifier",
+                exception: "Expected identifier after 'let'".to_string(),
+                help: "Expected identifier".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
             return None;
         }
-        let identifier = self.current_token.value;
+        let identifier = self.current_token.value.clone();
         self.next_token();
 
         let mut datatype = None;
@@ -806,20 +815,20 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_typedef_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_typedef_statement(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'typedef'
 
         if self.current_token.token_type != TokenType::Identifier {
             self.errors.push(ParserError {
-                exception: "Expected alias name",
-                help: "Expected identifier",
+                exception: "Expected alias name".to_string(),
+                help: "Expected identifier".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
             return None;
         }
-        let alias = self.current_token.value;
+        let alias = self.current_token.value.clone();
         self.next_token();
 
         let datatype = self.parse_type()?;
@@ -832,20 +841,20 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_extern_declare_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_extern_declare_statement(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume '_extern_declare'
 
         if self.current_token.token_type != TokenType::Identifier {
             self.errors.push(ParserError {
-                exception: "Expected identifier",
-                help: "Expected identifier",
+                exception: "Expected identifier".to_string(),
+                help: "Expected identifier".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
             return None;
         }
-        let identifier = self.current_token.value;
+        let identifier = self.current_token.value.clone();
         self.next_token();
 
         let datatype = self.parse_type()?;
@@ -858,7 +867,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_link_c_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_link_c_statement(&mut self) -> Option<Statements> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume '_link_c'
 
@@ -871,13 +880,13 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_break_statement(&mut self) -> Option<Statements<'a>> {
+    fn parse_break_statement(&mut self) -> Option<Statements> {
         let span = self.current_token.span;
         self.next_token(); // consume 'break'
         Some(Statements::BreakStatements { span })
     }
 
-    fn parse_expression(&mut self, precedence: Precedence) -> Option<Expressions<'a>> {
+    fn parse_expression(&mut self, precedence: Precedence) -> Option<Expressions> {
         let mut left_expr = match self.parse_prefix() {
             Ok(expr) => expr,
             Err(_) => return None,
@@ -891,7 +900,7 @@ impl<'a> Parser<'a> {
         Some(left_expr)
     }
 
-    fn parse_prefix(&mut self) -> Result<Expressions<'a>, ()> {
+    fn parse_prefix(&mut self) -> Result<Expressions, ()> {
         match self.current_token.token_type {
             TokenType::Number => self.parse_integer_literal().ok_or(()),
             TokenType::FloatNumber => self.parse_float_literal().ok_or(()),
@@ -907,13 +916,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_integer_literal(&mut self) -> Option<Expressions<'a>> {
+    fn parse_integer_literal(&mut self) -> Option<Expressions> {
         let value = match self.current_token.value.parse::<i64>() {
             Ok(v) => v,
             Err(_) => {
                 self.errors.push(ParserError {
-                    exception: "Could not parse integer",
-                    help: "Invalid integer literal",
+                    exception: "Could not parse integer".to_string(),
+                    help: "Invalid integer literal".to_string(),
                     src: self.source.clone(),
                     span: self.current_token.span,
                 });
@@ -927,13 +936,13 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_float_literal(&mut self) -> Option<Expressions<'a>> {
+    fn parse_float_literal(&mut self) -> Option<Expressions> {
         let value = match self.current_token.value.parse::<f64>() {
             Ok(v) => v,
             Err(_) => {
                 self.errors.push(ParserError {
-                    exception: "Could not parse float",
-                    help: "Invalid float literal",
+                    exception: "Could not parse float".to_string(),
+                    help: "Invalid float literal".to_string(),
                     src: self.source.clone(),
                     span: self.current_token.span,
                 });
@@ -947,14 +956,14 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_string_literal(&mut self) -> Option<Expressions<'a>> {
+    fn parse_string_literal(&mut self) -> Option<Expressions> {
         Some(Expressions::Value(
-            crate::value::Value::String(self.current_token.value),
+            crate::value::Value::String(self.current_token.value.clone()),
             self.current_token.span,
         ))
     }
 
-    fn parse_boolean_literal(&mut self) -> Option<Expressions<'a>> {
+    fn parse_boolean_literal(&mut self) -> Option<Expressions> {
         let value = self.current_token.value == "true";
         Some(Expressions::Value(
             crate::value::Value::Boolean(value),
@@ -962,19 +971,19 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_identifier(&mut self) -> Option<Expressions<'a>> {
+    fn parse_identifier(&mut self) -> Option<Expressions> {
         if self.peek_token.token_type == TokenType::LBrace {
             return self.parse_struct_literal();
         }
 
         Some(Expressions::Value(
-            crate::value::Value::Identifier(self.current_token.value),
+            crate::value::Value::Identifier(self.current_token.value.clone()),
             self.current_token.span,
         ))
     }
 
-    fn parse_prefix_expression(&mut self) -> Option<Expressions<'a>> {
-        let operator = self.current_token.value;
+    fn parse_prefix_expression(&mut self) -> Option<Expressions> {
+        let operator = self.current_token.value.clone();
         let span_start = self.current_token.span.0;
 
         self.next_token();
@@ -983,7 +992,7 @@ impl<'a> Parser<'a> {
 
         right.map(|right_expr| {
             let span_end = right_expr.get_span().1;
-            match operator {
+            match operator.as_str() {
                 "&" => Expressions::Reference {
                     object: Box::new(right_expr),
                     span: (span_start, span_end),
@@ -1001,7 +1010,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_infix(&mut self, left: Expressions<'a>) -> Option<Expressions<'a>> {
+    fn parse_infix(&mut self, left: Expressions) -> Option<Expressions> {
         match self.current_token.token_type {
             TokenType::Plus
             | TokenType::Minus
@@ -1029,15 +1038,15 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_binary_expression(&mut self, left: Expressions<'a>) -> Option<Expressions<'a>> {
+    fn parse_binary_expression(&mut self, left: Expressions) -> Option<Expressions> {
         let precedence = self.current_precedence();
-        let operator = self.current_token.value;
+        let operator = self.current_token.value.clone();
         self.next_token();
         let right = self.parse_expression(precedence)?;
 
         let span = (left.get_span().0, right.get_span().1);
 
-        let expression = match operator {
+        let expression = match operator.as_str() {
             "+" | "-" | "*" | "/" | "%" => Expressions::Binary {
                 lhs: Box::new(left),
                 operand: operator,
@@ -1062,17 +1071,14 @@ impl<'a> Parser<'a> {
         Some(expression)
     }
 
-    fn parse_grouped_expression(&mut self) -> Option<Expressions<'a>> {
+    fn parse_grouped_expression(&mut self) -> Option<Expressions> {
         self.next_token(); // consume '('
 
         if self.current_token.token_type == TokenType::RParen {
             // Empty tuple
             return Some(Expressions::Tuple {
                 values: vec![],
-                span: (
-                    self.current_token.span.0 - 1,
-                    self.current_token.span.1,
-                ),
+                span: (self.current_token.span.0 - 1, self.current_token.span.1),
             });
         }
 
@@ -1087,8 +1093,8 @@ impl<'a> Parser<'a> {
 
         if self.peek_token.token_type != TokenType::RParen {
             self.errors.push(ParserError {
-                exception: "Expected ')' after expression",
-                help: "Expected ')'",
+                exception: "Expected ')' after expression".to_string(),
+                help: "Expected ')'".to_string(),
                 src: self.source.clone(),
                 span: self.peek_token.span,
             });
@@ -1110,15 +1116,16 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_call_expression(&mut self, function: Expressions<'a>) -> Option<Expressions<'a>> {
+    fn parse_call_expression(&mut self, function: Expressions) -> Option<Expressions> {
+        let span = function.get_span();
         let name = match function {
             Expressions::Value(crate::value::Value::Identifier(name), _) => name,
             _ => {
                 self.errors.push(ParserError {
-                    exception: "Expected function name",
-                    help: "Expected identifier",
+                    exception: "Expected function name".to_string(),
+                    help: "Expected identifier".to_string(),
                     src: self.source.clone(),
-                    span: function.get_span(),
+                    span,
                 });
                 return None;
             }
@@ -1129,11 +1136,11 @@ impl<'a> Parser<'a> {
         Some(Expressions::FnCall {
             name,
             arguments,
-            span: (function.get_span().0, self.current_token.span.1),
+            span: (span.0, self.current_token.span.1),
         })
     }
 
-    fn parse_expression_list(&mut self, end: TokenType) -> Option<Vec<Expressions<'a>>> {
+    fn parse_expression_list(&mut self, end: TokenType) -> Option<Vec<Expressions>> {
         let mut list = Vec::new();
 
         if self.peek_token.token_type == end {
@@ -1152,8 +1159,8 @@ impl<'a> Parser<'a> {
 
         if self.peek_token.token_type != end {
             self.errors.push(ParserError {
-                exception: "Expected end of list",
-                help: "Expected token",
+                exception: "Expected end of list".to_string(),
+                help: "Expected token".to_string(),
                 src: self.source.clone(),
                 span: self.peek_token.span,
             });
@@ -1165,7 +1172,7 @@ impl<'a> Parser<'a> {
         Some(list)
     }
 
-    fn parse_array_literal(&mut self) -> Option<Expressions<'a>> {
+    fn parse_array_literal(&mut self) -> Option<Expressions> {
         let span_start = self.current_token.span.0;
         let values = self.parse_expression_list(TokenType::RBrack)?;
         let len = values.len();
@@ -1185,8 +1192,8 @@ impl<'a> Parser<'a> {
         self.get_precedence(&self.current_token.token_type)
     }
 
-    fn parse_struct_literal(&mut self) -> Option<Expressions<'a>> {
-        let name = self.current_token.value;
+    fn parse_struct_literal(&mut self) -> Option<Expressions> {
+        let name = self.current_token.value.clone();
         let span_start = self.current_token.span.0;
 
         self.next_token(); // consume identifier
@@ -1197,8 +1204,8 @@ impl<'a> Parser<'a> {
         while self.current_token.token_type != TokenType::RBrace {
             if self.current_token.token_type != TokenType::Dot {
                 self.errors.push(ParserError {
-                    exception: "Expected '.' before field name",
-                    help: "Expected '.'",
+                    exception: "Expected '.' before field name".to_string(),
+                    help: "Expected '.'".to_string(),
                     src: self.source.clone(),
                     span: self.current_token.span,
                 });
@@ -1208,20 +1215,20 @@ impl<'a> Parser<'a> {
 
             if self.current_token.token_type != TokenType::Identifier {
                 self.errors.push(ParserError {
-                    exception: "Expected field name",
-                    help: "Expected identifier",
+                    exception: "Expected field name".to_string(),
+                    help: "Expected identifier".to_string(),
                     src: self.source.clone(),
                     span: self.current_token.span,
                 });
                 return None;
             }
-            let field_name = self.current_token.value;
+            let field_name = self.current_token.value.clone();
             self.next_token();
 
             if self.current_token.token_type != TokenType::Equal {
                 self.errors.push(ParserError {
-                    exception: "Expected '=' after field name",
-                    help: "Expected '='",
+                    exception: "Expected '=' after field name".to_string(),
+                    help: "Expected '='".to_string(),
                     src: self.source.clone(),
                     span: self.current_token.span,
                 });
@@ -1239,8 +1246,8 @@ impl<'a> Parser<'a> {
 
             if self.peek_token.token_type != TokenType::Comma {
                 self.errors.push(ParserError {
-                    exception: "Expected ',' or '}' after field",
-                    help: "Expected ',' or '}'",
+                    exception: "Expected ',' or '}' after field".to_string(),
+                    help: "Expected ',' or '}'".to_string(),
                     src: self.source.clone(),
                     span: self.peek_token.span,
                 });
@@ -1259,15 +1266,16 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_macro_call_expression(&mut self, macro_expr: Expressions<'a>) -> Option<Expressions<'a>> {
+    fn parse_macro_call_expression(&mut self, macro_expr: Expressions) -> Option<Expressions> {
+        let span = macro_expr.get_span();
         let name = match macro_expr {
             Expressions::Value(crate::value::Value::Identifier(name), _) => name,
             _ => {
                 self.errors.push(ParserError {
-                    exception: "Expected macro name",
-                    help: "Expected identifier",
+                    exception: "Expected macro name".to_string(),
+                    help: "Expected identifier".to_string(),
                     src: self.source.clone(),
-                    span: macro_expr.get_span(),
+                    span,
                 });
                 return None;
             }
@@ -1275,8 +1283,8 @@ impl<'a> Parser<'a> {
 
         if self.peek_token.token_type != TokenType::LParen {
             self.errors.push(ParserError {
-                exception: "Expected '(' after macro name",
-                help: "Expected '('",
+                exception: "Expected '(' after macro name".to_string(),
+                help: "Expected '('".to_string(),
                 src: self.source.clone(),
                 span: self.peek_token.span,
             });
@@ -1289,11 +1297,11 @@ impl<'a> Parser<'a> {
         Some(Expressions::MacroCall {
             name,
             arguments,
-            span: (macro_expr.get_span().0, self.current_token.span.1),
+            span: (span.0, self.current_token.span.1),
         })
     }
 
-    fn parse_sub_element_expression(&mut self, left: Expressions<'a>) -> Option<Expressions<'a>> {
+    fn parse_sub_element_expression(&mut self, left: Expressions) -> Option<Expressions> {
         self.next_token(); // Consume the dot
 
         let mut subelements = vec![];
@@ -1315,15 +1323,15 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_slice_expression(&mut self, left: Expressions<'a>) -> Option<Expressions<'a>> {
+    fn parse_slice_expression(&mut self, left: Expressions) -> Option<Expressions> {
         let span_start = left.get_span().0;
         self.next_token();
         let index = self.parse_expression(Precedence::LOWEST)?;
 
         if self.peek_token.token_type != TokenType::RBrack {
             self.errors.push(ParserError {
-                exception: "Expected ']' after slice index",
-                help: "Expected ']'",
+                exception: "Expected ']' after slice index".to_string(),
+                help: "Expected ']'".to_string(),
                 src: self.source.clone(),
                 span: self.peek_token.span,
             });
@@ -1345,7 +1353,9 @@ impl<'a> Parser<'a> {
             TokenType::Plus | TokenType::Minus => Precedence::SUM,
             TokenType::Divide | TokenType::Multiply | TokenType::Modulus => Precedence::PRODUCT,
             TokenType::Eq | TokenType::Ne => Precedence::EQUALS,
-            TokenType::Lt | TokenType::Bt | TokenType::Leq | TokenType::Beq => Precedence::LESSGREATER,
+            TokenType::Lt | TokenType::Bt | TokenType::Leq | TokenType::Beq => {
+                Precedence::LESSGREATER
+            }
             TokenType::And => Precedence::LOGICALAND,
             TokenType::Or => Precedence::LOGICALOR,
             TokenType::LShift | TokenType::RShift => Precedence::SHIFT,
@@ -1359,11 +1369,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_type(&mut self) -> Option<Type<'a>> {
+    fn parse_type(&mut self) -> Option<Type> {
         self.parse_prefix_type()
     }
 
-    fn parse_prefix_type(&mut self) -> Option<Type<'a>> {
+    fn parse_prefix_type(&mut self) -> Option<Type> {
         match self.current_token.token_type {
             TokenType::Multiply => {
                 self.next_token();
@@ -1371,9 +1381,9 @@ impl<'a> Parser<'a> {
                 Some(Type::Pointer(Box::new(inner_type)))
             }
             TokenType::Type => {
-                let type_name = self.current_token.value;
+                let type_name = self.current_token.value.clone();
                 self.next_token();
-                match type_name {
+                match type_name.as_str() {
                     "i8" => Some(Type::I8),
                     "i16" => Some(Type::I16),
                     "i32" => Some(Type::I32),
@@ -1392,7 +1402,7 @@ impl<'a> Parser<'a> {
                 }
             }
             TokenType::Identifier => {
-                let alias = self.current_token.value;
+                let alias = self.current_token.value.clone();
                 self.next_token();
                 Some(Type::Alias(alias))
             }
@@ -1400,8 +1410,8 @@ impl<'a> Parser<'a> {
             TokenType::LParen => self.parse_tuple_type(),
             _ => {
                 self.errors.push(ParserError {
-                    exception: "Invalid type",
-                    help: "Expected a type",
+                    exception: "Invalid type".to_string(),
+                    help: "Expected a type".to_string(),
                     src: self.source.clone(),
                     span: self.current_token.span,
                 });
@@ -1410,7 +1420,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_array_type_syntax(&mut self) -> Option<Type<'a>> {
+    fn parse_array_type_syntax(&mut self) -> Option<Type> {
         self.next_token(); // Consume '['
 
         if self.current_token.token_type == TokenType::RBrack {
@@ -1425,8 +1435,8 @@ impl<'a> Parser<'a> {
 
         if self.current_token.token_type != TokenType::Semicolon {
             self.errors.push(ParserError {
-                exception: "Expected ';' in array type",
-                help: "Expected ';'",
+                exception: "Expected ';' in array type".to_string(),
+                help: "Expected ';'".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
@@ -1436,8 +1446,8 @@ impl<'a> Parser<'a> {
 
         if self.current_token.token_type != TokenType::Number {
             self.errors.push(ParserError {
-                exception: "Expected number for array size",
-                help: "Expected an integer literal",
+                exception: "Expected number for array size".to_string(),
+                help: "Expected an integer literal".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
@@ -1448,8 +1458,8 @@ impl<'a> Parser<'a> {
 
         if self.current_token.token_type != TokenType::RBrack {
             self.errors.push(ParserError {
-                exception: "Expected ']' at the end of array type",
-                help: "Expected ']'",
+                exception: "Expected ']' at the end of array type".to_string(),
+                help: "Expected ']'".to_string(),
                 src: self.source.clone(),
                 span: self.current_token.span,
             });
@@ -1460,7 +1470,7 @@ impl<'a> Parser<'a> {
         Some(Type::Array(Box::new(inner_type), size))
     }
 
-    fn parse_tuple_type(&mut self) -> Option<Type<'a>> {
+    fn parse_tuple_type(&mut self) -> Option<Type> {
         self.next_token(); // Consume '('
         let mut types = Vec::new();
 
@@ -1479,8 +1489,8 @@ impl<'a> Parser<'a> {
 
         if self.peek_token.token_type != TokenType::RParen {
             self.errors.push(ParserError {
-                exception: "Expected ')' at the end of tuple type",
-                help: "Expected ')'",
+                exception: "Expected ')' at the end of tuple type".to_string(),
+                help: "Expected ')'".to_string(),
                 src: self.source.clone(),
                 span: self.peek_token.span,
             });
@@ -1498,17 +1508,15 @@ mod tests {
 
     #[test]
     fn test_let_statement() {
-        let input = "let x = 5;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "let x = 5;".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
         let statement = &program[0];
 
         if let Statements::AnnotationStatement {
-            identifier,
-            value,
-            ..
+            identifier, value, ..
         } = statement
         {
             assert_eq!(*identifier, "x");
@@ -1524,8 +1532,8 @@ mod tests {
 
     #[test]
     fn test_return_statement() {
-        let input = "return 5;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "return 5;".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1544,14 +1552,17 @@ mod tests {
 
     #[test]
     fn test_infix_expression() {
-        let input = "5 + 5;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "5 + 5;".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
         let statement = &program[0];
 
-        if let Statements::Expression(Expressions::Binary { lhs, operand, rhs, .. }) = statement {
+        if let Statements::Expression(Expressions::Binary {
+            lhs, operand, rhs, ..
+        }) = statement
+        {
             assert_eq!(*operand, "+");
             if let Expressions::Value(crate::value::Value::Integer(5), _) = **lhs {
                 // pass
@@ -1570,21 +1581,24 @@ mod tests {
 
     #[test]
     fn test_operator_precedence() {
-        let input = "-a * b";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "-a * b".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
 
-        if let Statements::Expression(Expressions::Binary { lhs, operand, rhs, .. }) = statement {
+        if let Statements::Expression(Expressions::Binary {
+            lhs, operand, rhs, ..
+        }) = statement
+        {
             assert_eq!(*operand, "*");
             if let Expressions::Unary { operand, .. } = &**lhs {
                 assert_eq!(*operand, "-");
             } else {
                 panic!("lhs is not unary expression");
             }
-            if let Expressions::Value(crate::value::Value::Identifier("b"), _) = &**rhs {
-                // pass
+            if let Expressions::Value(crate::value::Value::Identifier(s), _) = &**rhs {
+                assert_eq!(s, "b");
             } else {
                 panic!("rhs is not identifier");
             }
@@ -1595,16 +1609,89 @@ mod tests {
 
     #[test]
     fn test_function_call_expression() {
-        let input = "add(1, 2 * 3, 4 + 5);";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "add(1, 2 * 3, 4 + 5);".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
+        let program = parser.parse().unwrap();
+        assert_eq!(program.len(), 1);
+        let statement = &program[0];
+
+        if let Statements::Expression(Expressions::FnCall {
+            name, arguments, ..
+        }) = statement
+        {
+            assert_eq!(name, "add");
+            assert_eq!(arguments.len(), 3);
+            if let Expressions::Value(crate::value::Value::Integer(1), _) = &arguments[0] {
+                // pass
+            } else {
+                panic!("Wrong first argument");
+            }
+            if let Expressions::Binary {
+                lhs, operand, rhs, ..
+            } = &arguments[1]
+            {
+                assert_eq!(*operand, "*");
+                if let Expressions::Value(crate::value::Value::Integer(2), _) = &**lhs {
+                    // pass
+                } else {
+                    panic!("Wrong second argument");
+                }
+                if let Expressions::Value(crate::value::Value::Integer(3), _) = &**rhs {
+                    // pass
+                } else {
+                    panic!("Wrong second argument");
+                }
+            } else {
+                panic!("Wrong second argument");
+            }
+            if let Expressions::Binary {
+                lhs, operand, rhs, ..
+            } = &arguments[2]
+            {
+                assert_eq!(*operand, "+");
+                if let Expressions::Value(crate::value::Value::Integer(4), _) = &**lhs {
+                    // pass
+                } else {
+                    panic!("Wrong third argument");
+                }
+                if let Expressions::Value(crate::value::Value::Integer(5), _) = &**rhs {
+                    // pass
+                } else {
+                    panic!("Wrong third argument");
+                }
+            } else {
+                panic!("Wrong third argument");
+            }
+        } else {
+            panic!("Wrong statement type");
+        }
+    }
+
+    #[test]
+    fn test_fn_definition() {
+        let input = "fn add(a: i32, b: i32) i32 { return a + b; }".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
         let statement = &program[0];
 
-        if let Statements::Expression(Expressions::FnCall { name, arguments, .. }) = statement {
-            assert_eq!(*name, "add");
-            assert_eq!(arguments.len(), 3);
+        if let Statements::FunctionDefineStatement {
+            name,
+            arguments,
+            datatype,
+            block,
+            ..
+        } = statement
+        {
+            assert_eq!(name, "add");
+            assert_eq!(arguments.len(), 2);
+            if let Type::I32 = datatype {
+                // pass
+            } else {
+                panic!("Wrong return type");
+            }
+            assert_eq!(block.len(), 1);
         } else {
             panic!("Wrong statement type");
         }
@@ -1612,8 +1699,8 @@ mod tests {
 
     #[test]
     fn test_array_literal() {
-        let input = "[1, 2 * 2, 3 + 3]";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "[1, 2 * 2, 3 + 3]".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1628,16 +1715,16 @@ mod tests {
 
     #[test]
     fn test_slice_expression() {
-        let input = "myArray[1 + 1]";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "myArray[1 + 1]".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
         let statement = &program[0];
 
         if let Statements::Expression(Expressions::Slice { object, index, .. }) = statement {
-            if let Expressions::Value(crate::value::Value::Identifier("myArray"), _) = &**object {
-                // pass
+            if let Expressions::Value(crate::value::Value::Identifier(s), _) = &**object {
+                assert_eq!(s, "myArray");
             } else {
                 panic!("Wrong object in slice expression");
             }
@@ -1654,8 +1741,8 @@ mod tests {
 
     #[test]
     fn test_struct_literal() {
-        let input = "MyStruct { .a = 1, .b = 2 }";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "MyStruct { .a = 1, .b = 2 }".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1671,8 +1758,8 @@ mod tests {
 
     #[test]
     fn test_if_else_statement() {
-        let input = "if (x < y) { x } else { y }";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "if (x < y) { x } else { y }".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1700,17 +1787,15 @@ mod tests {
 
     #[test]
     fn test_while_statement() {
-        let input = "while (x < y) { x = x + 1 }";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "while (x < y) { x = x + 1 }".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
         let statement = &program[0];
 
         if let Statements::WhileStatement {
-            condition,
-            block,
-            ..
+            condition, block, ..
         } = statement
         {
             if let Expressions::Boolean { .. } = condition {
@@ -1726,8 +1811,8 @@ mod tests {
 
     #[test]
     fn test_for_statement() {
-        let input = "for i = 0 { x }";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "for i = 0 { x }".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1753,39 +1838,9 @@ mod tests {
     }
 
     #[test]
-    fn test_fn_definition() {
-        let input = "fn add(a: i32, b: i32) i32 { return a + b; }";
-        let mut parser = Parser::new(input, "test.pay");
-        let program = parser.parse().unwrap();
-
-        assert_eq!(program.len(), 1);
-        let statement = &program[0];
-
-        if let Statements::FunctionDefineStatement {
-            name,
-            arguments,
-            datatype,
-            block,
-            ..
-        } = statement
-        {
-            assert_eq!(*name, "add");
-            assert_eq!(arguments.len(), 2);
-            if let Type::I32 = datatype {
-                // pass
-            } else {
-                panic!("Wrong return type");
-            }
-            assert_eq!(block.len(), 1);
-        } else {
-            panic!("Wrong statement type");
-        }
-    }
-
-    #[test]
     fn test_struct_definition() {
-        let input = "struct Point { x: i32, y: i32 }";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "struct Point { x: i32, y: i32 }".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1801,8 +1856,8 @@ mod tests {
 
     #[test]
     fn test_enum_definition() {
-        let input = "enum Color { Red, Green, Blue }";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "enum Color { Red, Green, Blue }".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1818,8 +1873,8 @@ mod tests {
 
     #[test]
     fn test_binary_assign_statement() {
-        let input = "x += 5;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "x += 5;".to_string();
+        let mut parser = Parser::new(input.to_string(), "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1832,8 +1887,8 @@ mod tests {
             ..
         } = statement
         {
-            if let Expressions::Value(crate::value::Value::Identifier("x"), _) = object {
-                // pass
+            if let Expressions::Value(crate::value::Value::Identifier(s), _) = object {
+                assert_eq!(s, "x");
             } else {
                 panic!("Wrong object in binary assign statement");
             }
@@ -1852,16 +1907,16 @@ mod tests {
 
     #[test]
     fn test_assign_statement() {
-        let input = "x = 5;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "x = 5;".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
         let statement = &program[0];
 
         if let Statements::AssignStatement { object, value, .. } = statement {
-            if let Expressions::Value(crate::value::Value::Identifier("x"), _) = object {
-                // pass
+            if let Expressions::Value(crate::value::Value::Identifier(s), _) = object {
+                assert_eq!(s, "x");
             } else {
                 panic!("Wrong object in assign statement");
             }
@@ -1878,14 +1933,17 @@ mod tests {
 
     #[test]
     fn test_typedef_statement() {
-        let input = "typedef my_int i32;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "typedef my_int i32;".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
         let statement = &program[0];
 
-        if let Statements::TypedefStatement { alias, datatype, .. } = statement {
+        if let Statements::TypedefStatement {
+            alias, datatype, ..
+        } = statement
+        {
             assert_eq!(*alias, "my_int");
             if let Type::I32 = datatype {
                 // pass
@@ -1899,8 +1957,8 @@ mod tests {
 
     #[test]
     fn test_extern_declare_statement() {
-        let input = "_extern_declare my_var i32;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "_extern_declare my_var i32;".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1925,16 +1983,16 @@ mod tests {
 
     #[test]
     fn test_link_c_statement() {
-        let input = "_link_c \"mylib.a\";";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "_link_c \"mylib.a\";".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
         let statement = &program[0];
 
         if let Statements::LinkCStatement { path, .. } = statement {
-            if let Expressions::Value(crate::value::Value::String("mylib.a"), _) = path {
-                // pass
+            if let Expressions::Value(crate::value::Value::String(s), _) = path {
+                assert_eq!(s, "mylib.a");
             } else {
                 panic!("Wrong path in link_c");
             }
@@ -1945,8 +2003,8 @@ mod tests {
 
     #[test]
     fn test_break_statement() {
-        let input = "break;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "break;".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1962,8 +2020,8 @@ mod tests {
     #[test]
     fn test_pointer_related_parsing() {
         // Test let statement with pointer type
-        let input = "let x: *i32 = &y;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "let x: *i32 = &y;".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -1976,34 +2034,39 @@ mod tests {
         {
             assert_eq!(*identifier, "x");
             assert_eq!(datatype, &Some(Type::Pointer(Box::new(Type::I32))));
-            assert!(matches!(
-                value,
-                Some(Expressions::Reference { .. })
-            ));
+            assert!(matches!(value, Some(Expressions::Reference { .. })));
         } else {
-            panic!("Failed to parse let statement with pointer type. Got: {:?}", statement);
+            panic!(
+                "Failed to parse let statement with pointer type. Got: {:?}",
+                statement
+            );
         }
 
         // Test dereference expression
-        let input = "*x;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "*x;".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
-        assert!(matches!(statement, Statements::Expression(Expressions::Dereference { .. })));
-
+        assert!(matches!(
+            statement,
+            Statements::Expression(Expressions::Dereference { .. })
+        ));
 
         // Test reference expression
-        let input = "&y;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "&y;".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
-        assert!(matches!(statement, Statements::Expression(Expressions::Reference { .. })));
+        assert!(matches!(
+            statement,
+            Statements::Expression(Expressions::Reference { .. })
+        ));
 
         // Test assignment to dereferenced pointer
-        let input = "*x = 10;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "*x = 10;".to_string();
+        let mut parser = Parser::new(input.to_string(), "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -2015,12 +2078,15 @@ mod tests {
                 panic!("Wrong value in assignment");
             }
         } else {
-            panic!("Failed to parse assignment to dereferenced pointer. Got: {:?}", statement);
+            panic!(
+                "Failed to parse assignment to dereferenced pointer. Got: {:?}",
+                statement
+            );
         }
 
         // Test function with pointer argument and return type
-        let input = "fn foo(p: *i32) *i32 { return p; }";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "fn foo(p: *i32) *i32 { return p; }".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -2033,23 +2099,28 @@ mod tests {
             assert_eq!(arguments[0].1, Type::Pointer(Box::new(Type::I32)));
             assert_eq!(*datatype, Type::Pointer(Box::new(Type::I32)));
         } else {
-            panic!("Failed to parse function with pointer. Got: {:?}", statement);
+            panic!(
+                "Failed to parse function with pointer. Got: {:?}",
+                statement
+            );
         }
 
         // Test let statement with double pointer type
-        let input = "let x: **i32;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "let x: **i32;".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
-        if let Statements::AnnotationStatement {
-            datatype,
-            ..
-        } = statement
-        {
-            assert_eq!(datatype, &Some(Type::Pointer(Box::new(Type::Pointer(Box::new(Type::I32))))));
+        if let Statements::AnnotationStatement { datatype, .. } = statement {
+            assert_eq!(
+                datatype,
+                &Some(Type::Pointer(Box::new(Type::Pointer(Box::new(Type::I32)))))
+            );
         } else {
-            panic!("Failed to parse let statement with double pointer. Got: {:?}", statement);
+            panic!(
+                "Failed to parse let statement with double pointer. Got: {:?}",
+                statement
+            );
         }
     }
 }

@@ -1,8 +1,0 @@
-Entered `MAIN` scope
-Entered `TEMP` scope
-message from temp
-Exited `TEMP` scope
-Entered `IF` scope
-condition is true
-Exited `IF` scope
-Exited `MAIN` scope
