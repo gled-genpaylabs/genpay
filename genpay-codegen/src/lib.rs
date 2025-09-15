@@ -105,54 +105,6 @@ impl<'ctx> CodeGen<'ctx> {
         statements: Vec<Statements>,
         prefix: Option<String>,
     ) -> (&Module<'ctx>, ModuleContent<'ctx>) {
-        // let pre_statements = statements
-        //     .iter()
-        //     .filter(|stmt| match stmt {
-        //         Statements::StructDefineStatement {
-        //             name: _,
-        //             fields: _,
-        //             functions: _,
-        //             public: _,
-        //             span: _,
-        //         } => true,
-        //         Statements::EnumDefineStatement {
-        //             name: _,
-        //             fields: _,
-        //             functions: _,
-        //             public: _,
-        //             span: _,
-        //         } => true,
-        //         Statements::TypedefStatement {
-        //             alias: _,
-        //             datatype: _,
-        //             span: _,
-        //         } => true,
-        //         Statements::ImportStatement { path: _, span: _ } => true,
-        //         Statements::FunctionDefineStatement {
-        //             name,
-        //             datatype: _,
-        //             arguments: _,
-        //             block: _,
-        //             public: _,
-        //             span: _,
-        //             header_span: _,
-        //         } => name != "main",
-        //         _ => false,
-        //     })
-        //     .collect::<Vec<&Statements>>();
-        //
-        // let after_statements = statements
-        //     .iter()
-        //     .filter(|stmt| !pre_statements.contains(stmt));
-        //
-        // pre_statements
-        //     .clone()
-        //     .into_iter()
-        //     .for_each(|stmt| self.compile_statement(stmt.clone(), prefix.clone()));
-        // after_statements
-        //     .into_iter()
-        //     .for_each(|stmt| self.compile_statement(stmt.clone(), prefix.clone()));
-
         statements
             .into_iter()
             .for_each(|stmt| self.compile_statement(stmt, prefix.clone()));
@@ -705,10 +657,7 @@ impl<'ctx> CodeGen<'ctx> {
                     self.enter_new_scope();
 
                     function_statements.iter().for_each(|statement| {
-                        self.compile_statement(
-                            statement.clone(),
-                            Some(format!("struct_{name}__")),
-                        );
+                        self.compile_statement(statement.clone(), Some(format!("struct_{name}__")));
                     });
 
                     let (mut function_id, mut function_value) =
