@@ -179,7 +179,7 @@ impl<'bump> Parser<'bump> {
             || self.peek_token.token_type == TokenType::DivideAssign
         {
             self.next_token(); // current is now the operator
-            let operator = self.bump.alloc_str(&self.current_token.value);
+            let operator: &str = self.bump.alloc_str(&self.current_token.value);
             self.next_token(); // current is now the start of the value expression
             let value = self.parse_expression(Precedence::LOWEST)?;
             let span = (expression.get_span().0, value.get_span().1);
@@ -330,7 +330,7 @@ impl<'bump> Parser<'bump> {
             });
             return None;
         }
-        let binding = self.bump.alloc_str(&self.current_token.value);
+        let binding: &str = self.bump.alloc_str(&self.current_token.value);
         self.next_token();
 
         if self.current_token.token_type != TokenType::Equal {
@@ -389,7 +389,7 @@ impl<'bump> Parser<'bump> {
             });
             return None;
         }
-        let name = self.bump.alloc_str(&self.current_token.value);
+        let name: &str = self.bump.alloc_str(&self.current_token.value);
         self.next_token();
 
         if self.current_token.token_type != TokenType::LParen {
@@ -459,7 +459,7 @@ impl<'bump> Parser<'bump> {
             });
             return None;
         }
-        let name = self.bump.alloc_str(&self.current_token.value);
+        let name: &str = self.bump.alloc_str(&self.current_token.value);
         self.next_token();
 
         if self.current_token.token_type != TokenType::DoubleDots {
@@ -499,7 +499,7 @@ impl<'bump> Parser<'bump> {
                 });
                 return None;
             }
-            let name = self.bump.alloc_str(&self.current_token.value);
+            let name: &str = self.bump.alloc_str(&self.current_token.value);
             self.next_token();
 
             if self.current_token.token_type != TokenType::DoubleDots {
@@ -580,7 +580,7 @@ impl<'bump> Parser<'bump> {
             });
             return None;
         }
-        let extern_type = self.bump.alloc_str(&self.current_token.value);
+        let extern_type: &str = self.bump.alloc_str(&self.current_token.value);
         self.next_token();
 
         let public = self.current_token.token_type == TokenType::Keyword
@@ -635,7 +635,7 @@ impl<'bump> Parser<'bump> {
             });
             return None;
         }
-        let name = self.bump.alloc_str(&self.current_token.value);
+        let name: &str = self.bump.alloc_str(&self.current_token.value);
         self.next_token();
 
         if self.current_token.token_type != TokenType::LBrace {
@@ -649,8 +649,10 @@ impl<'bump> Parser<'bump> {
         }
         self.next_token();
 
-        let mut fields = indexmap::IndexMap::new();
-        let mut functions: indexmap::IndexMap<&'bump str, bumpalo::collections::Vec<'bump, Statements<'bump>>> = indexmap::IndexMap::new();
+        let mut fields: indexmap::IndexMap<&'bump str, types::Type<'bump>> =
+            indexmap::IndexMap::new();
+        let mut functions: indexmap::IndexMap<&'bump str, bumpalo::collections::Vec<'bump, Statements<'bump>>> =
+            indexmap::IndexMap::new();
 
         while self.current_token.token_type != TokenType::RBrace
             && self.current_token.token_type != TokenType::EOF
@@ -660,10 +662,13 @@ impl<'bump> Parser<'bump> {
             {
                 let function = self.parse_fn_statement()?;
                 if let Statements::FunctionDefineStatement { ref name, .. } = function {
-                    functions.entry(name).or_default().push(function);
+                    functions
+                        .entry(name)
+                        .or_insert_with(|| bumpalo::collections::Vec::new_in(self.bump))
+                        .push(function);
                 }
             } else if self.current_token.token_type == TokenType::Identifier {
-                let field_name = self.bump.alloc_str(&self.current_token.value);
+                let field_name: &str = self.bump.alloc_str(&self.current_token.value);
                 self.next_token();
 
                 if self.current_token.token_type != TokenType::DoubleDots {
@@ -722,7 +727,7 @@ impl<'bump> Parser<'bump> {
             });
             return None;
         }
-        let name = self.bump.alloc_str(&self.current_token.value);
+        let name: &str = self.bump.alloc_str(&self.current_token.value);
         self.next_token();
 
         if self.current_token.token_type != TokenType::LBrace {
@@ -736,7 +741,8 @@ impl<'bump> Parser<'bump> {
         }
         self.next_token();
 
-        let mut fields = bumpalo::collections::Vec::new_in(self.bump);
+        let mut fields: bumpalo::collections::Vec<'bump, &str> =
+            bumpalo::collections::Vec::new_in(self.bump);
         let mut functions: indexmap::IndexMap<&'bump str, bumpalo::collections::Vec<'bump, Statements<'bump>>> =
             indexmap::IndexMap::new();
 
@@ -748,10 +754,13 @@ impl<'bump> Parser<'bump> {
             {
                 let function = self.parse_fn_statement()?;
                 if let Statements::FunctionDefineStatement { ref name, .. } = function {
-                    functions.entry(name).or_default().push(function);
+                    functions
+                        .entry(name)
+                        .or_insert_with(|| bumpalo::collections::Vec::new_in(self.bump))
+                        .push(function);
                 }
             } else if self.current_token.token_type == TokenType::Identifier {
-                let field_name = self.bump.alloc_str(&self.current_token.value);
+                let field_name: &str = self.bump.alloc_str(&self.current_token.value);
                 fields.push(field_name);
                 self.next_token();
             }
@@ -793,7 +802,7 @@ impl<'bump> Parser<'bump> {
             });
             return None;
         }
-        let identifier = self.bump.alloc_str(&self.current_token.value);
+        let identifier: &str = self.bump.alloc_str(&self.current_token.value);
         self.next_token();
 
         let mut datatype = None;
@@ -835,7 +844,7 @@ impl<'bump> Parser<'bump> {
             });
             return None;
         }
-        let alias = self.bump.alloc_str(&self.current_token.value);
+        let alias: &str = self.bump.alloc_str(&self.current_token.value);
         self.next_token();
 
         let datatype = self.parse_type()?;
@@ -861,7 +870,7 @@ impl<'bump> Parser<'bump> {
             });
             return None;
         }
-        let identifier = self.bump.alloc_str(&self.current_token.value);
+        let identifier: &str = self.bump.alloc_str(&self.current_token.value);
         self.next_token();
 
         let datatype = self.parse_type()?;
@@ -964,7 +973,7 @@ impl<'bump> Parser<'bump> {
     }
 
     fn parse_string_literal(&mut self) -> Option<Expressions<'bump>> {
-        let value = self.bump.alloc_str(&self.current_token.value);
+        let value: &str = self.bump.alloc_str(&self.current_token.value);
         Some(Expressions::Value(
             crate::value::Value::String(value),
             self.current_token.span,
@@ -984,7 +993,7 @@ impl<'bump> Parser<'bump> {
             return self.parse_struct_literal();
         }
 
-        let value = self.bump.alloc_str(&self.current_token.value);
+        let value: &str = self.bump.alloc_str(&self.current_token.value);
         Some(Expressions::Value(
             crate::value::Value::Identifier(value),
             self.current_token.span,
@@ -992,7 +1001,7 @@ impl<'bump> Parser<'bump> {
     }
 
     fn parse_prefix_expression(&mut self) -> Option<Expressions<'bump>> {
-        let operator = self.bump.alloc_str(&self.current_token.value);
+        let operator: &str = self.bump.alloc_str(&self.current_token.value);
         let span_start = self.current_token.span.0;
 
         self.next_token();
@@ -1050,7 +1059,7 @@ impl<'bump> Parser<'bump> {
 
     fn parse_binary_expression(&mut self, left: Expressions<'bump>) -> Option<Expressions<'bump>> {
         let precedence = self.current_precedence();
-        let operator = self.bump.alloc_str(&self.current_token.value);
+        let operator: &str = self.bump.alloc_str(&self.current_token.value);
         self.next_token();
         let right = self.parse_expression(precedence)?;
 
@@ -1205,13 +1214,14 @@ impl<'bump> Parser<'bump> {
     }
 
     fn parse_struct_literal(&mut self) -> Option<Expressions<'bump>> {
-        let name = self.bump.alloc_str(&self.current_token.value);
+        let name: &str = self.bump.alloc_str(&self.current_token.value);
         let span_start = self.current_token.span.0;
 
         self.next_token(); // consume identifier
         self.next_token(); // consume '{'
 
-        let mut fields = std::collections::HashMap::new();
+        let mut fields: std::collections::HashMap<&'bump str, Expressions<'bump>> =
+            std::collections::HashMap::new();
 
         while self.current_token.token_type != TokenType::RBrace {
             if self.current_token.token_type != TokenType::Dot {
@@ -1234,7 +1244,7 @@ impl<'bump> Parser<'bump> {
                 });
                 return None;
             }
-            let field_name = self.bump.alloc_str(&self.current_token.value);
+            let field_name: &str = self.bump.alloc_str(&self.current_token.value);
             self.next_token();
 
             if self.current_token.token_type != TokenType::Equal {
