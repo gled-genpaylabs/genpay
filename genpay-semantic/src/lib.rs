@@ -13,7 +13,7 @@ mod element;
 mod error;
 mod macros;
 mod scope;
-mod visitor;
+pub mod visitor;
 /// Semantic Analyzer Symbol Table
 pub mod symtable;
 
