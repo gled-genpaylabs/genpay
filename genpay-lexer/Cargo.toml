@@ -5,6 +5,9 @@ description = "Lexical Analyzer for Genpay Programming Language"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
+description.workspace = true
+repository.workspace = true
+license.workspace = true
 
 [dependencies]
 miette = { version = "7.5.0", features = ["fancy"] }
