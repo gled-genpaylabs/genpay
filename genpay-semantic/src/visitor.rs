@@ -1,5 +1,6 @@
-use crate::Analyzer;
+use crate::{Analyzer, Scope, SemanticError};
 use genpay_parser::{expressions::Expressions, statements::Statements, types::Type};
+use indexmap::IndexMap;
 use std::path::PathBuf;
 
 impl Analyzer {
@@ -60,21 +61,22 @@ impl Analyzer {
                 arguments,
                 block,
                 public,
-                is_var_args: _,
+                is_var_args,
                 span: _,
                 header_span: _,
             } => {
-                let func_type = Type::Function {
-                    ret_type: Box::new(datatype.clone()),
-                    args: arguments.iter().map(|(_, t)| t.clone()).collect(),
-                };
+                let func_type = Type::Function(
+                    arguments.iter().map(|(_, t)| t.clone()).collect(),
+                    Box::new(datatype.clone()),
+                    *is_var_args,
+                );
 
-                if let Err(err) = self.scope.add_fn(name.clone(), func_type, *public) {
+                if let Err(err) = self.scope.add_fn(name.clone(), func_type.clone(), *public) {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
                         src: self.source.clone(),
-                        span: name.as_str().into(),
+                        span: (0, 0).into(),
                     });
                     return;
                 }
@@ -187,10 +189,7 @@ impl Analyzer {
                 public,
                 span,
             } => {
-                let struct_type = Type::Struct {
-                    name: name.clone(),
-                    fields: fields.clone(),
-                };
+                let struct_type = Type::Struct(fields.clone(), IndexMap::new());
 
                 if let Err(err) = self.scope.add_struct(name.clone(), struct_type, *public) {
                     self.error(SemanticError::RedefinitionError {
@@ -208,10 +207,7 @@ impl Analyzer {
                 public,
                 span,
             } => {
-                let enum_type = Type::Enum {
-                    name: name.clone(),
-                    variants: fields.clone(),
-                };
+                let enum_type = Type::Enum(fields.clone(), IndexMap::new());
 
                 if let Err(err) = self.scope.add_enum(name.clone(), enum_type, *public) {
                     self.error(SemanticError::RedefinitionError {
@@ -278,86 +274,7 @@ impl Analyzer {
                     });
                 }
             }
-            Expressions::Array { values, .. } => {
-                if values.is_empty() {
-                    return Type::Array(Box::new(Type::Void), 0);
-                }
-
-                let first_type = self.visit_expression(&values[0], None);
-                for value in values.iter().skip(1) {
-                    let current_type = self.visit_expression(value, Some(first_type.clone()));
-                    if current_type != first_type {
-                        self.error(SemanticError::TypesMismatch {
-                            exception: format!(
-                                "Array elements must have the same type. Expected `{}` but found `{}`.",
-                                first_type, current_type
-                            ),
-                            help: None,
-                            src: self.source.clone(),
-                            span: value.get_span().into(),
-                        });
-                    }
-                }
-                Type::Array(Box::new(first_type), values.len())
-            }
-            Expressions::Tuple { values, .. } => {
-                let types = values
-                    .iter()
-                    .map(|v| self.visit_expression(v, None))
-                    .collect();
-                Type::Tuple(types)
-            }
-            Expressions::Slice {
-                object,
-                index,
-                span,
-            } => {
-                let obj_type = self.visit_expression(object, None);
-                let index_type = self.visit_expression(index, Some(Type::I64));
-
-                if !Analyzer::is_integer(&index_type) {
-                    self.error(SemanticError::TypesMismatch {
-                        exception: format!(
-                            "Array index must be an integer, but found `{}`.",
-                            index_type
-                        ),
-                        help: None,
-                        src: self.source.clone(),
-                        span: index.get_span().into(),
-                    });
-                }
-
-                if let Type::Array(elem_type, _) = obj_type {
-                    *elem_type
-                } else {
-                    self.error(SemanticError::TypesMismatch {
-                        exception: format!("Cannot index non-array type `{}`.", obj_type),
-                        help: None,
-                        src: self.source.clone(),
-                        span: (*span).into(),
-                    });
-                    Type::Void
-                }
-            }
-            Expressions::Reference { object, .. } => {
-                let obj_type = self.visit_expression(object, None);
-                Type::Pointer(Box::new(obj_type))
-            }
-            Expressions::Dereference { object, span } => {
-                let obj_type = self.visit_expression(object, None);
-                if let Type::Pointer(elem_type) = obj_type {
-                    *elem_type
-                } else {
-                    self.error(SemanticError::TypesMismatch {
-                        exception: format!("Cannot dereference non-pointer type `{}`.", obj_type),
-                        help: None,
-                        src: self.source.clone(),
-                        span: (*span).into(),
-                    });
-                    Type::Void
-                }
-            }
-            _ => todo!(),
+            _ => {}
         }
     }
 
@@ -499,7 +416,7 @@ impl Analyzer {
                 span,
             } => {
                 if let Some(func_type) = self.scope.get_fn(name) {
-                    if let Type::Function { ret_type, args } = func_type {
+                    if let Type::Function(args, ret_type, _) = func_type {
                         if arguments.len() != args.len() {
                             self.error(SemanticError::ArgumentException {
                                 exception: format!(
@@ -529,7 +446,7 @@ impl Analyzer {
                             }
                         }
 
-                        *ret_type
+                        *ret_type.clone()
                     } else {
                         self.error(SemanticError::SemanticalError {
                             exception: format!("`{}` is not a function.", name),
@@ -555,10 +472,7 @@ impl Analyzer {
                 span,
             } => {
                 if let Some(struct_type) = self.scope.get_struct(name) {
-                    if let Type::Struct {
-                        fields: defined_fields,
-                        ..
-                    } = struct_type.clone()
+                    if let Type::Struct(defined_fields, _) = struct_type.clone()
                     {
                         if fields.len() != defined_fields.len() {
                             self.error(SemanticError::MissingFields {
@@ -625,7 +539,7 @@ impl Analyzer {
                 let mut current_type = self.visit_expression(head, None);
                 for sub in subelements {
                     if let Expressions::Value(genpay_parser::value::Value::Identifier(name), _) = sub {
-                        if let Type::Struct { fields, .. } = current_type.clone() {
+                        if let Type::Struct(fields, _) = current_type.clone() {
                             if let Some(field_type) = fields.get(name) {
                                 current_type = field_type.clone();
                             } else {
@@ -657,6 +571,85 @@ impl Analyzer {
                     }
                 }
                 current_type
+            }
+            Expressions::Array { values, .. } => {
+                if values.is_empty() {
+                    return Type::Array(Box::new(Type::Void), 0);
+                }
+
+                let first_type = self.visit_expression(&values[0], None);
+                for value in values.iter().skip(1) {
+                    let current_type = self.visit_expression(value, Some(first_type.clone()));
+                    if current_type != first_type {
+                        self.error(SemanticError::TypesMismatch {
+                            exception: format!(
+                                "Array elements must have the same type. Expected `{}` but found `{}`.",
+                                first_type, current_type
+                            ),
+                            help: None,
+                            src: self.source.clone(),
+                            span: value.get_span().into(),
+                        });
+                    }
+                }
+                Type::Array(Box::new(first_type), values.len())
+            }
+            Expressions::Tuple { values, .. } => {
+                let types = values
+                    .iter()
+                    .map(|v| self.visit_expression(v, None))
+                    .collect();
+                Type::Tuple(types)
+            }
+            Expressions::Slice {
+                object,
+                index,
+                span,
+            } => {
+                let obj_type = self.visit_expression(object, None);
+                let index_type = self.visit_expression(index, Some(Type::I64));
+
+                if !Analyzer::is_integer(&index_type) {
+                    self.error(SemanticError::TypesMismatch {
+                        exception: format!(
+                            "Array index must be an integer, but found `{}`.",
+                            index_type
+                        ),
+                        help: None,
+                        src: self.source.clone(),
+                        span: index.get_span().into(),
+                    });
+                }
+
+                if let Type::Array(elem_type, _) = obj_type {
+                    *elem_type
+                } else {
+                    self.error(SemanticError::TypesMismatch {
+                        exception: format!("Cannot index non-array type `{}`.", obj_type),
+                        help: None,
+                        src: self.source.clone(),
+                        span: (*span).into(),
+                    });
+                    Type::Void
+                }
+            }
+            Expressions::Reference { object, .. } => {
+                let obj_type = self.visit_expression(object, None);
+                Type::Pointer(Box::new(obj_type))
+            }
+            Expressions::Dereference { object, span } => {
+                let obj_type = self.visit_expression(object, None);
+                if let Type::Pointer(elem_type) = obj_type {
+                    *elem_type
+                } else {
+                    self.error(SemanticError::TypesMismatch {
+                        exception: format!("Cannot dereference non-pointer type `{}`.", obj_type),
+                        help: None,
+                        src: self.source.clone(),
+                        span: (*span).into(),
+                    });
+                    Type::Void
+                }
             }
             _ => todo!(),
         }
@@ -705,6 +698,24 @@ impl Analyzer {
             Type::F32 => 1,
             Type::F64 => 2,
             _ => 0,
+        }
+    }
+
+    pub fn is_unsigned_integer(a_type: &Type) -> bool {
+        matches!(
+            a_type,
+            Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::USIZE
+        )
+    }
+
+    pub fn unsigned_to_signed_integer(a_type: &Type) -> Type {
+        match a_type {
+            Type::U8 => Type::I8,
+            Type::U16 => Type::I16,
+            Type::U32 => Type::I32,
+            Type::U64 => Type::I64,
+            Type::USIZE => Type::I64,
+            _ => a_type.clone(),
         }
     }
 

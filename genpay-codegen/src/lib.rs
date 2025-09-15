@@ -481,6 +481,7 @@ impl<'ctx> CodeGen<'ctx> {
                 arguments,
                 block,
                 public: _,
+                is_var_args: _,
                 span: _,
                 header_span: _,
             } => {
@@ -700,13 +701,15 @@ impl<'ctx> CodeGen<'ctx> {
                     },
                 );
 
-                functions.iter().for_each(|(_, function_statement)| {
+                functions.iter().for_each(|(_, function_statements)| {
                     self.enter_new_scope();
 
-                    self.compile_statement(
-                        function_statement.to_owned(),
-                        Some(format!("struct_{name}__")),
-                    );
+                    function_statements.iter().for_each(|statement| {
+                        self.compile_statement(
+                            statement.clone(),
+                            Some(format!("struct_{name}__")),
+                        );
+                    });
 
                     let (mut function_id, mut function_value) =
                         self.scope.stricted_functions().into_iter().last().unwrap();
@@ -744,18 +747,16 @@ impl<'ctx> CodeGen<'ctx> {
                     },
                 );
 
-                functions.iter().for_each(|(_, function_statement)| {
-                    self.compile_statement(
-                        function_statement.to_owned(),
-                        Some(format!("enum_{name}__")),
-                    );
+                functions.iter().for_each(|(_, function_statements)| {
+                    function_statements.iter().for_each(|statement| {
+                        self.compile_statement(statement.clone(), Some(format!("enum_{name}__")));
+                    });
 
                     self.enter_new_scope();
 
-                    self.compile_statement(
-                        function_statement.to_owned(),
-                        Some(format!("enum_{name}__")),
-                    );
+                    function_statements.iter().for_each(|statement| {
+                        self.compile_statement(statement.clone(), Some(format!("enum_{name}__")));
+                    });
 
                     let (mut function_id, function_value) =
                         self.scope.stricted_functions().into_iter().last().unwrap();
@@ -3318,6 +3319,10 @@ impl<'ctx> CodeGen<'ctx> {
             Type::Enum(_, _) => self.context.i16_type().into(),
             Type::SelfRef => self.context.ptr_type(AddressSpace::default()).into(),
             Type::Null => self.context.bool_type().into(),
+            Type::String => self
+                .context
+                .ptr_type(AddressSpace::default())
+                .as_basic_type_enum(),
             // Type::Function(args, datatype) => self.get_basic_type(*datatype).fn_type(
             //     &args.iter().map(|arg| self.get_basic_type(arg.clone()).into()).collect::<Vec<BasicMetadataTypeEnum>>(),
             //     false

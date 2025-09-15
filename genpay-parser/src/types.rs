@@ -24,6 +24,7 @@ pub enum Type {
     Void,
     Null,
     Char,
+    String,
 
     Pointer(Box<Type>),
     Array(Box<Type>, usize),
@@ -62,6 +63,7 @@ impl<'a> std::fmt::Display for Type {
             Type::USIZE => write!(f, "usize"),
 
             Type::Char => write!(f, "char"),
+            Type::String => write!(f, "string"),
             Type::Bool => write!(f, "bool"),
             Type::Null => write!(f, "null"),
             Type::Void => write!(f, "void"),

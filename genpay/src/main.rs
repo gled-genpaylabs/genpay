@@ -107,7 +107,7 @@ fn main() {
     cli::info("Parsing", "syntax tree");
 
     // Syntax Analyzer initialization.
-    let mut parser = genpay_parser::Parser::new(&src, fname);
+    let mut parser = genpay_parser::Parser::new(src.clone(), fname.to_string());
     let ast = match parser.parse() {
         Ok(ast) => ast,
         Err(errors) => {
