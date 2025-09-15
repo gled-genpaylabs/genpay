@@ -46,7 +46,7 @@ use genpay_lexer::token_type::TokenType;
 
 impl Parser {
     pub fn new(source: String, filename: String) -> Self {
-        let mut lexer = Lexer::new(source);
+        let mut lexer = Lexer::new(source.clone());
         let current_token = match lexer.next() {
             Some(Ok(token)) => token,
             _ => Token {
@@ -628,7 +628,7 @@ impl Parser {
             });
             return None;
         }
-        let name = self.current_token.value;
+        let name = self.current_token.value.clone();
         self.next_token();
 
         if self.current_token.token_type != TokenType::LBrace {
@@ -643,7 +643,7 @@ impl Parser {
         self.next_token();
 
         let mut fields = indexmap::IndexMap::new();
-        let mut functions = indexmap::IndexMap::new();
+        let mut functions: indexmap::IndexMap<String, Vec<Statements>> = indexmap::IndexMap::new();
 
         while self.current_token.token_type != TokenType::RBrace
             && self.current_token.token_type != TokenType::EOF
@@ -652,11 +652,11 @@ impl Parser {
                 && self.current_token.value == "fn"
             {
                 let function = self.parse_fn_statement()?;
-                if let Statements::FunctionDefineStatement { name, .. } = function.clone() {
-                    functions.insert(name, function);
+                if let Statements::FunctionDefineStatement { ref name, .. } = function {
+                    functions.entry(name.clone()).or_default().push(function);
                 }
             } else if self.current_token.token_type == TokenType::Identifier {
-                let field_name = self.current_token.value;
+                let field_name = self.current_token.value.clone();
                 self.next_token();
 
                 if self.current_token.token_type != TokenType::DoubleDots {
@@ -671,7 +671,7 @@ impl Parser {
                 self.next_token();
 
                 let field_type = self.parse_type()?;
-                fields.insert(field_name, field_type);
+                fields.insert(field_name.clone(), field_type);
             }
 
             if self.current_token.token_type == TokenType::Comma {
@@ -715,7 +715,7 @@ impl Parser {
             });
             return None;
         }
-        let name = self.current_token.value;
+        let name = self.current_token.value.clone();
         self.next_token();
 
         if self.current_token.token_type != TokenType::LBrace {
@@ -730,7 +730,8 @@ impl Parser {
         self.next_token();
 
         let mut fields = vec![];
-        let mut functions = indexmap::IndexMap::new();
+        let mut functions: indexmap::IndexMap<String, Vec<Statements>> =
+            indexmap::IndexMap::new();
 
         while self.current_token.token_type != TokenType::RBrace
             && self.current_token.token_type != TokenType::EOF
@@ -739,11 +740,11 @@ impl Parser {
                 && self.current_token.value == "fn"
             {
                 let function = self.parse_fn_statement()?;
-                if let Statements::FunctionDefineStatement { name, .. } = function.clone() {
-                    functions.insert(name, function);
+                if let Statements::FunctionDefineStatement { ref name, .. } = function {
+                    functions.entry(name.clone()).or_default().push(function);
                 }
             } else if self.current_token.token_type == TokenType::Identifier {
-                let field_name = self.current_token.value;
+                let field_name = self.current_token.value.clone();
                 fields.push(field_name);
                 self.next_token();
             }
@@ -1116,6 +1117,7 @@ impl Parser {
     }
 
     fn parse_call_expression(&mut self, function: Expressions) -> Option<Expressions> {
+        let span = function.get_span();
         let name = match function {
             Expressions::Value(crate::value::Value::Identifier(name), _) => name,
             _ => {
@@ -1123,7 +1125,7 @@ impl Parser {
                     exception: "Expected function name".to_string(),
                     help: "Expected identifier".to_string(),
                     src: self.source.clone(),
-                    span: function.get_span(),
+                    span,
                 });
                 return None;
             }
@@ -1134,7 +1136,7 @@ impl Parser {
         Some(Expressions::FnCall {
             name,
             arguments,
-            span: (function.get_span().0, self.current_token.span.1),
+            span: (span.0, self.current_token.span.1),
         })
     }
 
@@ -1265,6 +1267,7 @@ impl Parser {
     }
 
     fn parse_macro_call_expression(&mut self, macro_expr: Expressions) -> Option<Expressions> {
+        let span = macro_expr.get_span();
         let name = match macro_expr {
             Expressions::Value(crate::value::Value::Identifier(name), _) => name,
             _ => {
@@ -1272,7 +1275,7 @@ impl Parser {
                     exception: "Expected macro name".to_string(),
                     help: "Expected identifier".to_string(),
                     src: self.source.clone(),
-                    span: macro_expr.get_span(),
+                    span,
                 });
                 return None;
             }
@@ -1294,7 +1297,7 @@ impl Parser {
         Some(Expressions::MacroCall {
             name,
             arguments,
-            span: (macro_expr.get_span().0, self.current_token.span.1),
+            span: (span.0, self.current_token.span.1),
         })
     }
 
@@ -1505,8 +1508,8 @@ mod tests {
 
     #[test]
     fn test_let_statement() {
-        let input = "let x = 5;";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "let x = 5;".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1594,8 +1597,8 @@ mod tests {
             } else {
                 panic!("lhs is not unary expression");
             }
-            if let Expressions::Value(crate::value::Value::Identifier("b"), _) = &**rhs {
-                // pass
+            if let Expressions::Value(crate::value::Value::Identifier(s), _) = &**rhs {
+                assert_eq!(s, "b");
             } else {
                 panic!("rhs is not identifier");
             }
@@ -1665,20 +1668,30 @@ mod tests {
     }
 
     #[test]
-    fn test_function_definition_expression() {
-        let input = "fn add(a, b) { a + b; }".to_string();
+    fn test_fn_definition() {
+        let input = "fn add(a: i32, b: i32) i32 { return a + b; }".to_string();
         let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
         let statement = &program[0];
 
-        if let Statements::Expression(Expressions::FnCall {
-            name, arguments, ..
-        }) = statement
+        if let Statements::FunctionDefineStatement {
+            name,
+            arguments,
+            datatype,
+            block,
+            ..
+        } = statement
         {
-            assert_eq!(*name, "add");
-            assert_eq!(arguments.len(), 3);
+            assert_eq!(name, "add");
+            assert_eq!(arguments.len(), 2);
+            if let Type::I32 = datatype {
+                // pass
+            } else {
+                panic!("Wrong return type");
+            }
+            assert_eq!(block.len(), 1);
         } else {
             panic!("Wrong statement type");
         }
@@ -1710,8 +1723,8 @@ mod tests {
         let statement = &program[0];
 
         if let Statements::Expression(Expressions::Slice { object, index, .. }) = statement {
-            if let Expressions::Value(crate::value::Value::Identifier("myArray"), _) = &**object {
-                // pass
+            if let Expressions::Value(crate::value::Value::Identifier(s), _) = &**object {
+                assert_eq!(s, "myArray");
             } else {
                 panic!("Wrong object in slice expression");
             }
@@ -1798,8 +1811,8 @@ mod tests {
 
     #[test]
     fn test_for_statement() {
-        let input = "for i = 0 { x }";
-        let mut parser = Parser::new(input, "test.pay");
+        let input = "for i = 0 { x }".to_string();
+        let mut parser = Parser::new(input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1817,36 +1830,6 @@ mod tests {
                 // pass
             } else {
                 panic!("Wrong iterator type");
-            }
-            assert_eq!(block.len(), 1);
-        } else {
-            panic!("Wrong statement type");
-        }
-    }
-
-    #[test]
-    fn test_fn_definition() {
-        let input = "fn add(a: i32, b: i32) i32 { return a + b; }".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
-        let program = parser.parse().unwrap();
-
-        assert_eq!(program.len(), 1);
-        let statement = &program[0];
-
-        if let Statements::FunctionDefineStatement {
-            name,
-            arguments,
-            datatype,
-            block,
-            ..
-        } = statement
-        {
-            assert_eq!(*name, "add");
-            assert_eq!(arguments.len(), 2);
-            if let Type::I32 = datatype {
-                // pass
-            } else {
-                panic!("Wrong return type");
             }
             assert_eq!(block.len(), 1);
         } else {
@@ -1890,7 +1873,7 @@ mod tests {
 
     #[test]
     fn test_binary_assign_statement() {
-        let input = "x += 5;";
+        let input = "x += 5;".to_string();
         let mut parser = Parser::new(input.to_string(), "test.pay".to_string());
         let program = parser.parse().unwrap();
 
@@ -1904,8 +1887,8 @@ mod tests {
             ..
         } = statement
         {
-            if let Expressions::Value(crate::value::Value::Identifier("x"), _) = object {
-                // pass
+            if let Expressions::Value(crate::value::Value::Identifier(s), _) = object {
+                assert_eq!(s, "x");
             } else {
                 panic!("Wrong object in binary assign statement");
             }
@@ -1932,8 +1915,8 @@ mod tests {
         let statement = &program[0];
 
         if let Statements::AssignStatement { object, value, .. } = statement {
-            if let Expressions::Value(crate::value::Value::Identifier("x"), _) = object {
-                // pass
+            if let Expressions::Value(crate::value::Value::Identifier(s), _) = object {
+                assert_eq!(s, "x");
             } else {
                 panic!("Wrong object in assign statement");
             }
@@ -2008,8 +1991,8 @@ mod tests {
         let statement = &program[0];
 
         if let Statements::LinkCStatement { path, .. } = statement {
-            if let Expressions::Value(crate::value::Value::String("mylib.a"), _) = path {
-                // pass
+            if let Expressions::Value(crate::value::Value::String(s), _) = path {
+                assert_eq!(s, "mylib.a");
             } else {
                 panic!("Wrong path in link_c");
             }
@@ -2082,7 +2065,7 @@ mod tests {
         ));
 
         // Test assignment to dereferenced pointer
-        let input = "*x = 10;";
+        let input = "*x = 10;".to_string();
         let mut parser = Parser::new(input.to_string(), "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);

@@ -1,3 +1,4 @@
+use genpay_lexer::error::LexerError;
 use miette::{Diagnostic, NamedSource, SourceSpan};
 use thiserror::Error;
 
@@ -6,8 +7,8 @@ pub fn position_to_span(span: (usize, usize)) -> SourceSpan {
     span.into()
 }
 
-impl From<genpay_parser::error::LexerError> for SemanticError {
-    fn from(error: genpay_parser::error::LexerError) -> Self {
+impl From<LexerError> for SemanticError {
+    fn from(error: LexerError) -> Self {
         SemanticError::ModuleLexerError(error)
     }
 }
@@ -21,7 +22,7 @@ impl From<genpay_parser::error::ParserError> for SemanticError {
 #[derive(Debug, Error, Diagnostic, Clone, PartialEq, Eq)]
 pub enum SemanticError {
     #[error("Lexical Analyzer error")]
-    ModuleLexerError(genpay_parser::error::LexerError),
+    ModuleLexerError(LexerError),
 
     #[error("Syntax Analyzer error")]
     ModuleParserError(genpay_parser::error::ParserError),

@@ -191,3 +191,35 @@ pub enum Statements {
     Expression(Expressions),
     None,
 }
+
+impl Statements {
+    pub fn get_span(&self) -> (usize, usize) {
+        match self {
+            Statements::AssignStatement { span, .. } => *span,
+            Statements::BinaryAssignStatement { span, .. } => *span,
+            Statements::DerefAssignStatement { span, .. } => *span,
+            Statements::SliceAssignStatement { span, .. } => *span,
+            Statements::FieldAssignStatement { span, .. } => *span,
+            Statements::AnnotationStatement { span, .. } => *span,
+            Statements::FunctionDefineStatement { span, .. } => *span,
+            Statements::FunctionCallStatement { span, .. } => *span,
+            Statements::MacroCallStatement { span, .. } => *span,
+            Statements::StructDefineStatement { span, .. } => *span,
+            Statements::EnumDefineStatement { span, .. } => *span,
+            Statements::TypedefStatement { span, .. } => *span,
+            Statements::IfStatement { span, .. } => *span,
+            Statements::WhileStatement { span, .. } => *span,
+            Statements::ForStatement { span, .. } => *span,
+            Statements::ImportStatement { span, .. } => *span,
+            Statements::IncludeStatement { span, .. } => *span,
+            Statements::ExternDeclareStatement { span, .. } => *span,
+            Statements::LinkCStatement { span, .. } => *span,
+            Statements::ExternStatement { span, .. } => *span,
+            Statements::BreakStatements { span, .. } => *span,
+            Statements::ReturnStatement { value: _, span } => *span,
+            Statements::ScopeStatement { span, .. } => *span,
+            Statements::Expression(expr) => expr.get_span(),
+            Statements::None => (0, 0),
+        }
+    }
+}
