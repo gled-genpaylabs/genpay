@@ -2318,7 +2318,7 @@ impl<'a> Analyzer<'a> {
             }
 
             Expressions::Argument { name, r#type, span } => {
-                if name != "@deen_type" {
+                if name != "@genpay_type" {
                     self.error(SemanticError::ArgumentException {
                         exception: "arguments are not allowed in global code".to_string(),
                         help: None,
