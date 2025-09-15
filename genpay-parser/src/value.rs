@@ -1,12 +1,12 @@
 #[derive(Debug, Clone, PartialEq)]
-pub enum Value {
+pub enum Value<'bump> {
     Integer(i64),
     Float(f64),
-    String(String),
+    String(&'bump str),
     Char(char),
     Boolean(bool),
-    Identifier(String),
-    Keyword(String),
+    Identifier(&'bump str),
+    Keyword(&'bump str),
     Null,
     Void,
 }

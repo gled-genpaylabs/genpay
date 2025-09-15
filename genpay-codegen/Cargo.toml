@@ -14,3 +14,4 @@ inkwell = { version = "0.5.0", features = ["llvm18-0"] }
 llvm-sys = { version = "180", features = ["prefer-dynamic"] }
 miette = { version = "7.5.0", features = ["fancy"] }
 thiserror = "2.0.12"
+bumpalo = { workspace = true, features = ["collections"] }

@@ -8,32 +8,32 @@ use inkwell::{
 
 use crate::CodeGen;
 
-pub trait StandartMacros<'ctx> {
+pub trait StandartMacros<'ctx, 'bump> {
     fn build_macro_call(
         &mut self,
         id: &str,
-        arguments: Vec<Expressions>,
-    ) -> (Type, BasicValueEnum<'ctx>);
+        arguments: &[Expressions<'bump>],
+    ) -> (Type<'bump>, BasicValueEnum<'ctx>);
 }
 
-impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
+impl<'ctx, 'bump> StandartMacros<'ctx, 'bump> for CodeGen<'ctx, 'bump> {
     fn build_macro_call(
         &mut self,
         id: &str,
-        arguments: Vec<Expressions>,
-    ) -> (Type, BasicValueEnum<'ctx>) {
+        arguments: &[Expressions<'bump>],
+    ) -> (Type<'bump>, BasicValueEnum<'ctx>) {
         match id {
             "print" | "println" => {
                 let mut literal =
                     if let Some(Expressions::Value(Value::String(str), _)) = arguments.first() {
-                        str.clone()
+                        str.to_string()
                     } else {
                         String::default()
                     };
                 let compiled_args = arguments
                     .iter()
                     .skip(1)
-                    .map(|expr| self.compile_expression(expr.clone(), None))
+                    .map(|expr| self.compile_expression(expr, None))
                     .collect::<Vec<(Type, BasicValueEnum)>>();
 
                 let format_specifiers = compiled_args
@@ -64,7 +64,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                 let format_values = compiled_args
                     .into_iter()
                     .enumerate()
-                    .map(|(index, arg)| match arg.0.clone() {
+                    .map(|(index, arg)| match arg.0 {
                         Type::Bool => {
                             let (_true, _false) = self.booleans_strings();
                             self.builder
@@ -78,16 +78,16 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                             .unwrap()
                             .into(),
                         Type::Alias(alias) => {
-                            let alias_type = self.get_alias_type(arg.0.clone(), None).unwrap();
+                            let alias_type = self.get_alias_type(arg.0, None).unwrap();
 
                             match alias_type {
                                 "struct" => {
                                     let display_function = self
                                         .scope
-                                        .get_function(format!(
+                                        .get_function(self.bump.alloc(format!(
                                             "{}_{}__{}",
                                             alias_type, alias, "display"
-                                        ))
+                                        )))
                                         .unwrap();
 
                                     let self_val: BasicMetadataValueEnum = if arg
@@ -97,12 +97,12 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                                         arg.1.into()
                                     } else {
                                         let self_expression =
-                                            arguments.iter().skip(1).nth(index).unwrap().clone();
+                                            arguments.iter().skip(1).nth(index).unwrap();
 
                                         let mut recompiled = self
                                             .compile_expression(
                                                 self_expression,
-                                                Some(Type::Pointer(Box::new(Type::Undefined))),
+                                                Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                                             )
                                             .1;
 
@@ -155,14 +155,14 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
             "format" => {
                 let mut literal =
                     if let Some(Expressions::Value(Value::String(str), _)) = arguments.first() {
-                        str.clone()
+                        str.to_string()
                     } else {
                         String::default()
                     };
                 let compiled_args = arguments
                     .iter()
                     .skip(1)
-                    .map(|expr| self.compile_expression(expr.clone(), None))
+                    .map(|expr| self.compile_expression(expr, None))
                     .collect::<Vec<(Type, BasicValueEnum)>>();
 
                 let format_specifiers = compiled_args
@@ -194,7 +194,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                 let format_values = compiled_args
                     .into_iter()
                     .enumerate()
-                    .map(|(index, arg)| match arg.0.clone() {
+                    .map(|(index, arg)| match arg.0 {
                         Type::Bool => {
                             let (_true, _false) = self.booleans_strings();
                             self.builder
@@ -208,16 +208,16 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                             .unwrap()
                             .into(),
                         Type::Alias(alias) => {
-                            let alias_type = self.get_alias_type(arg.0.clone(), None).unwrap();
+                            let alias_type = self.get_alias_type(arg.0, None).unwrap();
 
                             match alias_type {
                                 "struct" => {
                                     let display_function = self
                                         .scope
-                                        .get_function(format!(
+                                        .get_function(self.bump.alloc(format!(
                                             "{}_{}__{}",
                                             alias_type, alias, "display"
-                                        ))
+                                        )))
                                         .unwrap();
 
                                     let self_val: BasicMetadataValueEnum = if arg
@@ -232,9 +232,8 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                                                     .iter()
                                                     .skip(1)
                                                     .nth(index)
-                                                    .unwrap()
-                                                    .clone(),
-                                                Some(Type::Pointer(Box::new(Type::Undefined))),
+                                                    .unwrap(),
+                                                Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                                             )
                                             .1;
 
@@ -337,12 +336,12 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                 let _ = self.builder.build_call(sprintf_fn, &call_arguments, "");
 
-                (Type::Pointer(Box::new(Type::Char)), buffer.into())
+                (Type::Pointer(self.bump.alloc(Type::Char)), buffer.into())
             }
             "panic" => {
                 let (mut literal, call_line) =
                     if let Some(Expressions::Value(Value::String(str), span)) = arguments.first() {
-                        (str.clone(), self.get_source_line(span.0))
+                        (str.to_string(), self.get_source_line(span.0))
                     } else {
                         (String::default(), 0)
                     };
@@ -350,7 +349,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                 let compiled_args = arguments
                     .iter()
                     .skip(1)
-                    .map(|expr| self.compile_expression(expr.clone(), None))
+                    .map(|expr| self.compile_expression(expr, None))
                     .collect::<Vec<(Type, BasicValueEnum)>>();
 
                 let format_specifiers = compiled_args
@@ -370,7 +369,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                 let format_values = compiled_args
                     .into_iter()
-                    .map(|arg| match arg.0.clone() {
+                    .map(|arg| match arg.0 {
                         Type::Bool => {
                             let (_true, _false) = self.booleans_strings();
                             self.builder
@@ -379,16 +378,16 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                                 .into()
                         }
                         Type::Alias(alias) => {
-                            let alias_type = self.get_alias_type(arg.0.clone(), None).unwrap();
+                            let alias_type = self.get_alias_type(arg.0, None).unwrap();
 
                             match alias_type {
                                 "struct" => {
                                     let display_function = self
                                         .scope
-                                        .get_function(format!(
+                                        .get_function(self.bump.alloc(format!(
                                             "{}_{}__{}",
                                             alias_type, alias, "display"
-                                        ))
+                                        )))
                                         .unwrap();
 
                                     let self_val: BasicMetadataValueEnum = arg.1.into();
@@ -423,21 +422,21 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                         span: _,
                     } = instance
                     {
-                        self.get_basic_type(r#type.clone())
+                        self.get_basic_type(*r#type)
                     } else {
-                        self.compile_expression(instance.clone(), None).1.get_type()
+                        self.compile_expression(instance, None).1.get_type()
                     }
                 };
 
                 (Type::USIZE, basic_type.size_of().unwrap().into())
             }
             "cast" => {
-                let from = arguments.first().unwrap().clone();
-                let to = arguments.get(1).unwrap().clone();
+                let from = arguments.first().unwrap();
+                let to = arguments.get(1).unwrap();
 
                 let from_value = self.compile_expression(from, None);
                 let to_type = self.compile_expression(to, None);
-                let target_basic_type = self.get_basic_type(to_type.0.clone());
+                let target_basic_type = self.get_basic_type(to_type.0);
 
                 match (&from_value.0, &to_type.0) {
                     (from, to) if from == to => from_value,

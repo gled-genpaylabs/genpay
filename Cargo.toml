@@ -17,6 +17,9 @@ description = "Compiler of Genpay Programming Language"
 repository = "https://github.com/gled-genpaylabs/genpay"
 license = "BSD-3-Clause"
 
+[workspace.dependencies]
+bumpalo = { version = "3.16.0", features = ["collections"] }
+
 [profile.dev]
 opt-level = 0
 

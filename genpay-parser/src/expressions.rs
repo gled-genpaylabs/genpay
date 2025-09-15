@@ -1,109 +1,110 @@
 use crate::{statements::Statements, types::Type, value::Value};
-use std::{collections::HashMap, string::String};
+use bumpalo::collections::Vec;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expressions {
+pub enum Expressions<'bump> {
     /// `OBJECT BINOP EXPRESSION`
     Binary {
-        operand: String,
-        lhs: Box<Expressions>,
-        rhs: Box<Expressions>,
+        operand: &'bump str,
+        lhs: &'bump Expressions<'bump>,
+        rhs: &'bump Expressions<'bump>,
         span: (usize, usize),
     },
     /// `UNOP OBJECT`
     Unary {
-        operand: String,
-        object: Box<Expressions>,
+        operand: &'bump str,
+        object: &'bump Expressions<'bump>,
         span: (usize, usize),
     },
 
     /// `OBJECT BOOLOP EXPRESSION`
     Boolean {
-        operand: String,
-        lhs: Box<Expressions>,
-        rhs: Box<Expressions>,
+        operand: &'bump str,
+        lhs: &'bump Expressions<'bump>,
+        rhs: &'bump Expressions<'bump>,
         span: (usize, usize),
     },
     /// `OBJECT BITOP EXPRESSION`
     Bitwise {
-        operand: String,
-        lhs: Box<Expressions>,
-        rhs: Box<Expressions>,
+        operand: &'bump str,
+        lhs: &'bump Expressions<'bump>,
+        rhs: &'bump Expressions<'bump>,
         span: (usize, usize),
     },
 
     /// `IDENTIFIER: TYPE`
     Argument {
-        name: String,
-        r#type: Type,
+        name: &'bump str,
+        r#type: Type<'bump>,
         span: (usize, usize),
     },
     /// `OBJECT.SUBELEMENT_1.SUBELEMENT_2`
     SubElement {
-        head: Box<Expressions>,
-        subelements: Vec<Expressions>,
+        head: &'bump Expressions<'bump>,
+        subelements: Vec<'bump, Expressions<'bump>>,
         span: (usize, usize),
     },
 
     /// `IDENTIFIER ( EXPRESSION, EXPRESSION, ... )`
     FnCall {
-        name: String,
-        arguments: Vec<Expressions>,
+        name: &'bump str,
+        arguments: Vec<'bump, Expressions<'bump>>,
         span: (usize, usize),
     },
     /// `IDENTIFIER! ( EXPRESSION, EXPRESSION, ... )`
     MacroCall {
-        name: String,
-        arguments: Vec<Expressions>,
+        name: &'bump str,
+        arguments: Vec<'bump, Expressions<'bump>>,
         span: (usize, usize),
     },
 
     /// `&EXPRESSION`
     Reference {
-        object: Box<Expressions>,
+        object: &'bump Expressions<'bump>,
         span: (usize, usize),
     },
 
     /// `*EXPRESSION`
     Dereference {
-        object: Box<Expressions>,
+        object: &'bump Expressions<'bump>,
         span: (usize, usize),
     },
 
     /// `[EXPRESSION, EXPRESSION, ...]`
     Array {
-        values: Vec<Expressions>,
+        values: Vec<'bump, Expressions<'bump>>,
         len: usize,
         span: (usize, usize),
     },
     /// `(EXPRESSION, EXPRESSION, ...)`
     Tuple {
-        values: Vec<Expressions>,
+        values: Vec<'bump, Expressions<'bump>>,
         span: (usize, usize),
     },
     /// `OBJECT[EXPRESSION]`
     Slice {
-        object: Box<Expressions>,
-        index: Box<Expressions>,
+        object: &'bump Expressions<'bump>,
+        index: &'bump Expressions<'bump>,
         span: (usize, usize),
     },
     /// `IDENTIFIER { .IDENTIFIER = EXPRESSION, .IDENTIFIER = EXPRESSION }`
     Struct {
-        name: String,
-        fields: HashMap<String, Expressions>,
+        name: &'bump str,
+        fields: HashMap<&'bump str, Expressions<'bump>>,
         span: (usize, usize),
     },
     /// `{ STATEMENTS }`
     Scope {
-        block: Vec<Statements>,
+        block: Vec<'bump, Statements<'bump>>,
         span: (usize, usize),
     },
 
-    Value(Value, (usize, usize)),
+    Value(Value<'bump>, (usize, usize)),
     None,
 }
 
-impl Expressions {
+impl<'bump> Expressions<'bump> {
     pub fn get_span(&self) -> (usize, usize) {
         match self {
             Expressions::Binary { span, .. } => *span,

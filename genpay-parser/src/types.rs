@@ -1,7 +1,8 @@
+use bumpalo::collections::Vec;
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Type {
+pub enum Type<'bump> {
     SelfRef,
     Undefined,
     NoDrop,
@@ -26,22 +27,22 @@ pub enum Type {
     Char,
     String,
 
-    Pointer(Box<Type>),
-    Array(Box<Type>, usize),
-    DynamicArray(Box<Type>),
+    Pointer(&'bump Type<'bump>),
+    Array(&'bump Type<'bump>, usize),
+    DynamicArray(&'bump Type<'bump>),
 
-    Tuple(Vec<Type>),
-    Alias(String),
+    Tuple(Vec<'bump, Type<'bump>>),
+    Alias(&'bump str),
 
     // for semantical analyzer
-    Function(Vec<Type>, Box<Type>, bool), // fn foo(a: i32, b: u32) string  --->  Function([I32, U32], String)
-    Struct(IndexMap<String, Type>, IndexMap<String, Type>), // struct Abc { a: i32, b: bool, c: *u64 }  ---> Struct([I32, Bool, Pointer(U64)])
-    Enum(Vec<String>, IndexMap<String, Type>), // enum Abc { A, B, C } -> Enum([A, B, C])
+    Function(Vec<'bump, Type<'bump>>, &'bump Type<'bump>, bool), // fn foo(a: i32, b: u32) string  --->  Function([I32, U32], String)
+    Struct(IndexMap<&'bump str, Type<'bump>>, IndexMap<&'bump str, Type<'bump>>), // struct Abc { a: i32, b: bool, c: *u64 }  ---> Struct([I32, Bool, Pointer(U64)])
+    Enum(Vec<'bump, &'bump str>, IndexMap<&'bump str, Type<'bump>>), // enum Abc { A, B, C } -> Enum([A, B, C])
 
-    ImportObject(String),
+    ImportObject(&'bump str),
 }
 
-impl<'a> std::fmt::Display for Type {
+impl<'a, 'bump> std::fmt::Display for Type<'bump> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Type::SelfRef => write!(f, "&self"),
@@ -89,7 +90,7 @@ impl<'a> std::fmt::Display for Type {
                 "{functype} ({}{})",
                 args.iter()
                     .map(|a| format!("{a}"))
-                    .collect::<Vec<String>>()
+                    .collect::<std::vec::Vec<std::string::String>>()
                     .join(", "),
                 if *is_var_args { ", ..." } else { "" }
             ),
@@ -98,7 +99,7 @@ impl<'a> std::fmt::Display for Type {
                 "struct {{ {} }}",
                 args.iter()
                     .map(|a| format!("{}", a.1))
-                    .collect::<Vec<String>>()
+                    .collect::<std::vec::Vec<std::string::String>>()
                     .join(", ")
             ),
             Type::Enum(args, _) => write!(
@@ -106,7 +107,7 @@ impl<'a> std::fmt::Display for Type {
                 "enum {{ {} }}",
                 args.iter()
                     .map(|a| a.to_string())
-                    .collect::<Vec<String>>()
+                    .collect::<std::vec::Vec<std::string::String>>()
                     .join(", ")
             ),
 

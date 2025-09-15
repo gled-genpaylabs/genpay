@@ -9,16 +9,16 @@ use genpay_parser::{expressions::Expressions, types::Type, value::Value};
 /// `format!(LITERAL, ...)` -> `*char`
 #[derive(Debug, Clone)]
 pub struct FormatMacro;
-impl MacroObject for FormatMacro {
+impl<'bump> MacroObject<'bump> for FormatMacro {
     fn verify_call(
         &self,
-        analyzer: &mut Analyzer,
-        arguments: &[Expressions],
+        analyzer: &mut Analyzer<'bump>,
+        arguments: &[Expressions<'bump>],
         span: &(usize, usize),
-    ) -> Type {
+    ) -> Type<'bump> {
         const DISPLAY_IMPLEMENTATION_FORMAT: &str = "fn display(&self) *char";
         const MINIMUM_ARGUMENTS_LEN: usize = 1;
-        let return_type: Type = Type::Pointer(Box::new(Type::Char));
+        let return_type: Type = Type::Pointer(analyzer.bump.alloc(Type::Char));
 
         if arguments.len() < MINIMUM_ARGUMENTS_LEN {
             analyzer.error(SemanticError::ArgumentException {
@@ -90,59 +90,39 @@ impl MacroObject for FormatMacro {
                 Type::Pointer(_) => {}
                 Type::Struct(_, functions) => {
                     if let Some(Type::Function(_, return_type, _)) = functions.get("display") {
-                        if let Type::Pointer(ptr) = *return_type.clone()
-                            && *ptr.clone() == Type::Char
-                            && arguments.len() == 2
-                        {
-                        } else {
-                            analyzer.error(
-                                SemanticError::IllegalImplementation {
-                                    exception: format!("type `{expr_type}` has wrong implementation for display"),
-                                    help: Some(format!("Consider using right format: {DISPLAY_IMPLEMENTATION_FORMAT}")),
-                                    src: analyzer.source.clone(),
-                                    span: error::position_to_span(expr.get_span())
-                                }
-                            );
-                        }
-                    } else {
-                        analyzer.error(
-                            SemanticError::IllegalImplementation {
-                                exception: format!("type `{expr_type}` has no implementation for display"),
-                                help: Some(format!("Consider implementing necessary method: {DISPLAY_IMPLEMENTATION_FORMAT}")),
-                                src: analyzer.source.clone(),
-                                span: error::position_to_span(expr.get_span())
+                        if let Type::Pointer(ptr) = (*return_type).clone() {
+                            if *ptr == Type::Char && arguments.len() == 2 {
+                                return;
                             }
-                        );
+                        }
                     }
+                    analyzer.error(
+                        SemanticError::IllegalImplementation {
+                            exception: format!("type `{expr_type}` has wrong implementation for display"),
+                            help: Some(format!("Consider using right format: {DISPLAY_IMPLEMENTATION_FORMAT}")),
+                            src: analyzer.source.clone(),
+                            span: error::position_to_span(expr.get_span())
+                        }
+                    );
                 }
                 Type::Alias(alias) => {
-                    if let Some(Type::Struct(_, functions)) = analyzer.scope.get_struct(&alias) {
+                    if let Some(Type::Struct(_, functions)) = analyzer.scope.get_struct(alias) {
                         if let Some(Type::Function(_, return_type, _)) = functions.get("display") {
-                            if let Type::Pointer(ptr) = *return_type.clone()
-                                && *ptr.clone() == Type::Char
-                                && arguments.len() == 2
-                            {
-                            } else {
-                                analyzer.error(
-                                    SemanticError::IllegalImplementation {
-                                        exception: format!("type `{expr_type}` has wrong implementation for display"),
-                                        help: Some(format!("Consider using right format: {DISPLAY_IMPLEMENTATION_FORMAT}")),
-                                        src: analyzer.source.clone(),
-                                        span: error::position_to_span(expr.get_span())
-                                    }
-                                );
+                            if let Type::Pointer(ptr) = (*return_type).clone() {
+                                if *ptr == Type::Char && arguments.len() == 2 {
+                                    return;
+                                }
                             }
-                        } else {
+                        }
                         analyzer.error(
                             SemanticError::IllegalImplementation {
-                                exception: format!("type `{expr_type}` has no implementation for display"),
-                                help: Some(format!("Consider implementing necessary method: {DISPLAY_IMPLEMENTATION_FORMAT}")),
+                                exception: format!("type `{expr_type}` has wrong implementation for display"),
+                                help: Some(format!("Consider using right format: {DISPLAY_IMPLEMENTATION_FORMAT}")),
                                 src: analyzer.source.clone(),
                                 span: error::position_to_span(expr.get_span())
                             }
                         );
-                        }
-                    } else if analyzer.scope.get_enum(&alias).is_none() {
+                    } else if analyzer.scope.get_enum(alias).is_none() {
                         analyzer.error(SemanticError::UnknownObject {
                             exception: format!("no displayable type `{expr_type}` found"),
                             help: None,

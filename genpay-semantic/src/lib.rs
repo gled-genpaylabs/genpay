@@ -5,6 +5,7 @@ use crate::{
     scope::Scope,
     symtable::SymbolTable,
 };
+use bumpalo::Bump;
 use genpay_parser::statements::Statements;
 use miette::NamedSource;
 use std::{collections::HashMap, path::PathBuf};
@@ -17,27 +18,34 @@ pub mod visitor;
 /// Semantic Analyzer Symbol Table
 pub mod symtable;
 
-pub type SemanticOk = (SymbolTable, Vec<SemanticWarning>);
+pub type SemanticOk<'bump> = (SymbolTable<'bump>, Vec<SemanticWarning>);
 pub type SemanticErr = (Vec<SemanticError>, Vec<SemanticWarning>);
 
 const STANDARD_LIBRARY_VAR: &str = "GENPAY_LIB";
 
 /// Main Analyzer Struct
 #[derive(Debug)]
-pub struct Analyzer {
-    scope: Scope,
+pub struct Analyzer<'bump> {
+    scope: Scope<'bump>,
     source: NamedSource<String>,
     source_path: PathBuf,
 
     errors: Vec<SemanticError>,
     warnings: Vec<SemanticWarning>,
 
-    symtable: SymbolTable,
+    symtable: SymbolTable<'bump>,
     compiler_macros: HashMap<String, CompilerMacros>,
+    bump: &'bump Bump,
 }
 
-impl Analyzer {
-    pub fn new(src: &str, filename: &str, source_path: PathBuf, is_main: bool) -> Self {
+impl<'bump> Analyzer<'bump> {
+    pub fn new(
+        src: &str,
+        filename: &str,
+        source_path: PathBuf,
+        is_main: bool,
+        bump: &'bump Bump,
+    ) -> Self {
         let compiler_macros = HashMap::from([
             (
                 String::from("print"),
@@ -64,7 +72,7 @@ impl Analyzer {
 
         Analyzer {
             scope: {
-                let mut scope = Scope::new();
+                let mut scope = Scope::new(bump);
                 scope.is_main = is_main;
                 scope
             },
@@ -76,10 +84,14 @@ impl Analyzer {
 
             symtable: SymbolTable::default(),
             compiler_macros,
+            bump,
         }
     }
 
-    pub fn analyze(&mut self, ast: &[Statements]) -> Result<SemanticOk, SemanticErr> {
+    pub fn analyze(
+        &mut self,
+        ast: &[Statements<'bump>],
+    ) -> Result<SemanticOk<'bump>, SemanticErr> {
         ast.iter().for_each(|stmt| self.visit_statement(stmt));
 
         if self.scope.get_fn("main").is_none() && self.scope.is_main {
@@ -97,7 +109,7 @@ impl Analyzer {
         if let Some(unused) = self.scope.check_unused_variables() {
             unused.iter().for_each(|var| {
                 self.warning(SemanticWarning::UnusedVariable {
-                    varname: var.0.clone(),
+                    varname: var.0.to_string(),
                     src: self.source.clone(),
                     span: error::position_to_span(var.1),
                 });
@@ -120,4 +132,3 @@ impl Analyzer {
         self.warnings.push(warning)
     }
 }
-

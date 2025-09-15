@@ -1,35 +1,37 @@
 use crate::element::ScopeElement;
+use bumpalo::Bump;
 use genpay_parser::types::Type;
 use std::collections::HashMap;
 
-type UnusedVariable = (String, (usize, usize));
+type UnusedVariable<'bump> = (&'bump str, (usize, usize));
 
 #[derive(Debug, Clone)]
-pub struct Scope {
-    pub expected: Type,
-    pub returned: Type,
-    pub parent: Option<Box<Scope>>,
+pub struct Scope<'bump> {
+    pub expected: Type<'bump>,
+    pub returned: Type<'bump>,
+    pub parent: Option<Box<Scope<'bump>>>,
 
     pub is_loop: bool,
     pub is_main: bool,
 
-    pub variables: HashMap<String, Variable>,
-    pub functions: HashMap<String, ScopeElement>,
-    pub structures: HashMap<String, ScopeElement>,
-    pub enums: HashMap<String, ScopeElement>,
-    pub typedefs: HashMap<String, Type>,
+    pub variables: HashMap<&'bump str, Variable<'bump>>,
+    pub functions: HashMap<&'bump str, ScopeElement<'bump>>,
+    pub structures: HashMap<&'bump str, ScopeElement<'bump>>,
+    pub enums: HashMap<&'bump str, ScopeElement<'bump>>,
+    pub typedefs: HashMap<&'bump str, Type<'bump>>,
+    bump: &'bump Bump,
 }
 
 #[derive(Debug, Clone)]
-pub struct Variable {
-    pub datatype: Type,
+pub struct Variable<'bump> {
+    pub datatype: Type<'bump>,
     pub initialized: bool,
     pub span: (usize, usize),
     pub used: bool,
 }
 
-impl Scope {
-    pub fn new() -> Self {
+impl<'bump> Scope<'bump> {
+    pub fn new(bump: &'bump Bump) -> Self {
         Scope {
             expected: Type::Void,
             returned: Type::Void,
@@ -44,14 +46,15 @@ impl Scope {
 
             is_loop: false,
             is_main: false,
+            bump,
         }
     }
 
     #[inline]
     pub fn add_var(
         &mut self,
-        name: String,
-        datatype: Type,
+        name: &'bump str,
+        datatype: Type<'bump>,
         initialized: bool,
         span: (usize, usize),
     ) {
@@ -70,7 +73,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_var(&mut self, name: &str) -> Option<Variable> {
+    pub fn get_var(&mut self, name: &str) -> Option<Variable<'bump>> {
         if name == "_" {
             return Some(Variable {
                 datatype: Type::Void,
@@ -86,7 +89,7 @@ impl Scope {
         })
     }
 
-    pub fn get_mut_var(&mut self, name: &str) -> Option<&mut Variable> {
+    pub fn get_mut_var(&mut self, name: &str) -> Option<&mut Variable<'bump>> {
         if name == "_" {
             return None;
         }
@@ -105,12 +108,12 @@ impl Scope {
     }
 
     #[inline]
-    pub fn check_unused_variables(&self) -> Option<Vec<UnusedVariable>> {
+    pub fn check_unused_variables(&self) -> Option<Vec<UnusedVariable<'bump>>> {
         let mut unused = Vec::new();
 
         self.variables.iter().for_each(|(name, signature)| {
             if !signature.used {
-                unused.push((name.clone(), signature.span));
+                unused.push((*name, signature.span));
             }
         });
 
@@ -134,12 +137,17 @@ impl Scope {
     }
 
     #[inline]
-    pub fn add_fn(&mut self, name: String, return_type: Type, public: bool) -> Result<(), String> {
-        if self.functions.contains_key(&name) {
+    pub fn add_fn(
+        &mut self,
+        name: &'bump str,
+        return_type: Type<'bump>,
+        public: bool,
+    ) -> Result<(), String> {
+        if self.functions.contains_key(name) {
             return Err(format!("function `{name}` already declared"));
         }
         self.functions.insert(
-            name.clone(),
+            name,
             ScopeElement {
                 datatype: return_type,
                 public,
@@ -149,7 +157,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_fn(&self, name: &str) -> Option<Type> {
+    pub fn get_fn(&self, name: &str) -> Option<Type<'bump>> {
         self.functions
             .get(name)
             .map(|elem| elem.datatype.clone())
@@ -160,15 +168,15 @@ impl Scope {
     #[allow(unused)]
     pub fn add_struct(
         &mut self,
-        name: String,
-        struct_type: Type,
+        name: &'bump str,
+        struct_type: Type<'bump>,
         public: bool,
     ) -> Result<(), String> {
-        if self.structures.contains_key(&name) {
+        if self.structures.contains_key(name) {
             return Err(format!("structure `{name}` already declared"));
         }
         self.structures.insert(
-            name.clone(),
+            name,
             ScopeElement {
                 datatype: struct_type,
                 public,
@@ -178,7 +186,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_struct(&self, name: &str) -> Option<Type> {
+    pub fn get_struct(&self, name: &str) -> Option<Type<'bump>> {
         self.structures
             .get(name)
             .map(|elem| elem.datatype.clone())
@@ -190,7 +198,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_mut_struct(&mut self, name: &str) -> Option<&mut ScopeElement> {
+    pub fn get_mut_struct(&mut self, name: &str) -> Option<&mut ScopeElement<'bump>> {
         self.structures.get_mut(name).or_else(|| {
             self.parent
                 .as_mut()
@@ -199,12 +207,17 @@ impl Scope {
     }
 
     #[inline]
-    pub fn add_enum(&mut self, name: String, enum_type: Type, public: bool) -> Result<(), String> {
-        if self.enums.contains_key(&name) {
+    pub fn add_enum(
+        &mut self,
+        name: &'bump str,
+        enum_type: Type<'bump>,
+        public: bool,
+    ) -> Result<(), String> {
+        if self.enums.contains_key(name) {
             return Err(format!("enum `{name}` already declared"));
         }
         self.enums.insert(
-            name.clone(),
+            name,
             ScopeElement {
                 datatype: enum_type,
                 public,
@@ -214,7 +227,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_enum(&self, name: &str) -> Option<Type> {
+    pub fn get_enum(&self, name: &str) -> Option<Type<'bump>> {
         self.enums
             .get(name)
             .map(|elem| elem.datatype.clone())
@@ -226,8 +239,8 @@ impl Scope {
     }
 
     #[inline]
-    pub fn add_typedef(&mut self, name: String, typ: Type) -> Result<(), String> {
-        if self.typedefs.contains_key(&name) {
+    pub fn add_typedef(&mut self, name: &'bump str, typ: Type<'bump>) -> Result<(), String> {
+        if self.typedefs.contains_key(name) {
             return Err(format!("type `{name}` already declared"));
         }
         self.typedefs.insert(name, typ);
@@ -235,7 +248,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn get_typedef(&self, name: &str) -> Option<Type> {
+    pub fn get_typedef(&self, name: &str) -> Option<Type<'bump>> {
         self.typedefs.get(name).cloned().or_else(|| {
             self.parent
                 .as_ref()

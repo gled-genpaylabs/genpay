@@ -1,10 +1,11 @@
 use crate::{Analyzer, Scope, SemanticError};
+use bumpalo::collections::CollectIn;
 use genpay_parser::{expressions::Expressions, statements::Statements, types::Type};
 use indexmap::IndexMap;
 use std::path::PathBuf;
 
-impl Analyzer {
-    pub fn visit_statement(&mut self, statement: &Statements) {
+impl<'bump> Analyzer<'bump> {
+    pub fn visit_statement(&mut self, statement: &Statements<'bump>) {
         match statement {
             Statements::AnnotationStatement {
                 identifier,
@@ -12,7 +13,7 @@ impl Analyzer {
                 value,
                 span,
             } => {
-                if self.scope.variables.contains_key(identifier) {
+                if self.scope.variables.contains_key(*identifier) {
                     self.error(SemanticError::RedefinitionError {
                         exception: format!("Variable `{}` is already defined in this scope.", identifier),
                         help: Some("Consider using a different name.".to_string()),
@@ -50,7 +51,7 @@ impl Analyzer {
                 }
 
                 self.scope
-                    .add_var(identifier.clone(), var_type, initialized, *span);
+                    .add_var(*identifier, var_type, initialized, *span);
             }
             Statements::Expression(expression) => {
                 self.visit_expression(expression, None);
@@ -65,13 +66,18 @@ impl Analyzer {
                 span: _,
                 header_span: _,
             } => {
+                let arg_types = arguments
+                    .iter()
+                    .map(|(_, t)| t.clone())
+                    .collect_in(self.bump);
+
                 let func_type = Type::Function(
-                    arguments.iter().map(|(_, t)| t.clone()).collect(),
-                    Box::new(datatype.clone()),
+                    arg_types,
+                    self.bump.alloc(datatype.clone()),
                     *is_var_args,
                 );
 
-                if let Err(err) = self.scope.add_fn(name.clone(), func_type.clone(), *public) {
+                if let Err(err) = self.scope.add_fn(*name, func_type.clone(), *public) {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
@@ -81,12 +87,12 @@ impl Analyzer {
                     return;
                 }
 
-                let mut func_scope = Scope::new();
+                let mut func_scope = Scope::new(self.bump);
                 func_scope.parent = Some(Box::new(self.scope.clone()));
                 func_scope.expected = datatype.clone();
 
                 for (arg_name, arg_type) in arguments {
-                    func_scope.add_var(arg_name.clone(), arg_type.clone(), true, (0, 0));
+                    func_scope.add_var(*arg_name, arg_type.clone(), true, (0, 0));
                 }
 
                 let original_scope = self.scope.clone();
@@ -131,7 +137,7 @@ impl Analyzer {
                     });
                 }
 
-                let mut then_scope = Scope::new();
+                let mut then_scope = Scope::new(self.bump);
                 then_scope.parent = Some(Box::new(self.scope.clone()));
                 let original_scope = self.scope.clone();
                 self.scope = then_scope;
@@ -141,7 +147,7 @@ impl Analyzer {
                 self.scope = original_scope;
 
                 if let Some(else_block) = else_block {
-                    let mut else_scope = Scope::new();
+                    let mut else_scope = Scope::new(self.bump);
                     else_scope.parent = Some(Box::new(self.scope.clone()));
                     let original_scope = self.scope.clone();
                     self.scope = else_scope;
@@ -169,7 +175,7 @@ impl Analyzer {
                     });
                 }
 
-                let mut while_scope = Scope::new();
+                let mut while_scope = Scope::new(self.bump);
                 while_scope.parent = Some(Box::new(self.scope.clone()));
                 while_scope.is_loop = true;
                 let original_scope = self.scope.clone();
@@ -185,13 +191,13 @@ impl Analyzer {
             Statements::StructDefineStatement {
                 name,
                 fields,
-                functions: _,
+                functions,
                 public,
                 span,
             } => {
-                let struct_type = Type::Struct(fields.clone(), IndexMap::new());
+                let struct_type = Type::Struct(fields.clone(), functions.clone());
 
-                if let Err(err) = self.scope.add_struct(name.clone(), struct_type, *public) {
+                if let Err(err) = self.scope.add_struct(*name, struct_type, *public) {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
@@ -203,13 +209,13 @@ impl Analyzer {
             Statements::EnumDefineStatement {
                 name,
                 fields,
-                functions: _,
+                functions,
                 public,
                 span,
             } => {
-                let enum_type = Type::Enum(fields.clone(), IndexMap::new());
+                let enum_type = Type::Enum(fields.clone(), functions.clone());
 
-                if let Err(err) = self.scope.add_enum(name.clone(), enum_type, *public) {
+                if let Err(err) = self.scope.add_enum(*name, enum_type, *public) {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
@@ -241,7 +247,7 @@ impl Analyzer {
                 // TODO: check for mutability
             }
             Statements::ScopeStatement { block, .. } => {
-                let mut scope = Scope::new();
+                let mut scope = Scope::new(self.bump);
                 scope.parent = Some(Box::new(self.scope.clone()));
                 let original_scope = self.scope.clone();
                 self.scope = scope;
@@ -265,7 +271,7 @@ impl Analyzer {
                 datatype,
                 span,
             } => {
-                if let Err(err) = self.scope.add_typedef(alias.clone(), datatype.clone()) {
+                if let Err(err) = self.scope.add_typedef(*alias, datatype.clone()) {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
@@ -278,7 +284,7 @@ impl Analyzer {
         }
     }
 
-    pub fn visit_expression(&mut self, expression: &Expressions, _expected_type: Option<Type>) -> Type {
+    pub fn visit_expression(&mut self, expression: &Expressions<'bump>, _expected_type: Option<Type<'bump>>) -> Type<'bump> {
         match expression {
             Expressions::Value(value, span) => match value {
                 genpay_parser::value::Value::Integer(_) => Type::I64,
@@ -309,7 +315,7 @@ impl Analyzer {
                 span,
             } => {
                 let obj_type = self.visit_expression(object, None);
-                match operand.as_str() {
+                match **operand {
                     "-" => {
                         if !Analyzer::is_integer(&obj_type) && !Analyzer::is_float(&obj_type) {
                             self.error(SemanticError::TypesMismatch {
@@ -358,7 +364,7 @@ impl Analyzer {
                 let left_type = self.visit_expression(lhs, None);
                 let right_type = self.visit_expression(rhs, None);
 
-                match operand.as_str() {
+                match **operand {
                     "+" | "-" | "*" | "/" | "%" => {
                         if Analyzer::is_integer(&left_type) && Analyzer::is_integer(&right_type) {
                             if Analyzer::integer_order(&left_type) > Analyzer::integer_order(&right_type) {
@@ -446,7 +452,7 @@ impl Analyzer {
                             }
                         }
 
-                        *ret_type.clone()
+                        (*ret_type).clone()
                     } else {
                         self.error(SemanticError::SemanticalError {
                             exception: format!("`{}` is not a function.", name),
@@ -489,7 +495,7 @@ impl Analyzer {
                         }
 
                         for (field_name, field_expr) in fields {
-                            if let Some(defined_field_type) = defined_fields.get(field_name) {
+                            if let Some(defined_field_type) = defined_fields.get(*field_name) {
                                 let field_type = self.visit_expression(
                                     field_expr,
                                     Some(defined_field_type.clone()),
@@ -574,7 +580,7 @@ impl Analyzer {
             }
             Expressions::Array { values, .. } => {
                 if values.is_empty() {
-                    return Type::Array(Box::new(Type::Void), 0);
+                    return Type::Array(self.bump.alloc(Type::Void), 0);
                 }
 
                 let first_type = self.visit_expression(&values[0], None);
@@ -592,13 +598,13 @@ impl Analyzer {
                         });
                     }
                 }
-                Type::Array(Box::new(first_type), values.len())
+                Type::Array(self.bump.alloc(first_type), values.len())
             }
             Expressions::Tuple { values, .. } => {
                 let types = values
                     .iter()
                     .map(|v| self.visit_expression(v, None))
-                    .collect();
+                    .collect_in(self.bump);
                 Type::Tuple(types)
             }
             Expressions::Slice {
@@ -622,7 +628,7 @@ impl Analyzer {
                 }
 
                 if let Type::Array(elem_type, _) = obj_type {
-                    *elem_type
+                    (*elem_type).clone()
                 } else {
                     self.error(SemanticError::TypesMismatch {
                         exception: format!("Cannot index non-array type `{}`.", obj_type),
@@ -635,12 +641,12 @@ impl Analyzer {
             }
             Expressions::Reference { object, .. } => {
                 let obj_type = self.visit_expression(object, None);
-                Type::Pointer(Box::new(obj_type))
+                Type::Pointer(self.bump.alloc(obj_type))
             }
             Expressions::Dereference { object, span } => {
                 let obj_type = self.visit_expression(object, None);
                 if let Type::Pointer(elem_type) = obj_type {
-                    *elem_type
+                    (*elem_type).clone()
                 } else {
                     self.error(SemanticError::TypesMismatch {
                         exception: format!("Cannot dereference non-pointer type `{}`.", obj_type),
@@ -656,7 +662,7 @@ impl Analyzer {
     }
 
     // Stubbed helper methods
-    pub fn unwrap_alias(&self, a_type: &Type) -> Result<Type, String> {
+    pub fn unwrap_alias(&self, a_type: &Type<'bump>) -> Result<Type<'bump>, String> {
         if let Type::Alias(alias) = a_type {
             if let Some(typ) = self.scope.get_typedef(alias) {
                 self.unwrap_alias(&typ)
@@ -668,18 +674,18 @@ impl Analyzer {
         }
     }
 
-    pub fn is_integer(a_type: &Type) -> bool {
+    pub fn is_integer(a_type: &Type<'bump>) -> bool {
         matches!(
             a_type,
             Type::I8 | Type::I16 | Type::I32 | Type::I64 | Type::U8 | Type::U16 | Type::U32 | Type::U64
         )
     }
 
-    pub fn is_float(a_type: &Type) -> bool {
+    pub fn is_float(a_type: &Type<'bump>) -> bool {
         matches!(a_type, Type::F32 | Type::F64)
     }
 
-    pub fn integer_order(a_type: &Type) -> u8 {
+    pub fn integer_order(a_type: &Type<'bump>) -> u8 {
         match a_type {
             Type::I8 => 1,
             Type::U8 => 2,
@@ -693,7 +699,7 @@ impl Analyzer {
         }
     }
 
-    pub fn float_order(a_type: &Type) -> u8 {
+    pub fn float_order(a_type: &Type<'bump>) -> u8 {
         match a_type {
             Type::F32 => 1,
             Type::F64 => 2,
@@ -701,14 +707,14 @@ impl Analyzer {
         }
     }
 
-    pub fn is_unsigned_integer(a_type: &Type) -> bool {
+    pub fn is_unsigned_integer(a_type: &Type<'bump>) -> bool {
         matches!(
             a_type,
             Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::USIZE
         )
     }
 
-    pub fn unsigned_to_signed_integer(a_type: &Type) -> Type {
+    pub fn unsigned_to_signed_integer(a_type: &Type<'bump>) -> Type<'bump> {
         match a_type {
             Type::U8 => Type::I8,
             Type::U16 => Type::I16,
@@ -719,7 +725,7 @@ impl Analyzer {
         }
     }
 
-    pub fn verify_macrocall(&mut self, name: &str, arguments: &[Expressions], span: &(usize, usize)) -> Type {
+    pub fn verify_macrocall(&mut self, name: &str, arguments: &[Expressions<'bump>], span: &(usize, usize)) -> Type<'bump> {
         todo!()
     }
 
@@ -727,7 +733,7 @@ impl Analyzer {
         todo!()
     }
 
-    pub fn verify_cast(&self, from_type: &Type, target_type: &Type) -> Result<(), String> {
+    pub fn verify_cast(&self, from_type: &Type<'bump>, target_type: &Type<'bump>) -> Result<(), String> {
         todo!()
     }
 }

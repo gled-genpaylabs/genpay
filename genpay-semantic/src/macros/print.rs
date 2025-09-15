@@ -6,13 +6,13 @@ use genpay_parser::{expressions::Expressions, types::Type};
 /// `print!(LITERAL, ...)` -> `void`
 #[derive(Debug, Clone)]
 pub struct PrintMacro;
-impl MacroObject for PrintMacro {
+impl<'bump> MacroObject<'bump> for PrintMacro {
     fn verify_call(
         &self,
-        analyzer: &mut Analyzer,
-        arguments: &[Expressions],
+        analyzer: &mut Analyzer<'bump>,
+        arguments: &[Expressions<'bump>],
         span: &(usize, usize),
-    ) -> Type {
+    ) -> Type<'bump> {
         let _ = super::FormatMacro.verify_call(analyzer, arguments, span);
         Type::Void
     }
