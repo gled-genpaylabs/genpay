@@ -1,7 +1,7 @@
 use crate::{
     CodeGen, enumeration::Enumeration, function::Function, structure::Structure, variable::Variable,
 };
-use genpay_parse_two::types::Type;
+use genpay_parser::types::Type;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
