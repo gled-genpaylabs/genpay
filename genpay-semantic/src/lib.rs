@@ -5,8 +5,8 @@ use crate::{
     scope::Scope,
     symtable::{Include, SymbolTable},
 };
-use genpay_parse_two::{
-    expressions::Expressions, statements::Statements, types::Type, value::Value, Parser,
+use genpay_parser::{
+    Parser, expressions::Expressions, statements::Statements, types::Type, value::Value,
 };
 use indexmap::IndexMap;
 use miette::NamedSource;
@@ -86,7 +86,6 @@ impl<'a> Analyzer<'a> {
     }
 
     pub fn analyze(&mut self, ast: &[Statements<'a>]) -> Result<SemanticOk<'a>, SemanticErr<'a>> {
-       
         ast.iter().for_each(|stmt| self.visit_statement(stmt));
 
         if self.scope.get_fn("main").is_none() && self.scope.is_main {
@@ -845,9 +844,7 @@ impl<'a> Analyzer<'a> {
                                     ),
                                     help: Some("Consider verifying provided argument".to_string()),
                                     src: self.source.clone(),
-                                    span: error::position_to_span(
-                                        arguments[ind].get_span(),
-                                    ),
+                                    span: error::position_to_span(arguments[ind].get_span()),
                                 });
                             }
                         },
@@ -2648,7 +2645,7 @@ impl<'a> Analyzer<'a> {
                                 Type::ImportObject(imp) => {
                                     let import = self.symtable.imports.get(&imp).unwrap().clone();
 
-                                    let name = format!("{imp}.{name}"); 
+                                    let name = format!("{imp}.{name}");
                                     if let Some(Type::Struct(struct_fields, _)) = import.structs.get(&name) {
 
                                         let mut assigned_fields = HashMap::new();
@@ -2968,9 +2965,7 @@ impl<'a> Analyzer<'a> {
                                     exception: "tuple index must be unsigned".to_string(),
                                     help: None,
                                     src: self.source.clone(),
-                                    span: error::position_to_span(
-                                        index.get_span(),
-                                    ),
+                                    span: error::position_to_span(index.get_span()),
                                 });
 
                                 return expected.unwrap_or(Type::Void);
@@ -3187,7 +3182,11 @@ impl<'a> Analyzer<'a> {
         }
     }
 
-    fn visit_value(&mut self, value: Value<'a>, expected: Option<Type<'a>>) -> Result<Type<'a>, String> {
+    fn visit_value(
+        &mut self,
+        value: Value<'a>,
+        expected: Option<Type<'a>>,
+    ) -> Result<Type<'a>, String> {
         match value {
             Value::Integer(int) => {
                 if expected.is_some()
@@ -3378,8 +3377,8 @@ impl<'a> Expressions<'a> {
 
 #[cfg(test)]
 mod tests {
-    use genpay_parse_two::types::Type;
     use crate::Analyzer;
+    use genpay_parser::types::Type;
 
     #[test]
     fn is_integer() {

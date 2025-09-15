@@ -8,7 +8,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-genpay-parse-two = { path = "../genpay-parser" }
+genpay-parser = { path = "../genpay-parser" }
 genpay-semantic = { path = "../genpay-semantic" }
 inkwell = { version = "0.5.0", features = ["llvm18-0"] }
 llvm-sys = { version = "180", features = ["prefer-dynamic"] }
