@@ -1,6 +1,6 @@
 use crate::{Analyzer, Scope, SemanticError};
 use genpay_parser::{expressions::Expressions, statements::Statements, types::Type};
-use indexmap::IndexMap;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 impl Analyzer {
@@ -189,7 +189,7 @@ impl Analyzer {
                 public,
                 span,
             } => {
-                let struct_type = Type::Struct(fields.clone(), IndexMap::new());
+                let struct_type = Type::Struct(fields.clone(), BTreeMap::new());
 
                 if let Err(err) = self.scope.add_struct(name.clone(), struct_type, *public) {
                     self.error(SemanticError::RedefinitionError {
@@ -207,7 +207,7 @@ impl Analyzer {
                 public,
                 span,
             } => {
-                let enum_type = Type::Enum(fields.clone(), IndexMap::new());
+                let enum_type = Type::Enum(fields.clone(), BTreeMap::new());
 
                 if let Err(err) = self.scope.add_enum(name.clone(), enum_type, *public) {
                     self.error(SemanticError::RedefinitionError {

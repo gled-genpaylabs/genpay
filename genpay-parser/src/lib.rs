@@ -642,8 +642,8 @@ impl Parser {
         }
         self.next_token();
 
-        let mut fields = indexmap::IndexMap::new();
-        let mut functions: indexmap::IndexMap<String, Vec<Statements>> = indexmap::IndexMap::new();
+        let mut fields = std::collections::BTreeMap::new();
+        let mut functions: std::collections::BTreeMap<String, Vec<Statements>> = std::collections::BTreeMap::new();
 
         while self.current_token.token_type != TokenType::RBrace
             && self.current_token.token_type != TokenType::EOF
@@ -730,8 +730,8 @@ impl Parser {
         self.next_token();
 
         let mut fields = vec![];
-        let mut functions: indexmap::IndexMap<String, Vec<Statements>> =
-            indexmap::IndexMap::new();
+        let mut functions: std::collections::BTreeMap<String, Vec<Statements>> =
+            std::collections::BTreeMap::new();
 
         while self.current_token.token_type != TokenType::RBrace
             && self.current_token.token_type != TokenType::EOF
