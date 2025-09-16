@@ -95,8 +95,8 @@ jobs:
         mkdir -p release-assets
         
         # Copy binaries with correct names
-        cp artifacts/genpay-linux-x86_64/deen-linux-x86_64 release-assets/genpay
-        cp artifacts/genpay-macos-aarch64/deen-macos-aarch64 release-assets/genpay
+        cp artifacts/genpay-linux-x86_64/genpay-linux-x86_64 release-assets/genpay
+        cp artifacts/genpay-macos-aarch64/genpay-macos-aarch64 release-assets/genpay
         
         # Copy additional files
         cp LICENSE release-assets/
