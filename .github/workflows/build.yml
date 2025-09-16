@@ -1,13 +1,10 @@
 permissions:
   contents: write
 
-name: Build GenPay Release
+name: Build Genpay Release
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*.*.*'
 
 env:
   CARGO_TERM_COLOR: always
@@ -22,16 +19,12 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            name: deen-linux-x86_64
-            binary: deen
+            name: genpay-linux-x86_64
+            binary: genpay
           - target: aarch64-apple-darwin
             os: macos-latest
-            name: deen-macos-aarch64
-            binary: deen
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            name: deen-windows-x86_64
-            binary: deen.exe
+            name: genpay-macos-aarch64
+            binary: genpay
 
     steps:
     - name: Checkout code
@@ -67,22 +60,6 @@ jobs:
         echo "PKG_CONFIG_PATH=$LLVM_PREFIX/lib/pkgconfig:$(brew --prefix zstd)/lib/pkgconfig:$(brew --prefix libffi)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
         echo "RUSTFLAGS=-L$LLVM_PREFIX/lib" >> $GITHUB_ENV
 
-    # Windows dependencies
-    - name: Install Windows dependencies
-      if: matrix.os == 'windows-latest'
-      run: |
-        curl -L -o llvm.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-pc-windows-msvc.tar.xz
-        7z x llvm.tar.xz
-        7z x llvm.tar -oC:\
-        move "C:\clang+llvm-18.1.8-x86_64-pc-windows-msvc" "C:\llvm"
-        
-    - name: Set Windows LLVM environment
-      if: matrix.os == 'windows-latest'
-      run: |
-        echo "LLVM_SYS_180_PREFIX=C:\llvm" >> $env:GITHUB_ENV
-        echo "PATH=C:\llvm\bin;$env:PATH" >> $env:GITHUB_ENV
-      shell: pwsh
-
     - name: Build
       run: cargo build --release --target ${{ matrix.target }}
 
@@ -92,4 +69,59 @@ jobs:
         cp target/${{ matrix.target }}/release/${{ matrix.binary }} ${{ matrix.name }}
         chmod +x ${{ matrix.name }}
 
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.name }}
+        path: ${{ matrix.name }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+
+  release:
+    name: Create Draft Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
     
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Prepare release assets
+      run: |
+        mkdir -p release-assets
+        
+        # Copy binaries with correct names
+        cp artifacts/genpay-linux-x86_64/deen-linux-x86_64 release-assets/genpay
+        cp artifacts/genpay-macos-aarch64/deen-macos-aarch64 release-assets/genpay
+        
+        # Copy additional files
+        cp LICENSE release-assets/
+        cp README.md release-assets/
+        cp -r stdlib release-assets/
+        
+        # Make Unix binaries executable
+        chmod +x release-assets/genpay
+
+    - name: Generate tag name
+      id: tag
+      run: |
+        TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+        TAG="release-${TIMESTAMP}"
+        echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+    - name: Create Draft Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.tag.outputs.tag }}
+        name: "Genpay Compiler Release ${{ steps.tag.outputs.tag }}"
+        draft: true
+        generate_release_notes: true
+        files: |
+          release-assets/genpay
+          release-assets/LICENSE
+          release-assets/README.md
+          release-assets/stdlib/**
