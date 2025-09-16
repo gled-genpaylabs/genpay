@@ -15,10 +15,10 @@ use miette::NamedSource;
 
 pub type Program = Vec<Statements>;
 
-pub struct Parser {
-    lexer: Lexer,
-    current_token: Token,
-    peek_token: Token,
+pub struct Parser<'a> {
+    lexer: Lexer<'a>,
+    current_token: Token<'a>,
+    peek_token: Token<'a>,
     source: NamedSource<String>,
     errors: Vec<ParserError>,
 }
@@ -44,13 +44,13 @@ enum Precedence {
 
 use genpay_lexer::token_type::TokenType;
 
-impl Parser {
-    pub fn new(source: String, filename: String) -> Self {
-        let mut lexer = Lexer::new(source.clone());
+impl<'a> Parser<'a> {
+    pub fn new(source: &'a str, filename: String) -> Self {
+        let mut lexer = Lexer::new(source);
         let current_token = match lexer.next() {
             Some(Ok(token)) => token,
             _ => Token {
-                value: "".to_string(),
+                value: "".into(),
                 token_type: TokenType::EOF,
                 span: (0, 0),
             },
@@ -58,7 +58,7 @@ impl Parser {
         let peek_token = match lexer.next() {
             Some(Ok(token)) => token,
             _ => Token {
-                value: "".to_string(),
+                value: "".into(),
                 token_type: TokenType::EOF,
                 span: (0, 0),
             },
@@ -67,7 +67,7 @@ impl Parser {
             lexer,
             current_token,
             peek_token,
-            source: NamedSource::new(filename, source),
+            source: NamedSource::new(filename, source.to_string()),
             errors: Vec::new(),
         }
     }
@@ -98,7 +98,7 @@ impl Parser {
             }
             None => {
                 self.peek_token = Token {
-                    value: "".to_string(),
+                    value: "".into(),
                     token_type: TokenType::EOF,
                     span: (0, 0),
                 };
@@ -176,7 +176,7 @@ impl Parser {
             || self.peek_token.token_type == TokenType::DivideAssign
         {
             self.next_token(); // current is now the operator
-            let operator = self.current_token.value.clone();
+            let operator = self.current_token.value.to_string();
             self.next_token(); // current is now the start of the value expression
             let value = self.parse_expression(Precedence::LOWEST)?;
             let span = (expression.get_span().0, value.get_span().1);
@@ -327,7 +327,7 @@ impl Parser {
             });
             return None;
         }
-        let binding = self.current_token.value.clone();
+        let binding = self.current_token.value.to_string();
         self.next_token();
 
         if self.current_token.token_type != TokenType::Equal {
@@ -386,7 +386,7 @@ impl Parser {
             });
             return None;
         }
-        let name = self.current_token.value.clone();
+        let name = self.current_token.value.to_string();
         self.next_token();
 
         if self.current_token.token_type != TokenType::LParen {
@@ -456,7 +456,7 @@ impl Parser {
             });
             return None;
         }
-        let name = self.current_token.value.clone();
+        let name = self.current_token.value.to_string();
         self.next_token();
 
         if self.current_token.token_type != TokenType::DoubleDots {
@@ -496,7 +496,7 @@ impl Parser {
                 });
                 return None;
             }
-            let name = self.current_token.value.clone();
+            let name = self.current_token.value.to_string();
             self.next_token();
 
             if self.current_token.token_type != TokenType::DoubleDots {
@@ -577,7 +577,7 @@ impl Parser {
             });
             return None;
         }
-        let extern_type = self.current_token.value.clone();
+        let extern_type = self.current_token.value.to_string();
         self.next_token();
 
         let public = self.current_token.token_type == TokenType::Keyword
@@ -628,7 +628,7 @@ impl Parser {
             });
             return None;
         }
-        let name = self.current_token.value.clone();
+        let name = self.current_token.value.to_string();
         self.next_token();
 
         if self.current_token.token_type != TokenType::LBrace {
@@ -656,7 +656,7 @@ impl Parser {
                     functions.entry(name.clone()).or_default().push(function);
                 }
             } else if self.current_token.token_type == TokenType::Identifier {
-                let field_name = self.current_token.value.clone();
+                let field_name = self.current_token.value.to_string();
                 self.next_token();
 
                 if self.current_token.token_type != TokenType::DoubleDots {
@@ -715,7 +715,7 @@ impl Parser {
             });
             return None;
         }
-        let name = self.current_token.value.clone();
+        let name = self.current_token.value.to_string();
         self.next_token();
 
         if self.current_token.token_type != TokenType::LBrace {
@@ -744,7 +744,7 @@ impl Parser {
                     functions.entry(name.clone()).or_default().push(function);
                 }
             } else if self.current_token.token_type == TokenType::Identifier {
-                let field_name = self.current_token.value.clone();
+                let field_name = self.current_token.value.to_string();
                 fields.push(field_name);
                 self.next_token();
             }
@@ -786,7 +786,7 @@ impl Parser {
             });
             return None;
         }
-        let identifier = self.current_token.value.clone();
+        let identifier = self.current_token.value.to_string();
         self.next_token();
 
         let mut datatype = None;
@@ -828,7 +828,7 @@ impl Parser {
             });
             return None;
         }
-        let alias = self.current_token.value.clone();
+        let alias = self.current_token.value.to_string();
         self.next_token();
 
         let datatype = self.parse_type()?;
@@ -854,7 +854,7 @@ impl Parser {
             });
             return None;
         }
-        let identifier = self.current_token.value.clone();
+        let identifier = self.current_token.value.to_string();
         self.next_token();
 
         let datatype = self.parse_type()?;
@@ -958,7 +958,7 @@ impl Parser {
 
     fn parse_string_literal(&mut self) -> Option<Expressions> {
         Some(Expressions::Value(
-            crate::value::Value::String(self.current_token.value.clone()),
+            crate::value::Value::String(self.current_token.value.to_string()),
             self.current_token.span,
         ))
     }
@@ -977,13 +977,13 @@ impl Parser {
         }
 
         Some(Expressions::Value(
-            crate::value::Value::Identifier(self.current_token.value.clone()),
+            crate::value::Value::Identifier(self.current_token.value.to_string()),
             self.current_token.span,
         ))
     }
 
     fn parse_prefix_expression(&mut self) -> Option<Expressions> {
-        let operator = self.current_token.value.clone();
+        let operator = self.current_token.value.to_string();
         let span_start = self.current_token.span.0;
 
         self.next_token();
@@ -1040,7 +1040,7 @@ impl Parser {
 
     fn parse_binary_expression(&mut self, left: Expressions) -> Option<Expressions> {
         let precedence = self.current_precedence();
-        let operator = self.current_token.value.clone();
+        let operator = self.current_token.value.to_string();
         self.next_token();
         let right = self.parse_expression(precedence)?;
 
@@ -1193,7 +1193,7 @@ impl Parser {
     }
 
     fn parse_struct_literal(&mut self) -> Option<Expressions> {
-        let name = self.current_token.value.clone();
+        let name = self.current_token.value.to_string();
         let span_start = self.current_token.span.0;
 
         self.next_token(); // consume identifier
@@ -1222,7 +1222,7 @@ impl Parser {
                 });
                 return None;
             }
-            let field_name = self.current_token.value.clone();
+            let field_name = self.current_token.value.to_string();
             self.next_token();
 
             if self.current_token.token_type != TokenType::Equal {
@@ -1381,7 +1381,7 @@ impl Parser {
                 Some(Type::Pointer(Box::new(inner_type)))
             }
             TokenType::Type => {
-                let type_name = self.current_token.value.clone();
+                let type_name = self.current_token.value.to_string();
                 self.next_token();
                 match type_name.as_str() {
                     "i8" => Some(Type::I8),
@@ -1402,7 +1402,7 @@ impl Parser {
                 }
             }
             TokenType::Identifier => {
-                let alias = self.current_token.value.clone();
+                let alias = self.current_token.value.to_string();
                 self.next_token();
                 Some(Type::Alias(alias))
             }
@@ -1509,7 +1509,7 @@ mod tests {
     #[test]
     fn test_let_statement() {
         let input = "let x = 5;".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1533,7 +1533,7 @@ mod tests {
     #[test]
     fn test_return_statement() {
         let input = "return 5;".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1553,7 +1553,7 @@ mod tests {
     #[test]
     fn test_infix_expression() {
         let input = "5 + 5;".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1582,7 +1582,7 @@ mod tests {
     #[test]
     fn test_operator_precedence() {
         let input = "-a * b".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -1610,7 +1610,7 @@ mod tests {
     #[test]
     fn test_function_call_expression() {
         let input = "add(1, 2 * 3, 4 + 5);".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -1670,7 +1670,7 @@ mod tests {
     #[test]
     fn test_fn_definition() {
         let input = "fn add(a: i32, b: i32) i32 { return a + b; }".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1700,7 +1700,7 @@ mod tests {
     #[test]
     fn test_array_literal() {
         let input = "[1, 2 * 2, 3 + 3]".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1716,7 +1716,7 @@ mod tests {
     #[test]
     fn test_slice_expression() {
         let input = "myArray[1 + 1]".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1742,7 +1742,7 @@ mod tests {
     #[test]
     fn test_struct_literal() {
         let input = "MyStruct { .a = 1, .b = 2 }".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1759,7 +1759,7 @@ mod tests {
     #[test]
     fn test_if_else_statement() {
         let input = "if (x < y) { x } else { y }".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1788,7 +1788,7 @@ mod tests {
     #[test]
     fn test_while_statement() {
         let input = "while (x < y) { x = x + 1 }".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1812,7 +1812,7 @@ mod tests {
     #[test]
     fn test_for_statement() {
         let input = "for i = 0 { x }".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1840,7 +1840,7 @@ mod tests {
     #[test]
     fn test_struct_definition() {
         let input = "struct Point { x: i32, y: i32 }".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1857,7 +1857,7 @@ mod tests {
     #[test]
     fn test_enum_definition() {
         let input = "enum Color { Red, Green, Blue }".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1874,7 +1874,7 @@ mod tests {
     #[test]
     fn test_binary_assign_statement() {
         let input = "x += 5;".to_string();
-        let mut parser = Parser::new(input.to_string(), "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1908,7 +1908,7 @@ mod tests {
     #[test]
     fn test_assign_statement() {
         let input = "x = 5;".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1934,7 +1934,7 @@ mod tests {
     #[test]
     fn test_typedef_statement() {
         let input = "typedef my_int i32;".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1958,7 +1958,7 @@ mod tests {
     #[test]
     fn test_extern_declare_statement() {
         let input = "_extern_declare my_var i32;".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1984,7 +1984,7 @@ mod tests {
     #[test]
     fn test_link_c_statement() {
         let input = "_link_c \"mylib.a\";".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -2004,7 +2004,7 @@ mod tests {
     #[test]
     fn test_break_statement() {
         let input = "break;".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -2021,7 +2021,7 @@ mod tests {
     fn test_pointer_related_parsing() {
         // Test let statement with pointer type
         let input = "let x: *i32 = &y;".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -2044,7 +2044,7 @@ mod tests {
 
         // Test dereference expression
         let input = "*x;".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -2055,7 +2055,7 @@ mod tests {
 
         // Test reference expression
         let input = "&y;".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -2066,7 +2066,8 @@ mod tests {
 
         // Test assignment to dereferenced pointer
         let input = "*x = 10;".to_string();
-        let mut parser = Parser::new(input.to_string(), "test.pay".to_string());
+        let s = input.to_string();
+        let mut parser = Parser::new(&s, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -2086,7 +2087,7 @@ mod tests {
 
         // Test function with pointer argument and return type
         let input = "fn foo(p: *i32) *i32 { return p; }".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -2107,7 +2108,7 @@ mod tests {
 
         // Test let statement with double pointer type
         let input = "let x: **i32;".to_string();
-        let mut parser = Parser::new(input, "test.pay".to_string());
+        let mut parser = Parser::new(&input, "test.pay".to_string());
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
