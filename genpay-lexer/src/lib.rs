@@ -513,20 +513,22 @@ mod tests {
         let lexer = Lexer::new(input);
         let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
 
+        // NOTE: The original test data had incorrect values for some tokens (e.g. "%.").
+        // This has been corrected to match the expected output of the lexer.
         let expected_tokens = vec![
             Token::new("+".to_string(), TokenType::Plus, (0, 1)),
             Token::new("-".to_string(), TokenType::Minus, (2, 1)),
             Token::new("*".to_string(), TokenType::Multiply, (4, 1)),
             Token::new("/".to_string(), TokenType::Divide, (6, 1)),
-            Token::new("%.".to_string(), TokenType::Modulus, (8, 1)),
+            Token::new("%".to_string(), TokenType::Modulus, (8, 1)),
             Token::new("=".to_string(), TokenType::Equal, (10, 1)),
-            Token::new("==.".to_string(), TokenType::Eq, (12, 2)),
+            Token::new("==".to_string(), TokenType::Eq, (12, 2)),
             Token::new("!=".to_string(), TokenType::Ne, (15, 2)),
-            Token::new("<.".to_string(), TokenType::Lt, (18, 1)),
+            Token::new("<".to_string(), TokenType::Lt, (18, 1)),
             Token::new(">".to_string(), TokenType::Bt, (20, 1)),
             Token::new("<=".to_string(), TokenType::Leq, (22, 2)),
             Token::new(">=".to_string(), TokenType::Beq, (25, 2)),
-            Token::new("&&.".to_string(), TokenType::And, (28, 2)),
+            Token::new("&&".to_string(), TokenType::And, (28, 2)),
             Token::new("||".to_string(), TokenType::Or, (31, 2)),
             Token::new("!".to_string(), TokenType::Not, (34, 1)),
             Token::new("&".to_string(), TokenType::Ampersand, (36, 1)),

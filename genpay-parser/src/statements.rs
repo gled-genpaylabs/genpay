@@ -1,5 +1,5 @@
 use crate::{expressions::Expressions, types::Type};
-use indexmap::IndexMap;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statements {
@@ -83,8 +83,8 @@ pub enum Statements {
     /// ```
     StructDefineStatement {
         name: String,
-        fields: IndexMap<String, Type>,
-        functions: IndexMap<String, Vec<Statements>>,
+        fields: BTreeMap<String, Type>,
+        functions: BTreeMap<String, Vec<Statements>>,
         public: bool,
         span: (usize, usize),
     },
@@ -100,7 +100,7 @@ pub enum Statements {
     EnumDefineStatement {
         name: String,
         fields: Vec<String>,
-        functions: IndexMap<String, Vec<Statements>>,
+        functions: BTreeMap<String, Vec<Statements>>,
         public: bool,
         span: (usize, usize),
     },
