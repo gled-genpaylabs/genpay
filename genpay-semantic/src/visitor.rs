@@ -279,6 +279,13 @@ impl Analyzer {
                     });
                 }
             }
+            Statements::MacroCallStatement {
+                name,
+                arguments,
+                span,
+            } => {
+                self.verify_macrocall(name, arguments, span);
+            }
             _ => {}
         }
     }
@@ -656,11 +663,6 @@ impl Analyzer {
                     Type::Void
                 }
             }
-            Expressions::MacroCall {
-                name,
-                arguments,
-                span,
-            } => self.verify_macrocall(name, arguments, span),
             _ => todo!(),
         }
     }

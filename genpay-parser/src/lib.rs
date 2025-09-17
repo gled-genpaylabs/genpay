@@ -145,9 +145,43 @@ impl<'a> Parser<'a> {
             TokenType::Keyword if self.current_token.value == "break" => {
                 self.parse_break_statement()
             }
+            TokenType::Identifier if self.peek_token.token_type == TokenType::Not => {
+                self.parse_macro_call_statement()
+            }
             TokenType::LBrace => self.parse_block_statement(),
             _ => self.parse_expression_statement(),
         }
+    }
+
+    fn parse_macro_call_statement(&mut self) -> Option<Statements> {
+        let name = self.current_token.value.to_string();
+        let span_start = self.current_token.span.0;
+
+        self.next_token(); // consume identifier
+        self.next_token(); // consume '!'
+
+        if self.current_token.token_type != TokenType::LParen {
+            self.errors.push(ParserError {
+                exception: "Expected '(' after macro name".to_string(),
+                help: "Expected '('".to_string(),
+                src: self.source.clone(),
+                span: self.current_token.span,
+            });
+            return None;
+        }
+
+        let arguments = self.parse_expression_list(TokenType::RParen)?;
+        let span_end = self.current_token.span.1;
+
+        if self.peek_token.token_type == TokenType::Semicolon {
+            self.next_token();
+        }
+
+        Some(Statements::MacroCallStatement {
+            name,
+            arguments,
+            span: (span_start, span_end),
+        })
     }
 
     fn parse_expression_statement(&mut self) -> Option<Statements> {
