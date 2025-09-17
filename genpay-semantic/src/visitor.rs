@@ -100,7 +100,12 @@ impl Analyzer {
             }
             Statements::ReturnStatement { value, span } => {
                 let ret_type = self.visit_expression(value, Some(self.scope.expected.clone()));
-                if ret_type != self.scope.expected {
+
+                // Allow i64 literals to be cast to i32 in return statements.
+                let is_i64_to_i32_cast =
+                    ret_type == Type::I64 && self.scope.expected == Type::I32;
+
+                if ret_type != self.scope.expected && !is_i64_to_i32_cast {
                     self.error(SemanticError::TypesMismatch {
                         exception: format!(
                             "Expected return type `{}`, but found type `{}`.",
@@ -651,6 +656,11 @@ impl Analyzer {
                     Type::Void
                 }
             }
+            Expressions::MacroCall {
+                name,
+                arguments,
+                span,
+            } => self.verify_macrocall(name, arguments, span),
             _ => todo!(),
         }
     }
@@ -719,8 +729,29 @@ impl Analyzer {
         }
     }
 
-    pub fn verify_macrocall(&mut self, name: &str, arguments: &[Expressions], span: &(usize, usize)) -> Type {
-        todo!()
+    pub fn verify_macrocall(
+        &mut self,
+        name: &str,
+        arguments: &[Expressions],
+        span: &(usize, usize),
+    ) -> Type {
+        match name {
+            "println" => {
+                for arg in arguments {
+                    self.visit_expression(arg, None);
+                }
+                Type::Void
+            }
+            _ => {
+                self.error(SemanticError::UnresolvedName {
+                    exception: format!("Macro `{}` not found.", name),
+                    help: None,
+                    src: self.source.clone(),
+                    span: (*span).into(),
+                });
+                Type::Void
+            }
+        }
     }
 
     pub fn expand_library_path(&self, path: &str, is_module: bool) -> Result<PathBuf, String> {
