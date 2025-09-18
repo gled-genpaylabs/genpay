@@ -1,6 +1,6 @@
-use bumpalo::{collections::Vec, Bump};
-use genpay_lexer::token::Token;
+use bumpalo::{Bump, collections::Vec};
 use genpay_lexer::Lexer;
+use genpay_lexer::token::Token;
 
 pub mod error;
 pub mod expressions;
@@ -27,21 +27,21 @@ pub struct Parser<'a, 'bump> {
 
 #[derive(PartialEq, PartialOrd, Debug, Clone, Copy)]
 enum Precedence {
-    LOWEST,
-    LOGICALOR,
-    LOGICALAND,
-    BITWISEOR,
-    BITWISEXOR,
-    BITWISEAND,
-    EQUALS,
-    LESSGREATER,
-    SHIFT,
-    SUM,
-    PRODUCT,
-    PREFIX,
-    CALL,
-    INDEX,
-    MEMBER,
+    Lowest,
+    LogicalOr,
+    LogicalAnd,
+    BitwiseOr,
+    BitwiseXor,
+    BitwiseAnd,
+    Equals,
+    LessGreater,
+    Shift,
+    Sum,
+    Product,
+    Prefix,
+    Call,
+    Index,
+    Member,
 }
 
 use genpay_lexer::token_type::TokenType;
@@ -157,12 +157,12 @@ where
     }
 
     fn parse_expression_statement(&mut self) -> Option<Statements<'bump>> {
-        let expression = self.parse_expression(Precedence::LOWEST)?;
+        let expression = self.parse_expression(Precedence::Lowest)?;
 
         if self.peek_token.token_type == TokenType::Equal {
             self.next_token(); // current is now '='
             self.next_token(); // current is now the start of the value expression
-            let value = self.parse_expression(Precedence::LOWEST)?;
+            let value = self.parse_expression(Precedence::Lowest)?;
             let span = (expression.get_span().0, value.get_span().1);
 
             if self.peek_token.token_type == TokenType::Semicolon {
@@ -184,7 +184,7 @@ where
             self.next_token(); // current is now the operator
             let operator = self.current_token.value.to_string();
             self.next_token(); // current is now the start of the value expression
-            let value = self.parse_expression(Precedence::LOWEST)?;
+            let value = self.parse_expression(Precedence::Lowest)?;
             let span = (expression.get_span().0, value.get_span().1);
 
             if self.peek_token.token_type == TokenType::Semicolon {
@@ -210,7 +210,7 @@ where
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'return'
 
-        let value = self.parse_expression(Precedence::LOWEST)?;
+        let value = self.parse_expression(Precedence::Lowest)?;
 
         if self.peek_token.token_type == TokenType::Semicolon {
             self.next_token();
@@ -250,7 +250,7 @@ where
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'if'
 
-        let condition = self.parse_expression(Precedence::LOWEST)?;
+        let condition = self.parse_expression(Precedence::Lowest)?;
 
         if self.peek_token.token_type != TokenType::LBrace {
             self.errors.push(ParserError {
@@ -293,7 +293,7 @@ where
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'while'
 
-        let condition = self.parse_expression(Precedence::LOWEST)?;
+        let condition = self.parse_expression(Precedence::Lowest)?;
 
         if self.peek_token.token_type != TokenType::LBrace {
             self.errors.push(ParserError {
@@ -347,7 +347,7 @@ where
         }
         self.next_token();
 
-        let iterator = self.parse_expression(Precedence::LOWEST)?;
+        let iterator = self.parse_expression(Precedence::Lowest)?;
 
         if self.peek_token.token_type != TokenType::LBrace {
             self.errors.push(ParserError {
@@ -482,14 +482,14 @@ where
         while self.current_token.token_type == TokenType::Comma {
             self.next_token();
 
-            if self.current_token.token_type == TokenType::Dot {
+            if self.current_token.token_type == TokenType::Dot
+                && self.peek_token.token_type == TokenType::Dot
+            {
+                self.next_token();
                 if self.peek_token.token_type == TokenType::Dot {
                     self.next_token();
-                    if self.peek_token.token_type == TokenType::Dot {
-                        self.next_token();
-                        is_var_args = true;
-                        break;
-                    }
+                    is_var_args = true;
+                    break;
                 }
             }
 
@@ -538,7 +538,7 @@ where
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'import'
 
-        let path = self.parse_expression(Precedence::LOWEST)?;
+        let path = self.parse_expression(Precedence::Lowest)?;
 
         if self.peek_token.token_type == TokenType::Semicolon {
             self.next_token();
@@ -556,7 +556,7 @@ where
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'include'
 
-        let path = self.parse_expression(Precedence::LOWEST)?;
+        let path = self.parse_expression(Precedence::Lowest)?;
 
         if self.peek_token.token_type == TokenType::Semicolon {
             self.next_token();
@@ -817,7 +817,7 @@ where
         let mut value = None;
         if self.current_token.token_type == TokenType::Equal {
             self.next_token();
-            value = self.parse_expression(Precedence::LOWEST);
+            value = self.parse_expression(Precedence::Lowest);
         }
 
         if self.peek_token.token_type == TokenType::Semicolon {
@@ -890,7 +890,7 @@ where
         let span_start = self.current_token.span.0;
         self.next_token(); // consume '_link_c'
 
-        let path = self.parse_expression(Precedence::LOWEST)?;
+        let path = self.parse_expression(Precedence::Lowest)?;
         let span_end = path.get_span().1;
 
         Some(Statements::LinkCStatement {
@@ -1007,7 +1007,7 @@ where
 
         self.next_token();
 
-        let right = self.parse_expression(Precedence::PREFIX);
+        let right = self.parse_expression(Precedence::Prefix);
 
         right.map(|right_expr| {
             let span_end = right_expr.get_span().1;
@@ -1102,12 +1102,12 @@ where
         }
 
         let mut expressions = Vec::new_in(self.bump);
-        expressions.push(self.parse_expression(Precedence::LOWEST)?);
+        expressions.push(self.parse_expression(Precedence::Lowest)?);
 
         while self.peek_token.token_type == TokenType::Comma {
             self.next_token();
             self.next_token();
-            expressions.push(self.parse_expression(Precedence::LOWEST)?);
+            expressions.push(self.parse_expression(Precedence::Lowest)?);
         }
 
         if self.peek_token.token_type != TokenType::RParen {
@@ -1171,12 +1171,12 @@ where
         }
 
         self.next_token();
-        list.push(self.parse_expression(Precedence::LOWEST)?);
+        list.push(self.parse_expression(Precedence::Lowest)?);
 
         while self.peek_token.token_type == TokenType::Comma {
             self.next_token();
             self.next_token();
-            list.push(self.parse_expression(Precedence::LOWEST)?);
+            list.push(self.parse_expression(Precedence::Lowest)?);
         }
 
         if self.peek_token.token_type != end {
@@ -1258,7 +1258,7 @@ where
             }
             self.next_token();
 
-            let value = self.parse_expression(Precedence::LOWEST)?;
+            let value = self.parse_expression(Precedence::Lowest)?;
             fields.insert(field_name, value);
 
             if self.peek_token.token_type == TokenType::RBrace {
@@ -1333,7 +1333,7 @@ where
         self.next_token(); // Consume the dot
 
         let mut subelements = Vec::new_in(self.bump);
-        if let Some(expr) = self.parse_expression(Precedence::MEMBER) {
+        if let Some(expr) = self.parse_expression(Precedence::Member) {
             subelements.push(expr);
         } else {
             return None; // or handle error
@@ -1354,7 +1354,7 @@ where
     fn parse_slice_expression(&mut self, left: Expressions<'bump>) -> Option<Expressions<'bump>> {
         let span_start = left.get_span().0;
         self.next_token();
-        let index = self.parse_expression(Precedence::LOWEST)?;
+        let index = self.parse_expression(Precedence::Lowest)?;
 
         if self.peek_token.token_type != TokenType::RBrack {
             self.errors.push(ParserError {
@@ -1378,22 +1378,22 @@ where
 
     fn get_precedence(&self, token_type: &TokenType) -> Precedence {
         match token_type {
-            TokenType::Plus | TokenType::Minus => Precedence::SUM,
-            TokenType::Divide | TokenType::Multiply | TokenType::Modulus => Precedence::PRODUCT,
-            TokenType::Eq | TokenType::Ne => Precedence::EQUALS,
+            TokenType::Plus | TokenType::Minus => Precedence::Sum,
+            TokenType::Divide | TokenType::Multiply | TokenType::Modulus => Precedence::Product,
+            TokenType::Eq | TokenType::Ne => Precedence::Equals,
             TokenType::Lt | TokenType::Bt | TokenType::Leq | TokenType::Beq => {
-                Precedence::LESSGREATER
+                Precedence::LessGreater
             }
-            TokenType::And => Precedence::LOGICALAND,
-            TokenType::Or => Precedence::LOGICALOR,
-            TokenType::LShift | TokenType::RShift => Precedence::SHIFT,
-            TokenType::Ampersand => Precedence::BITWISEAND,
-            TokenType::Verbar => Precedence::BITWISEOR,
-            TokenType::Xor => Precedence::BITWISEXOR,
-            TokenType::LParen => Precedence::CALL,
-            TokenType::LBrack => Precedence::INDEX,
-            TokenType::Dot => Precedence::MEMBER,
-            _ => Precedence::LOWEST,
+            TokenType::And => Precedence::LogicalAnd,
+            TokenType::Or => Precedence::LogicalOr,
+            TokenType::LShift | TokenType::RShift => Precedence::Shift,
+            TokenType::Ampersand => Precedence::BitwiseAnd,
+            TokenType::Verbar => Precedence::BitwiseOr,
+            TokenType::Xor => Precedence::BitwiseXor,
+            TokenType::LParen => Precedence::Call,
+            TokenType::LBrack => Precedence::Index,
+            TokenType::Dot => Precedence::Member,
+            _ => Precedence::Lowest,
         }
     }
 
@@ -1420,7 +1420,7 @@ where
                     "u16" => Some(Type::U16),
                     "u32" => Some(Type::U32),
                     "u64" => Some(Type::U64),
-                    "usize" => Some(Type::USIZE),
+                    "usize" => Some(Type::Usize),
                     "f32" => Some(Type::F32),
                     "f64" => Some(Type::F64),
                     "bool" => Some(Type::Bool),
@@ -2085,10 +2085,7 @@ mod tests {
             assert_eq!(datatype, &Some(Type::Pointer(bump.alloc(Type::I32))));
             assert!(matches!(value, Some(Expressions::Reference { .. })));
         } else {
-            panic!(
-                "Failed to parse let statement with pointer type. Got: {:?}",
-                statement
-            );
+            panic!("Failed to parse let statement with pointer type. Got: {statement:?}");
         }
 
         // Test dereference expression
@@ -2131,10 +2128,7 @@ mod tests {
                 panic!("Wrong value in assignment");
             }
         } else {
-            panic!(
-                "Failed to parse assignment to dereferenced pointer. Got: {:?}",
-                statement
-            );
+            panic!("Failed to parse assignment to dereferenced pointer. Got: {statement:?}");
         }
 
         // Test function with pointer argument and return type
@@ -2153,10 +2147,7 @@ mod tests {
             assert_eq!(arguments[0].1, Type::Pointer(bump.alloc(Type::I32)));
             assert_eq!(*datatype, Type::Pointer(bump.alloc(Type::I32)));
         } else {
-            panic!(
-                "Failed to parse function with pointer. Got: {:?}",
-                statement
-            );
+            panic!("Failed to parse function with pointer. Got: {statement:?}");
         }
 
         // Test let statement with double pointer type
@@ -2169,13 +2160,12 @@ mod tests {
         if let Statements::AnnotationStatement { datatype, .. } = statement {
             assert_eq!(
                 datatype,
-                &Some(Type::Pointer(bump.alloc(Type::Pointer(bump.alloc(Type::I32)))))
+                &Some(Type::Pointer(
+                    bump.alloc(Type::Pointer(bump.alloc(Type::I32)))
+                ))
             );
         } else {
-            panic!(
-                "Failed to parse let statement with double pointer. Got: {:?}",
-                statement
-            );
+            panic!("Failed to parse let statement with double pointer. Got: {statement:?}");
         }
     }
 }

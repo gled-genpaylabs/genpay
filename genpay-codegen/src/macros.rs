@@ -340,10 +340,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                 let _ = self.builder.build_call(sprintf_fn, &call_arguments, "");
 
-                (
-                    Type::Pointer(self.bump.alloc(Type::Char)),
-                    buffer.into(),
-                )
+                (Type::Pointer(self.bump.alloc(Type::Char)), buffer.into())
             }
             "panic" => {
                 let (mut literal, call_line) =
@@ -435,7 +432,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     }
                 };
 
-                (Type::USIZE, basic_type.size_of().unwrap().into())
+                (Type::Usize, basic_type.size_of().unwrap().into())
             }
             "cast" => {
                 let from = arguments.first().unwrap().clone();
@@ -450,8 +447,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                     // integer types cast
                     (from, to)
-                        if visitor::is_integer(from)
-                            && visitor::is_integer(to)
+                        if visitor::is_integer(from) && visitor::is_integer(to)
                             || from == &Type::Char
                             || to == &Type::Char
                             || from == &Type::Bool
@@ -504,10 +500,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     }
 
                     // float types casts
-                    (from, to)
-                        if visitor::is_float(from)
-                            && visitor::is_float(to) =>
-                    {
+                    (from, to) if visitor::is_float(from) && visitor::is_float(to) => {
                         let from_order = visitor::float_order(from);
                         let to_order = visitor::float_order(to);
 
@@ -537,10 +530,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     }
 
                     // `float -> integer` cast
-                    (from, to)
-                        if visitor::is_float(from)
-                            && visitor::is_integer(to) =>
-                    {
+                    (from, to) if visitor::is_float(from) && visitor::is_integer(to) => {
                         let unsigned = visitor::is_unsigned_integer(to);
 
                         let value = if unsigned {
@@ -567,10 +557,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     }
 
                     // `integer -> float` cast
-                    (from, to)
-                        if visitor::is_integer(from)
-                            && visitor::is_float(to) =>
-                    {
+                    (from, to) if visitor::is_integer(from) && visitor::is_float(to) => {
                         let unsigned = visitor::is_unsigned_integer(from);
 
                         let value = if unsigned {
@@ -597,10 +584,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     }
 
                     // `pointer -> integer` cast
-                    (from, to)
-                        if matches!(from, &Type::Pointer(_))
-                            && visitor::is_integer(to) =>
-                    {
+                    (from, to) if matches!(from, &Type::Pointer(_)) && visitor::is_integer(to) => {
                         let value = self
                             .builder
                             .build_ptr_to_int(
@@ -614,10 +598,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     }
 
                     // `integer -> pointer` cast
-                    (from, to)
-                        if visitor::is_integer(from)
-                            && matches!(to, &Type::Pointer(_)) =>
-                    {
+                    (from, to) if visitor::is_integer(from) && matches!(to, &Type::Pointer(_)) => {
                         let value = self
                             .builder
                             .build_int_to_ptr(

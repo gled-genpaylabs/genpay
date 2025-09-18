@@ -28,6 +28,12 @@ pub struct Variable<'bump> {
     pub used: bool,
 }
 
+impl<'bump> Default for Scope<'bump> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'bump> Scope<'bump> {
     pub fn new() -> Self {
         Scope {

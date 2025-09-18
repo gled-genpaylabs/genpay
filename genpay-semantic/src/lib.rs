@@ -12,14 +12,12 @@ mod element;
 mod error;
 mod macros;
 mod scope;
-pub mod visitor;
 /// Semantic Analyzer Symbol Table
 pub mod symtable;
+pub mod visitor;
 
 pub type SemanticOk<'bump> = (SymbolTable<'bump>, Vec<SemanticWarning>);
 pub type SemanticErr = (Vec<SemanticError>, Vec<SemanticWarning>);
-
-const STANDARD_LIBRARY_VAR: &str = "GENPAY_LIB";
 
 /// Main Analyzer Struct
 #[derive(Debug)]
@@ -62,30 +60,12 @@ impl<'bump> Analyzer<'bump> {
         });
 
         let mut macros = analyzer.compiler_macros.borrow_mut();
-        macros.insert(
-            "print".to_string(),
-            Rc::new(macros::PrintMacro),
-        );
-        macros.insert(
-            "println".to_string(),
-            Rc::new(macros::PrintlnMacro),
-        );
-        macros.insert(
-            "format".to_string(),
-            Rc::new(macros::FormatMacro),
-        );
-        macros.insert(
-            "panic".to_string(),
-            Rc::new(macros::PanicMacro),
-        );
-        macros.insert(
-            "sizeof".to_string(),
-            Rc::new(macros::SizeofMacro),
-        );
-        macros.insert(
-            "cast".to_string(),
-            Rc::new(macros::CastMacro),
-        );
+        macros.insert("print".to_string(), Rc::new(macros::PrintMacro));
+        macros.insert("println".to_string(), Rc::new(macros::PrintlnMacro));
+        macros.insert("format".to_string(), Rc::new(macros::FormatMacro));
+        macros.insert("panic".to_string(), Rc::new(macros::PanicMacro));
+        macros.insert("sizeof".to_string(), Rc::new(macros::SizeofMacro));
+        macros.insert("cast".to_string(), Rc::new(macros::CastMacro));
 
         analyzer.clone()
     }
@@ -121,10 +101,7 @@ impl<'bump> Analyzer<'bump> {
         }
 
         if !self.errors.borrow().is_empty() {
-            return Err((
-                self.errors.borrow().clone(),
-                self.warnings.borrow().clone(),
-            ));
+            return Err((self.errors.borrow().clone(), self.warnings.borrow().clone()));
         }
 
         Ok((

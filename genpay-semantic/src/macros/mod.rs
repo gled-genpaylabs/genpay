@@ -28,12 +28,19 @@ pub trait MacroObject<'bump>: std::fmt::Debug {
 /// Enumeration of all existing macros
 #[derive(Debug, Clone)]
 pub enum CompilerMacros {
+    #[allow(dead_code)]
     PrintMacro(PrintMacro),
+    #[allow(dead_code)]
     PrintlnMacro(PrintlnMacro),
+    #[allow(dead_code)]
     FormatMacro(FormatMacro),
+    #[allow(dead_code)]
     PanicMacro(PanicMacro),
+    #[allow(dead_code)]
     SizeofMacro(SizeofMacro),
+    #[allow(dead_code)]
     CastMacro(CastMacro),
+    #[allow(dead_code)]
     None,
 }
 

@@ -1,3 +1,8 @@
+use jemallocator::Jemalloc;
+
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
+
 use bumpalo::Bump;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
