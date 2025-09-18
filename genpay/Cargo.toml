@@ -14,6 +14,7 @@ inkwell = { version = "0.5.0", features = ["llvm18-0"] }
 llvm-sys = { version = "180", features = ["prefer-dynamic"] }
 colored = "3.0.0"
 thiserror = "2.0.12"
+bumpalo = { version = "3.19.0", features = ["collections"] }
 
 genpay-lexer = { path = "../genpay-lexer" }
 genpay-parser = { path = "../genpay-parser" }

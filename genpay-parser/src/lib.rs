@@ -1,5 +1,6 @@
-use genpay_lexer::Lexer;
+use bumpalo::{collections::Vec, Bump};
 use genpay_lexer::token::Token;
+use genpay_lexer::Lexer;
 
 pub mod error;
 pub mod expressions;
@@ -13,14 +14,15 @@ use crate::statements::Statements;
 use crate::types::Type;
 use miette::NamedSource;
 
-pub type Program = Vec<Statements>;
+pub type Program<'bump> = Vec<'bump, Statements<'bump>>;
 
-pub struct Parser<'a> {
+pub struct Parser<'a, 'bump> {
     lexer: Lexer<'a>,
     current_token: Token<'a>,
     peek_token: Token<'a>,
     source: NamedSource<String>,
-    errors: Vec<ParserError>,
+    errors: std::vec::Vec<ParserError>,
+    bump: &'bump Bump,
 }
 
 #[derive(PartialEq, PartialOrd, Debug, Clone, Copy)]
@@ -44,8 +46,11 @@ enum Precedence {
 
 use genpay_lexer::token_type::TokenType;
 
-impl<'a> Parser<'a> {
-    pub fn new(source: &'a str, filename: String) -> Self {
+impl<'a, 'bump> Parser<'a, 'bump>
+where
+    'a: 'bump,
+{
+    pub fn new(source: &'a str, filename: String, bump: &'bump Bump) -> Self {
         let mut lexer = Lexer::new(source);
         let current_token = match lexer.next() {
             Some(Ok(token)) => token,
@@ -68,12 +73,13 @@ impl<'a> Parser<'a> {
             current_token,
             peek_token,
             source: NamedSource::new(filename, source.to_string()),
-            errors: Vec::new(),
+            errors: std::vec::Vec::new(),
+            bump,
         }
     }
 
-    pub fn parse(&mut self) -> Result<Program, Vec<ParserError>> {
-        let mut program: Program = Vec::new();
+    pub fn parse(&mut self) -> Result<Program<'bump>, std::vec::Vec<ParserError>> {
+        let mut program: Program<'bump> = Vec::new_in(self.bump);
 
         while self.current_token.token_type != TokenType::EOF {
             if let Some(statement) = self.parse_statement() {
@@ -106,7 +112,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_statement(&mut self) -> Option<Statements> {
+    fn parse_statement(&mut self) -> Option<Statements<'bump>> {
         match self.current_token.token_type {
             TokenType::Keyword if self.current_token.value == "let" => self.parse_let_statement(),
             TokenType::Keyword if self.current_token.value == "return" => {
@@ -150,7 +156,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_expression_statement(&mut self) -> Option<Statements> {
+    fn parse_expression_statement(&mut self) -> Option<Statements<'bump>> {
         let expression = self.parse_expression(Precedence::LOWEST)?;
 
         if self.peek_token.token_type == TokenType::Equal {
@@ -200,7 +206,7 @@ impl<'a> Parser<'a> {
         Some(Statements::Expression(expression))
     }
 
-    fn parse_return_statement(&mut self) -> Option<Statements> {
+    fn parse_return_statement(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'return'
 
@@ -218,11 +224,11 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_block_statement(&mut self) -> Option<Statements> {
+    fn parse_block_statement(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume '{'
 
-        let mut statements = vec![];
+        let mut statements = Vec::new_in(self.bump);
         while self.current_token.token_type != TokenType::RBrace
             && self.current_token.token_type != TokenType::EOF
         {
@@ -240,7 +246,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_if_statement(&mut self) -> Option<Statements> {
+    fn parse_if_statement(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'if'
 
@@ -283,7 +289,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_while_statement(&mut self) -> Option<Statements> {
+    fn parse_while_statement(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'while'
 
@@ -314,7 +320,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_for_statement(&mut self) -> Option<Statements> {
+    fn parse_for_statement(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'for'
 
@@ -369,7 +375,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_fn_statement(&mut self) -> Option<Statements> {
+    fn parse_fn_statement(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         let public = self.current_token.value == "pub";
         if public {
@@ -438,8 +444,8 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_function_parameters(&mut self) -> Option<(Vec<(String, Type)>, bool)> {
-        let mut params = Vec::new();
+    fn parse_function_parameters(&mut self) -> Option<(Vec<'bump, (String, Type<'bump>)>, bool)> {
+        let mut params = Vec::new_in(self.bump);
         let mut is_var_args = false;
 
         if self.current_token.token_type == TokenType::RParen {
@@ -528,7 +534,7 @@ impl<'a> Parser<'a> {
         Some((params, is_var_args))
     }
 
-    fn parse_import_statement(&mut self) -> Option<Statements> {
+    fn parse_import_statement(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'import'
 
@@ -546,7 +552,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_include_statement(&mut self) -> Option<Statements> {
+    fn parse_include_statement(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'include'
 
@@ -564,7 +570,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_extern_statement(&mut self) -> Option<Statements> {
+    fn parse_extern_statement(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'extern'
 
@@ -599,7 +605,13 @@ impl<'a> Parser<'a> {
             let span_end = self.current_token.span.1;
             Some(Statements::ExternStatement {
                 identifier: name,
-                arguments: arguments.into_iter().map(|(_, t)| t).collect(),
+                arguments: {
+                    let mut args = Vec::new_in(self.bump);
+                    for (_, t) in arguments {
+                        args.push(t);
+                    }
+                    args
+                },
                 return_type: datatype,
                 extern_type,
                 is_var_args,
@@ -611,7 +623,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_struct_definition(&mut self) -> Option<Statements> {
+    fn parse_struct_definition(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         let public = self.current_token.value == "pub";
         if public {
@@ -643,7 +655,8 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         let mut fields = std::collections::BTreeMap::new();
-        let mut functions: std::collections::BTreeMap<String, Vec<Statements>> = std::collections::BTreeMap::new();
+        let mut functions: std::collections::BTreeMap<String, Vec<'bump, Statements<'bump>>> =
+            std::collections::BTreeMap::new();
 
         while self.current_token.token_type != TokenType::RBrace
             && self.current_token.token_type != TokenType::EOF
@@ -653,7 +666,10 @@ impl<'a> Parser<'a> {
             {
                 let function = self.parse_fn_statement()?;
                 if let Statements::FunctionDefineStatement { ref name, .. } = function {
-                    functions.entry(name.clone()).or_default().push(function);
+                    functions
+                        .entry(name.clone())
+                        .or_insert_with(|| Vec::new_in(self.bump))
+                        .push(function);
                 }
             } else if self.current_token.token_type == TokenType::Identifier {
                 let field_name = self.current_token.value.to_string();
@@ -698,7 +714,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_enum_definition(&mut self) -> Option<Statements> {
+    fn parse_enum_definition(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         let public = self.current_token.value == "pub";
         if public {
@@ -729,8 +745,8 @@ impl<'a> Parser<'a> {
         }
         self.next_token();
 
-        let mut fields = vec![];
-        let mut functions: std::collections::BTreeMap<String, Vec<Statements>> =
+        let mut fields = Vec::new_in(self.bump);
+        let mut functions: std::collections::BTreeMap<String, Vec<'bump, Statements<'bump>>> =
             std::collections::BTreeMap::new();
 
         while self.current_token.token_type != TokenType::RBrace
@@ -741,7 +757,10 @@ impl<'a> Parser<'a> {
             {
                 let function = self.parse_fn_statement()?;
                 if let Statements::FunctionDefineStatement { ref name, .. } = function {
-                    functions.entry(name.clone()).or_default().push(function);
+                    functions
+                        .entry(name.clone())
+                        .or_insert_with(|| Vec::new_in(self.bump))
+                        .push(function);
                 }
             } else if self.current_token.token_type == TokenType::Identifier {
                 let field_name = self.current_token.value.to_string();
@@ -773,7 +792,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_let_statement(&mut self) -> Option<Statements> {
+    fn parse_let_statement(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'let'
 
@@ -815,7 +834,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_typedef_statement(&mut self) -> Option<Statements> {
+    fn parse_typedef_statement(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume 'typedef'
 
@@ -841,7 +860,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_extern_declare_statement(&mut self) -> Option<Statements> {
+    fn parse_extern_declare_statement(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume '_extern_declare'
 
@@ -867,7 +886,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_link_c_statement(&mut self) -> Option<Statements> {
+    fn parse_link_c_statement(&mut self) -> Option<Statements<'bump>> {
         let span_start = self.current_token.span.0;
         self.next_token(); // consume '_link_c'
 
@@ -880,13 +899,13 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_break_statement(&mut self) -> Option<Statements> {
+    fn parse_break_statement(&mut self) -> Option<Statements<'bump>> {
         let span = self.current_token.span;
         self.next_token(); // consume 'break'
         Some(Statements::BreakStatements { span })
     }
 
-    fn parse_expression(&mut self, precedence: Precedence) -> Option<Expressions> {
+    fn parse_expression(&mut self, precedence: Precedence) -> Option<Expressions<'bump>> {
         let mut left_expr = match self.parse_prefix() {
             Ok(expr) => expr,
             Err(_) => return None,
@@ -900,7 +919,7 @@ impl<'a> Parser<'a> {
         Some(left_expr)
     }
 
-    fn parse_prefix(&mut self) -> Result<Expressions, ()> {
+    fn parse_prefix(&mut self) -> Result<Expressions<'bump>, ()> {
         match self.current_token.token_type {
             TokenType::Number => self.parse_integer_literal().ok_or(()),
             TokenType::FloatNumber => self.parse_float_literal().ok_or(()),
@@ -916,7 +935,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_integer_literal(&mut self) -> Option<Expressions> {
+    fn parse_integer_literal(&mut self) -> Option<Expressions<'bump>> {
         let value = match self.current_token.value.parse::<i64>() {
             Ok(v) => v,
             Err(_) => {
@@ -936,7 +955,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_float_literal(&mut self) -> Option<Expressions> {
+    fn parse_float_literal(&mut self) -> Option<Expressions<'bump>> {
         let value = match self.current_token.value.parse::<f64>() {
             Ok(v) => v,
             Err(_) => {
@@ -956,14 +975,14 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_string_literal(&mut self) -> Option<Expressions> {
+    fn parse_string_literal(&mut self) -> Option<Expressions<'bump>> {
         Some(Expressions::Value(
             crate::value::Value::String(self.current_token.value.to_string()),
             self.current_token.span,
         ))
     }
 
-    fn parse_boolean_literal(&mut self) -> Option<Expressions> {
+    fn parse_boolean_literal(&mut self) -> Option<Expressions<'bump>> {
         let value = self.current_token.value == "true";
         Some(Expressions::Value(
             crate::value::Value::Boolean(value),
@@ -971,7 +990,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_identifier(&mut self) -> Option<Expressions> {
+    fn parse_identifier(&mut self) -> Option<Expressions<'bump>> {
         if self.peek_token.token_type == TokenType::LBrace {
             return self.parse_struct_literal();
         }
@@ -982,7 +1001,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_prefix_expression(&mut self) -> Option<Expressions> {
+    fn parse_prefix_expression(&mut self) -> Option<Expressions<'bump>> {
         let operator = self.current_token.value.to_string();
         let span_start = self.current_token.span.0;
 
@@ -994,23 +1013,23 @@ impl<'a> Parser<'a> {
             let span_end = right_expr.get_span().1;
             match operator.as_str() {
                 "&" => Expressions::Reference {
-                    object: Box::new(right_expr),
+                    object: self.bump.alloc(right_expr),
                     span: (span_start, span_end),
                 },
                 "*" => Expressions::Dereference {
-                    object: Box::new(right_expr),
+                    object: self.bump.alloc(right_expr),
                     span: (span_start, span_end),
                 },
                 _ => Expressions::Unary {
                     operand: operator,
-                    object: Box::new(right_expr),
+                    object: self.bump.alloc(right_expr),
                     span: (span_start, span_end),
                 },
             }
         })
     }
 
-    fn parse_infix(&mut self, left: Expressions) -> Option<Expressions> {
+    fn parse_infix(&mut self, left: Expressions<'bump>) -> Option<Expressions<'bump>> {
         match self.current_token.token_type {
             TokenType::Plus
             | TokenType::Minus
@@ -1038,7 +1057,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_binary_expression(&mut self, left: Expressions) -> Option<Expressions> {
+    fn parse_binary_expression(&mut self, left: Expressions<'bump>) -> Option<Expressions<'bump>> {
         let precedence = self.current_precedence();
         let operator = self.current_token.value.to_string();
         self.next_token();
@@ -1048,21 +1067,21 @@ impl<'a> Parser<'a> {
 
         let expression = match operator.as_str() {
             "+" | "-" | "*" | "/" | "%" => Expressions::Binary {
-                lhs: Box::new(left),
+                lhs: self.bump.alloc(left),
                 operand: operator,
-                rhs: Box::new(right),
+                rhs: self.bump.alloc(right),
                 span,
             },
             "==" | "!=" | "<" | ">" | "<=" | ">=" => Expressions::Boolean {
-                lhs: Box::new(left),
+                lhs: self.bump.alloc(left),
                 operand: operator,
-                rhs: Box::new(right),
+                rhs: self.bump.alloc(right),
                 span,
             },
             "&" | "|" | "^" | "<<" | ">>" => Expressions::Bitwise {
-                lhs: Box::new(left),
+                lhs: self.bump.alloc(left),
                 operand: operator,
-                rhs: Box::new(right),
+                rhs: self.bump.alloc(right),
                 span,
             },
             _ => return None,
@@ -1071,18 +1090,18 @@ impl<'a> Parser<'a> {
         Some(expression)
     }
 
-    fn parse_grouped_expression(&mut self) -> Option<Expressions> {
+    fn parse_grouped_expression(&mut self) -> Option<Expressions<'bump>> {
         self.next_token(); // consume '('
 
         if self.current_token.token_type == TokenType::RParen {
             // Empty tuple
             return Some(Expressions::Tuple {
-                values: vec![],
+                values: Vec::new_in(self.bump),
                 span: (self.current_token.span.0 - 1, self.current_token.span.1),
             });
         }
 
-        let mut expressions = vec![];
+        let mut expressions = Vec::new_in(self.bump);
         expressions.push(self.parse_expression(Precedence::LOWEST)?);
 
         while self.peek_token.token_type == TokenType::Comma {
@@ -1104,7 +1123,7 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         if expressions.len() == 1 && self.current_token.token_type != TokenType::Comma {
-            return Some(expressions.remove(0));
+            return Some(expressions.into_iter().next().unwrap());
         }
 
         let span_start = expressions.first().unwrap().get_span().0;
@@ -1116,7 +1135,10 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_call_expression(&mut self, function: Expressions) -> Option<Expressions> {
+    fn parse_call_expression(
+        &mut self,
+        function: Expressions<'bump>,
+    ) -> Option<Expressions<'bump>> {
         let span = function.get_span();
         let name = match function {
             Expressions::Value(crate::value::Value::Identifier(name), _) => name,
@@ -1140,8 +1162,8 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_expression_list(&mut self, end: TokenType) -> Option<Vec<Expressions>> {
-        let mut list = Vec::new();
+    fn parse_expression_list(&mut self, end: TokenType) -> Option<Vec<'bump, Expressions<'bump>>> {
+        let mut list = Vec::new_in(self.bump);
 
         if self.peek_token.token_type == end {
             self.next_token();
@@ -1172,7 +1194,7 @@ impl<'a> Parser<'a> {
         Some(list)
     }
 
-    fn parse_array_literal(&mut self) -> Option<Expressions> {
+    fn parse_array_literal(&mut self) -> Option<Expressions<'bump>> {
         let span_start = self.current_token.span.0;
         let values = self.parse_expression_list(TokenType::RBrack)?;
         let len = values.len();
@@ -1192,7 +1214,7 @@ impl<'a> Parser<'a> {
         self.get_precedence(&self.current_token.token_type)
     }
 
-    fn parse_struct_literal(&mut self) -> Option<Expressions> {
+    fn parse_struct_literal(&mut self) -> Option<Expressions<'bump>> {
         let name = self.current_token.value.to_string();
         let span_start = self.current_token.span.0;
 
@@ -1266,7 +1288,10 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_macro_call_expression(&mut self, macro_expr: Expressions) -> Option<Expressions> {
+    fn parse_macro_call_expression(
+        &mut self,
+        macro_expr: Expressions<'bump>,
+    ) -> Option<Expressions<'bump>> {
         let span = macro_expr.get_span();
         let name = match macro_expr {
             Expressions::Value(crate::value::Value::Identifier(name), _) => name,
@@ -1301,10 +1326,13 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_sub_element_expression(&mut self, left: Expressions) -> Option<Expressions> {
+    fn parse_sub_element_expression(
+        &mut self,
+        left: Expressions<'bump>,
+    ) -> Option<Expressions<'bump>> {
         self.next_token(); // Consume the dot
 
-        let mut subelements = vec![];
+        let mut subelements = Vec::new_in(self.bump);
         if let Some(expr) = self.parse_expression(Precedence::MEMBER) {
             subelements.push(expr);
         } else {
@@ -1317,13 +1345,13 @@ impl<'a> Parser<'a> {
         let span_end = subelements.last().unwrap().get_span().1;
 
         Some(Expressions::SubElement {
-            head: Box::new(left.clone()),
+            head: self.bump.alloc(left.clone()),
             subelements,
             span: (left.get_span().0, span_end),
         })
     }
 
-    fn parse_slice_expression(&mut self, left: Expressions) -> Option<Expressions> {
+    fn parse_slice_expression(&mut self, left: Expressions<'bump>) -> Option<Expressions<'bump>> {
         let span_start = left.get_span().0;
         self.next_token();
         let index = self.parse_expression(Precedence::LOWEST)?;
@@ -1342,8 +1370,8 @@ impl<'a> Parser<'a> {
         let span_end = self.current_token.span.1;
 
         Some(Expressions::Slice {
-            object: Box::new(left),
-            index: Box::new(index),
+            object: self.bump.alloc(left),
+            index: self.bump.alloc(index),
             span: (span_start, span_end),
         })
     }
@@ -1369,16 +1397,16 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_type(&mut self) -> Option<Type> {
+    fn parse_type(&mut self) -> Option<Type<'bump>> {
         self.parse_prefix_type()
     }
 
-    fn parse_prefix_type(&mut self) -> Option<Type> {
+    fn parse_prefix_type(&mut self) -> Option<Type<'bump>> {
         match self.current_token.token_type {
             TokenType::Multiply => {
                 self.next_token();
                 let inner_type = self.parse_type()?;
-                Some(Type::Pointer(Box::new(inner_type)))
+                Some(Type::Pointer(self.bump.alloc(inner_type)))
             }
             TokenType::Type => {
                 let type_name = self.current_token.value.to_string();
@@ -1420,14 +1448,14 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_array_type_syntax(&mut self) -> Option<Type> {
+    fn parse_array_type_syntax(&mut self) -> Option<Type<'bump>> {
         self.next_token(); // Consume '['
 
         if self.current_token.token_type == TokenType::RBrack {
             // Dynamic array: []T
             self.next_token(); // Consume ']'
             let inner_type = self.parse_type()?;
-            return Some(Type::DynamicArray(Box::new(inner_type)));
+            return Some(Type::DynamicArray(self.bump.alloc(inner_type)));
         }
 
         // Sized array: [T; size]
@@ -1467,12 +1495,12 @@ impl<'a> Parser<'a> {
         }
         self.next_token(); // Consume ']'
 
-        Some(Type::Array(Box::new(inner_type), size))
+        Some(Type::Array(self.bump.alloc(inner_type), size))
     }
 
-    fn parse_tuple_type(&mut self) -> Option<Type> {
+    fn parse_tuple_type(&mut self) -> Option<Type<'bump>> {
         self.next_token(); // Consume '('
-        let mut types = Vec::new();
+        let mut types = Vec::new_in(self.bump);
 
         if self.current_token.token_type == TokenType::RParen {
             self.next_token(); // Consume ')'
@@ -1509,7 +1537,8 @@ mod tests {
     #[test]
     fn test_let_statement() {
         let input = "let x = 5;".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1533,7 +1562,8 @@ mod tests {
     #[test]
     fn test_return_statement() {
         let input = "return 5;".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1553,7 +1583,8 @@ mod tests {
     #[test]
     fn test_infix_expression() {
         let input = "5 + 5;".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1582,7 +1613,8 @@ mod tests {
     #[test]
     fn test_operator_precedence() {
         let input = "-a * b".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -1610,7 +1642,8 @@ mod tests {
     #[test]
     fn test_function_call_expression() {
         let input = "add(1, 2 * 3, 4 + 5);".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -1670,7 +1703,8 @@ mod tests {
     #[test]
     fn test_fn_definition() {
         let input = "fn add(a: i32, b: i32) i32 { return a + b; }".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1700,7 +1734,8 @@ mod tests {
     #[test]
     fn test_array_literal() {
         let input = "[1, 2 * 2, 3 + 3]".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1716,7 +1751,8 @@ mod tests {
     #[test]
     fn test_slice_expression() {
         let input = "myArray[1 + 1]".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1742,7 +1778,8 @@ mod tests {
     #[test]
     fn test_struct_literal() {
         let input = "MyStruct { .a = 1, .b = 2 }".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1759,7 +1796,8 @@ mod tests {
     #[test]
     fn test_if_else_statement() {
         let input = "if (x < y) { x } else { y }".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1788,7 +1826,8 @@ mod tests {
     #[test]
     fn test_while_statement() {
         let input = "while (x < y) { x = x + 1 }".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1812,7 +1851,8 @@ mod tests {
     #[test]
     fn test_for_statement() {
         let input = "for i = 0 { x }".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1840,7 +1880,8 @@ mod tests {
     #[test]
     fn test_struct_definition() {
         let input = "struct Point { x: i32, y: i32 }".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1857,7 +1898,8 @@ mod tests {
     #[test]
     fn test_enum_definition() {
         let input = "enum Color { Red, Green, Blue }".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1874,7 +1916,8 @@ mod tests {
     #[test]
     fn test_binary_assign_statement() {
         let input = "x += 5;".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1908,7 +1951,8 @@ mod tests {
     #[test]
     fn test_assign_statement() {
         let input = "x = 5;".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1934,7 +1978,8 @@ mod tests {
     #[test]
     fn test_typedef_statement() {
         let input = "typedef my_int i32;".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1958,7 +2003,8 @@ mod tests {
     #[test]
     fn test_extern_declare_statement() {
         let input = "_extern_declare my_var i32;".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -1984,7 +2030,8 @@ mod tests {
     #[test]
     fn test_link_c_statement() {
         let input = "_link_c \"mylib.a\";".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -2004,7 +2051,8 @@ mod tests {
     #[test]
     fn test_break_statement() {
         let input = "break;".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
 
         assert_eq!(program.len(), 1);
@@ -2021,7 +2069,8 @@ mod tests {
     fn test_pointer_related_parsing() {
         // Test let statement with pointer type
         let input = "let x: *i32 = &y;".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -2033,7 +2082,7 @@ mod tests {
         } = statement
         {
             assert_eq!(*identifier, "x");
-            assert_eq!(datatype, &Some(Type::Pointer(Box::new(Type::I32))));
+            assert_eq!(datatype, &Some(Type::Pointer(bump.alloc(Type::I32))));
             assert!(matches!(value, Some(Expressions::Reference { .. })));
         } else {
             panic!(
@@ -2044,7 +2093,8 @@ mod tests {
 
         // Test dereference expression
         let input = "*x;".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -2055,7 +2105,8 @@ mod tests {
 
         // Test reference expression
         let input = "&y;".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -2067,7 +2118,8 @@ mod tests {
         // Test assignment to dereferenced pointer
         let input = "*x = 10;".to_string();
         let s = input.to_string();
-        let mut parser = Parser::new(&s, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&s, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -2087,7 +2139,8 @@ mod tests {
 
         // Test function with pointer argument and return type
         let input = "fn foo(p: *i32) *i32 { return p; }".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
@@ -2097,8 +2150,8 @@ mod tests {
             ..
         } = statement
         {
-            assert_eq!(arguments[0].1, Type::Pointer(Box::new(Type::I32)));
-            assert_eq!(*datatype, Type::Pointer(Box::new(Type::I32)));
+            assert_eq!(arguments[0].1, Type::Pointer(bump.alloc(Type::I32)));
+            assert_eq!(*datatype, Type::Pointer(bump.alloc(Type::I32)));
         } else {
             panic!(
                 "Failed to parse function with pointer. Got: {:?}",
@@ -2108,14 +2161,15 @@ mod tests {
 
         // Test let statement with double pointer type
         let input = "let x: **i32;".to_string();
-        let mut parser = Parser::new(&input, "test.pay".to_string());
+        let bump = Bump::new();
+        let mut parser = Parser::new(&input, "test.pay".to_string(), &bump);
         let program = parser.parse().unwrap();
         assert_eq!(program.len(), 1);
         let statement = &program[0];
         if let Statements::AnnotationStatement { datatype, .. } = statement {
             assert_eq!(
                 datatype,
-                &Some(Type::Pointer(Box::new(Type::Pointer(Box::new(Type::I32)))))
+                &Some(Type::Pointer(bump.alloc(Type::Pointer(bump.alloc(Type::I32)))))
             );
         } else {
             panic!(

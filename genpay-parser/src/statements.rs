@@ -1,59 +1,60 @@
 use crate::{expressions::Expressions, types::Type};
+use bumpalo::collections::Vec;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Statements {
+pub enum Statements<'bump> {
     /// `OBJECT = EXPRESSION`
     AssignStatement {
-        object: Expressions,
-        value: Expressions,
+        object: Expressions<'bump>,
+        value: Expressions<'bump>,
         span: (usize, usize),
     },
 
     /// `OBJECT BINOP= EXPRESSION`
     BinaryAssignStatement {
-        object: Expressions,
+        object: Expressions<'bump>,
         operand: String,
-        value: Expressions,
+        value: Expressions<'bump>,
         span: (usize, usize),
     },
 
     /// `*OBJECT = EXPRESSION`
     DerefAssignStatement {
-        object: Expressions,
-        value: Expressions,
+        object: Expressions<'bump>,
+        value: Expressions<'bump>,
         span: (usize, usize),
     },
 
     /// `OBJECT[EXPRESSION] = EXPRESSION`
     SliceAssignStatement {
-        object: Expressions,
-        index: Expressions,
-        value: Expressions,
+        object: Expressions<'bump>,
+        index: Expressions<'bump>,
+        value: Expressions<'bump>,
         span: (usize, usize),
     },
 
     /// `OBJECT.FIELD= EXPRESSION`
     FieldAssignStatement {
-        object: Expressions,
-        value: Expressions,
+        object: Expressions<'bump>,
+        value: Expressions<'bump>,
         span: (usize, usize),
     },
 
     /// `let IDENTIFIER = EXPRESSION`
     AnnotationStatement {
         identifier: String,
-        datatype: Option<Type>,
-        value: Option<Expressions>,
+        datatype: Option<Type<'bump>>,
+        value: Option<Expressions<'bump>>,
         span: (usize, usize),
     },
 
     /// `pub/NOTHING fn IDENTIFIER ( IDENTIFIER: TYPE, IDENTIFIER: TYPE, ... ) TYPE/NOTHING { STATEMENTS }`
     FunctionDefineStatement {
         name: String,
-        datatype: Type,
-        arguments: Vec<(String, Type)>,
-        block: Vec<Statements>,
+        datatype: Type<'bump>,
+        arguments: Vec<'bump, (String, Type<'bump>)>,
+        block: Vec<'bump, Statements<'bump>>,
         public: bool,
         is_var_args: bool,
         span: (usize, usize),
@@ -62,14 +63,14 @@ pub enum Statements {
     /// `NAME ( EXPRESSION, EXPRESSION, ... )`
     FunctionCallStatement {
         name: String,
-        arguments: Vec<Expressions>,
+        arguments: Vec<'bump, Expressions<'bump>>,
         span: (usize, usize),
     },
 
     /// `MACRONAME! ( EXPRESSION, EXPRESSION, ... )`
     MacroCallStatement {
         name: String,
-        arguments: Vec<Expressions>,
+        arguments: Vec<'bump, Expressions<'bump>>,
         span: (usize, usize),
     },
 
@@ -83,8 +84,8 @@ pub enum Statements {
     /// ```
     StructDefineStatement {
         name: String,
-        fields: BTreeMap<String, Type>,
-        functions: BTreeMap<String, Vec<Statements>>,
+        fields: BTreeMap<String, Type<'bump>>,
+        functions: BTreeMap<String, Vec<'bump, Statements<'bump>>>,
         public: bool,
         span: (usize, usize),
     },
@@ -99,8 +100,8 @@ pub enum Statements {
     /// ```
     EnumDefineStatement {
         name: String,
-        fields: Vec<String>,
-        functions: BTreeMap<String, Vec<Statements>>,
+        fields: Vec<'bump, String>,
+        functions: BTreeMap<String, Vec<'bump, Statements<'bump>>>,
         public: bool,
         span: (usize, usize),
     },
@@ -108,50 +109,50 @@ pub enum Statements {
     /// `typedef IDENTIFIER TYPE`
     TypedefStatement {
         alias: String,
-        datatype: Type,
+        datatype: Type<'bump>,
         span: (usize, usize),
     },
 
     /// `if EXPRESSION { STATEMENTS } else { STATEMENTS }`
     IfStatement {
-        condition: Expressions,
-        then_block: Vec<Statements>,
-        else_block: Option<Vec<Statements>>,
+        condition: Expressions<'bump>,
+        then_block: Vec<'bump, Statements<'bump>>,
+        else_block: Option<Vec<'bump, Statements<'bump>>>,
         span: (usize, usize),
     },
 
     /// `while EXPRESSION { STATEMENTS }`
     WhileStatement {
-        condition: Expressions,
-        block: Vec<Statements>,
+        condition: Expressions<'bump>,
+        block: Vec<'bump, Statements<'bump>>,
         span: (usize, usize),
     },
 
     /// `for IDENTIFIER = OBJECT { STATEMENTS }`
     ForStatement {
         binding: String,
-        iterator: Expressions,
-        block: Vec<Statements>,
+        iterator: Expressions<'bump>,
+        block: Vec<'bump, Statements<'bump>>,
         span: (usize, usize),
     },
 
     /// `import "PATH"`
     ImportStatement {
-        path: Expressions,
+        path: Expressions<'bump>,
         span: (usize, usize),
     },
 
     /// `include "PATH"`
     IncludeStatement {
-        path: Expressions,
+        path: Expressions<'bump>,
         span: (usize, usize),
     },
 
     /// `extern "EXT_TYPE" pub/NOTHING fn IDENTIFIER ( TYPE, TYPE, ... ) TYPE/NOTHING`
     ExternStatement {
         identifier: String,
-        arguments: Vec<Type>,
-        return_type: Type,
+        arguments: Vec<'bump, Type<'bump>>,
+        return_type: Type<'bump>,
         extern_type: String,
         is_var_args: bool,
         public: bool,
@@ -161,13 +162,13 @@ pub enum Statements {
     /// `_extern_declare IDENTIFIER EXPRESSION`
     ExternDeclareStatement {
         identifier: String,
-        datatype: Type,
+        datatype: Type<'bump>,
         span: (usize, usize),
     },
 
     /// `_link_c "PATH"`
     LinkCStatement {
-        path: Expressions,
+        path: Expressions<'bump>,
         span: (usize, usize),
     },
 
@@ -178,21 +179,21 @@ pub enum Statements {
 
     /// `return EXPRESSION`
     ReturnStatement {
-        value: Expressions,
+        value: Expressions<'bump>,
         span: (usize, usize),
     },
 
     /// `{ STATEMENTS }`
     ScopeStatement {
-        block: Vec<Statements>,
+        block: Vec<'bump, Statements<'bump>>,
         span: (usize, usize),
     },
 
-    Expression(Expressions),
+    Expression(Expressions<'bump>),
     None,
 }
 
-impl Statements {
+impl<'bump> Statements<'bump> {
     pub fn get_span(&self) -> (usize, usize) {
         match self {
             Statements::AssignStatement { span, .. } => *span,

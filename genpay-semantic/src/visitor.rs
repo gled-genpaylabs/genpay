@@ -1,10 +1,15 @@
-use crate::{Analyzer, Scope, SemanticError};
+use crate::{
+    error::SemanticError,
+    Analyzer, Scope,
+};
+use bumpalo::collections::CollectIn;
 use genpay_parser::{expressions::Expressions, statements::Statements, types::Type};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::rc::Rc;
 
-impl Analyzer {
-    pub fn visit_statement(&mut self, statement: &Statements) {
+impl<'bump> Analyzer<'bump> {
+    pub fn visit_statement(self: &Rc<Self>, statement: &Statements<'bump>) {
         match statement {
             Statements::AnnotationStatement {
                 identifier,
@@ -12,11 +17,11 @@ impl Analyzer {
                 value,
                 span,
             } => {
-                if self.scope.variables.contains_key(identifier) {
+                if self.scope.borrow().variables.contains_key(identifier) {
                     self.error(SemanticError::RedefinitionError {
                         exception: format!("Variable `{}` is already defined in this scope.", identifier),
                         help: Some("Consider using a different name.".to_string()),
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: (*span).into(),
                     });
                     return;
@@ -29,7 +34,7 @@ impl Analyzer {
                             self.error(SemanticError::TypesMismatch {
                                 exception: format!("Expected type `{}`, but found type `{}`.", dt, expr_type),
                                 help: None,
-                                src: self.source.clone(),
+                                src: (*self.source).clone(),
                                 span: expr.get_span().into(),
                             });
                         }
@@ -43,13 +48,14 @@ impl Analyzer {
                     self.error(SemanticError::SemanticalError {
                         exception: "Variable declaration must have a type or an initial value.".to_string(),
                         help: Some(format!("Consider adding a type annotation, like `let {}: <type>;` or an initial value `let {} = <value>;`", identifier, identifier)),
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: (*span).into(),
                     });
                     return;
                 }
 
                 self.scope
+                    .borrow_mut()
                     .add_var(identifier.clone(), var_type, initialized, *span);
             }
             Statements::Expression(expression) => {
@@ -66,48 +72,48 @@ impl Analyzer {
                 header_span: _,
             } => {
                 let func_type = Type::Function(
-                    arguments.iter().map(|(_, t)| t.clone()).collect(),
-                    Box::new(datatype.clone()),
+                    arguments.iter().map(|(_, t)| t.clone()).collect_in(self.bump),
+                    self.bump.alloc(datatype.clone()),
                     *is_var_args,
                 );
 
-                if let Err(err) = self.scope.add_fn(name.clone(), func_type.clone(), *public) {
+                if let Err(err) = self.scope.borrow_mut().add_fn(name.clone(), func_type.clone(), *public) {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: (0, 0).into(),
                     });
                     return;
                 }
 
                 let mut func_scope = Scope::new();
-                func_scope.parent = Some(Box::new(self.scope.clone()));
+                func_scope.parent = Some(Box::new(self.scope.borrow().clone()));
                 func_scope.expected = datatype.clone();
 
                 for (arg_name, arg_type) in arguments {
                     func_scope.add_var(arg_name.clone(), arg_type.clone(), true, (0, 0));
                 }
 
-                let original_scope = self.scope.clone();
-                self.scope = func_scope;
+                let original_scope = self.scope.borrow().clone();
+                *self.scope.borrow_mut() = func_scope;
 
                 for stmt in block {
                     self.visit_statement(stmt);
                 }
 
-                self.scope = original_scope;
+                *self.scope.borrow_mut() = original_scope;
             }
             Statements::ReturnStatement { value, span } => {
-                let ret_type = self.visit_expression(value, Some(self.scope.expected.clone()));
-                if ret_type != self.scope.expected {
+                let ret_type = self.visit_expression(value, Some(self.scope.borrow().expected.clone()));
+                if ret_type != self.scope.borrow().expected {
                     self.error(SemanticError::TypesMismatch {
                         exception: format!(
                             "Expected return type `{}`, but found type `{}`.",
-                            self.scope.expected, ret_type
+                            self.scope.borrow().expected, ret_type
                         ),
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: (*span).into(),
                     });
                 }
@@ -126,29 +132,29 @@ impl Analyzer {
                             cond_type
                         ),
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: condition.get_span().into(),
                     });
                 }
 
                 let mut then_scope = Scope::new();
-                then_scope.parent = Some(Box::new(self.scope.clone()));
-                let original_scope = self.scope.clone();
-                self.scope = then_scope;
+                then_scope.parent = Some(Box::new(self.scope.borrow().clone()));
+                let original_scope = self.scope.borrow().clone();
+                *self.scope.borrow_mut() = then_scope;
                 for stmt in then_block {
                     self.visit_statement(stmt);
                 }
-                self.scope = original_scope;
+                *self.scope.borrow_mut() = original_scope;
 
                 if let Some(else_block) = else_block {
                     let mut else_scope = Scope::new();
-                    else_scope.parent = Some(Box::new(self.scope.clone()));
-                    let original_scope = self.scope.clone();
-                    self.scope = else_scope;
+                    else_scope.parent = Some(Box::new(self.scope.borrow().clone()));
+                    let original_scope = self.scope.borrow().clone();
+                    *self.scope.borrow_mut() = else_scope;
                     for stmt in else_block {
                         self.visit_statement(stmt);
                     }
-                    self.scope = original_scope;
+                    *self.scope.borrow_mut() = original_scope;
                 }
             }
             Statements::WhileStatement {
@@ -164,20 +170,20 @@ impl Analyzer {
                             cond_type
                         ),
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: condition.get_span().into(),
                     });
                 }
 
                 let mut while_scope = Scope::new();
-                while_scope.parent = Some(Box::new(self.scope.clone()));
+                while_scope.parent = Some(Box::new(self.scope.borrow().clone()));
                 while_scope.is_loop = true;
-                let original_scope = self.scope.clone();
-                self.scope = while_scope;
+                let original_scope = self.scope.borrow().clone();
+                *self.scope.borrow_mut() = while_scope;
                 for stmt in block {
                     self.visit_statement(stmt);
                 }
-                self.scope = original_scope;
+                *self.scope.borrow_mut() = original_scope;
             }
             Statements::ForStatement { .. } => {
                 // TODO: Implement for loops
@@ -191,11 +197,11 @@ impl Analyzer {
             } => {
                 let struct_type = Type::Struct(fields.clone(), BTreeMap::new());
 
-                if let Err(err) = self.scope.add_struct(name.clone(), struct_type, *public) {
+                if let Err(err) = self.scope.borrow_mut().add_struct(name.clone(), struct_type, *public) {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: (*span).into(),
                     });
                 }
@@ -207,13 +213,13 @@ impl Analyzer {
                 public,
                 span,
             } => {
-                let enum_type = Type::Enum(fields.clone(), BTreeMap::new());
+                let enum_type = Type::Enum(fields.iter().map(|s| s.clone()).collect_in(self.bump), BTreeMap::new());
 
-                if let Err(err) = self.scope.add_enum(name.clone(), enum_type, *public) {
+                if let Err(err) = self.scope.borrow_mut().add_enum(name.clone(), enum_type, *public) {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: (*span).into(),
                     });
                 }
@@ -233,7 +239,7 @@ impl Analyzer {
                             left_type, right_type
                         ),
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: (*span).into(),
                     });
                 }
@@ -242,20 +248,20 @@ impl Analyzer {
             }
             Statements::ScopeStatement { block, .. } => {
                 let mut scope = Scope::new();
-                scope.parent = Some(Box::new(self.scope.clone()));
-                let original_scope = self.scope.clone();
-                self.scope = scope;
+                scope.parent = Some(Box::new(self.scope.borrow().clone()));
+                let original_scope = self.scope.borrow().clone();
+                *self.scope.borrow_mut() = scope;
                 for stmt in block {
                     self.visit_statement(stmt);
                 }
-                self.scope = original_scope;
+                *self.scope.borrow_mut() = original_scope;
             }
             Statements::BreakStatements { span } => {
-                if !self.scope.is_loop() {
+                if !self.scope.borrow().is_loop() {
                     self.error(SemanticError::UnsupportedExpression {
                         exception: "Cannot use `break` outside of a loop.".to_string(),
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: (*span).into(),
                     });
                 }
@@ -265,11 +271,11 @@ impl Analyzer {
                 datatype,
                 span,
             } => {
-                if let Err(err) = self.scope.add_typedef(alias.clone(), datatype.clone()) {
+                if let Err(err) = self.scope.borrow_mut().add_typedef(alias.clone(), datatype.clone()) {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: (*span).into(),
                     });
                 }
@@ -278,7 +284,11 @@ impl Analyzer {
         }
     }
 
-    pub fn visit_expression(&mut self, expression: &Expressions, _expected_type: Option<Type>) -> Type {
+    pub fn visit_expression(
+        &self,
+        expression: &Expressions<'bump>,
+        _expected_type: Option<Type<'bump>>,
+    ) -> Type<'bump> {
         match expression {
             Expressions::Value(value, span) => match value {
                 genpay_parser::value::Value::Integer(_) => Type::I64,
@@ -287,13 +297,13 @@ impl Analyzer {
                 genpay_parser::value::Value::Char(_) => Type::Char,
                 genpay_parser::value::Value::Boolean(_) => Type::Bool,
                 genpay_parser::value::Value::Identifier(name) => {
-                    if let Some(var) = self.scope.get_var(name) {
+                    if let Some(var) = self.scope.borrow_mut().get_var(name) {
                         var.datatype
                     } else {
                         self.error(SemanticError::UnresolvedName {
                             exception: format!("Variable `{}` not found in this scope.", name),
                             help: None,
-                            src: self.source.clone(),
+                            src: (*self.source).clone(),
                             span: (*span).into(),
                         });
                         Type::Void
@@ -311,14 +321,14 @@ impl Analyzer {
                 let obj_type = self.visit_expression(object, None);
                 match operand.as_str() {
                     "-" => {
-                        if !Analyzer::is_integer(&obj_type) && !Analyzer::is_float(&obj_type) {
+                        if !is_integer(&obj_type) && !is_float(&obj_type) {
                             self.error(SemanticError::TypesMismatch {
                                 exception: format!(
                                     "Cannot apply unary operator `-` to type `{}`.",
                                     obj_type
                                 ),
                                 help: Some("The `-` operator can only be applied to integers and floats.".to_string()),
-                                src: self.source.clone(),
+                                src: (*self.source).clone(),
                                 span: (*span).into(),
                             });
                         }
@@ -332,7 +342,7 @@ impl Analyzer {
                                     obj_type
                                 ),
                                 help: Some("The `!` operator can only be applied to booleans.".to_string()),
-                                src: self.source.clone(),
+                                src: (*self.source).clone(),
                                 span: (*span).into(),
                             });
                         }
@@ -342,7 +352,7 @@ impl Analyzer {
                         self.error(SemanticError::UnsupportedExpression {
                             exception: format!("Unsupported unary operator `{}`.", operand),
                             help: None,
-                            src: self.source.clone(),
+                            src: (*self.source).clone(),
                             span: (*span).into(),
                         });
                         Type::Void
@@ -360,14 +370,14 @@ impl Analyzer {
 
                 match operand.as_str() {
                     "+" | "-" | "*" | "/" | "%" => {
-                        if Analyzer::is_integer(&left_type) && Analyzer::is_integer(&right_type) {
-                            if Analyzer::integer_order(&left_type) > Analyzer::integer_order(&right_type) {
+                        if is_integer(&left_type) && is_integer(&right_type) {
+                            if integer_order(&left_type) > integer_order(&right_type) {
                                 left_type
                             } else {
                                 right_type
                             }
-                        } else if Analyzer::is_float(&left_type) && Analyzer::is_float(&right_type) {
-                            if Analyzer::float_order(&left_type) > Analyzer::float_order(&right_type) {
+                        } else if is_float(&left_type) && is_float(&right_type) {
+                            if float_order(&left_type) > float_order(&right_type) {
                                 left_type
                             } else {
                                 right_type
@@ -379,7 +389,7 @@ impl Analyzer {
                                     operand, left_type, right_type
                                 ),
                                 help: Some("This operator can only be applied to numbers of the same type.".to_string()),
-                                src: self.source.clone(),
+                                src: (*self.source).clone(),
                                 span: (*span).into(),
                             });
                             Type::Void
@@ -393,7 +403,7 @@ impl Analyzer {
                                     operand, left_type, right_type
                                 ),
                                 help: Some("Comparison operators can only be applied to values of the same type.".to_string()),
-                                src: self.source.clone(),
+                                src: (*self.source).clone(),
                                 span: (*span).into(),
                             });
                         }
@@ -403,7 +413,7 @@ impl Analyzer {
                         self.error(SemanticError::UnsupportedExpression {
                             exception: format!("Unsupported binary operator `{}`.", operand),
                             help: None,
-                            src: self.source.clone(),
+                            src: (*self.source).clone(),
                             span: (*span).into(),
                         });
                         Type::Void
@@ -415,7 +425,7 @@ impl Analyzer {
                 arguments,
                 span,
             } => {
-                if let Some(func_type) = self.scope.get_fn(name) {
+                if let Some(func_type) = self.scope.borrow().get_fn(name) {
                     if let Type::Function(args, ret_type, _) = func_type {
                         if arguments.len() != args.len() {
                             self.error(SemanticError::ArgumentException {
@@ -426,7 +436,7 @@ impl Analyzer {
                                     arguments.len()
                                 ),
                                 help: None,
-                                src: self.source.clone(),
+                                src: (*self.source).clone(),
                                 span: (*span).into(),
                             });
                         }
@@ -440,18 +450,18 @@ impl Analyzer {
                                         args[i], arg_type
                                     ),
                                     help: None,
-                                    src: self.source.clone(),
+                                    src: (*self.source).clone(),
                                     span: arg_expr.get_span().into(),
                                 });
                             }
                         }
 
-                        *ret_type.clone()
+                        (*ret_type).clone()
                     } else {
                         self.error(SemanticError::SemanticalError {
                             exception: format!("`{}` is not a function.", name),
                             help: None,
-                            src: self.source.clone(),
+                            src: (*self.source).clone(),
                             span: (*span).into(),
                         });
                         Type::Void
@@ -460,7 +470,7 @@ impl Analyzer {
                     self.error(SemanticError::UnresolvedName {
                         exception: format!("Function `{}` not found.", name),
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: (*span).into(),
                     });
                     Type::Void
@@ -471,7 +481,7 @@ impl Analyzer {
                 fields,
                 span,
             } => {
-                if let Some(struct_type) = self.scope.get_struct(name) {
+                if let Some(struct_type) = self.scope.borrow().get_struct(name) {
                     if let Type::Struct(defined_fields, _) = struct_type.clone()
                     {
                         if fields.len() != defined_fields.len() {
@@ -483,7 +493,7 @@ impl Analyzer {
                                     fields.len()
                                 ),
                                 help: None,
-                                src: self.source.clone(),
+                                src: (*self.source).clone(),
                                 span: (*span).into(),
                             });
                         }
@@ -501,7 +511,7 @@ impl Analyzer {
                                             field_name, defined_field_type, field_type
                                         ),
                                         help: None,
-                                        src: self.source.clone(),
+                                        src: (*self.source).clone(),
                                         span: field_expr.get_span().into(),
                                     });
                                 }
@@ -512,7 +522,7 @@ impl Analyzer {
                                         field_name, name
                                     ),
                                     help: None,
-                                    src: self.source.clone(),
+                                    src: (*self.source).clone(),
                                     span: field_expr.get_span().into(),
                                 });
                             }
@@ -525,7 +535,7 @@ impl Analyzer {
                     self.error(SemanticError::UnresolvedName {
                         exception: format!("Struct `{}` not found.", name),
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: (*span).into(),
                     });
                     Type::Void
@@ -549,7 +559,7 @@ impl Analyzer {
                                         name, current_type
                                     ),
                                     help: None,
-                                    src: self.source.clone(),
+                                    src: (*self.source).clone(),
                                     span: sub.get_span().into(),
                                 });
                                 return Type::Void;
@@ -561,7 +571,7 @@ impl Analyzer {
                                     current_type
                                 ),
                                 help: None,
-                                src: self.source.clone(),
+                                src: (*self.source).clone(),
                                 span: (*span).into(),
                             });
                             return Type::Void;
@@ -574,7 +584,7 @@ impl Analyzer {
             }
             Expressions::Array { values, .. } => {
                 if values.is_empty() {
-                    return Type::Array(Box::new(Type::Void), 0);
+                    return Type::Array(self.bump.alloc(Type::Void), 0);
                 }
 
                 let first_type = self.visit_expression(&values[0], None);
@@ -587,18 +597,19 @@ impl Analyzer {
                                 first_type, current_type
                             ),
                             help: None,
-                            src: self.source.clone(),
+                            src: (*self.source).clone(),
                             span: value.get_span().into(),
                         });
                     }
                 }
-                Type::Array(Box::new(first_type), values.len())
+                Type::Array(self.bump.alloc(first_type), values.len())
             }
             Expressions::Tuple { values, .. } => {
+                let bump = self.bump;
                 let types = values
                     .iter()
                     .map(|v| self.visit_expression(v, None))
-                    .collect();
+                    .collect_in(bump);
                 Type::Tuple(types)
             }
             Expressions::Slice {
@@ -609,25 +620,25 @@ impl Analyzer {
                 let obj_type = self.visit_expression(object, None);
                 let index_type = self.visit_expression(index, Some(Type::I64));
 
-                if !Analyzer::is_integer(&index_type) {
+                if !is_integer(&index_type) {
                     self.error(SemanticError::TypesMismatch {
                         exception: format!(
                             "Array index must be an integer, but found `{}`.",
                             index_type
                         ),
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: index.get_span().into(),
                     });
                 }
 
                 if let Type::Array(elem_type, _) = obj_type {
-                    *elem_type
+                    (*elem_type).clone()
                 } else {
                     self.error(SemanticError::TypesMismatch {
                         exception: format!("Cannot index non-array type `{}`.", obj_type),
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: (*span).into(),
                     });
                     Type::Void
@@ -635,17 +646,17 @@ impl Analyzer {
             }
             Expressions::Reference { object, .. } => {
                 let obj_type = self.visit_expression(object, None);
-                Type::Pointer(Box::new(obj_type))
+                Type::Pointer(self.bump.alloc(obj_type))
             }
             Expressions::Dereference { object, span } => {
                 let obj_type = self.visit_expression(object, None);
                 if let Type::Pointer(elem_type) = obj_type {
-                    *elem_type
+                    (*elem_type).clone()
                 } else {
                     self.error(SemanticError::TypesMismatch {
                         exception: format!("Cannot dereference non-pointer type `{}`.", obj_type),
                         help: None,
-                        src: self.source.clone(),
+                        src: (*self.source).clone(),
                         span: (*span).into(),
                     });
                     Type::Void
@@ -655,10 +666,9 @@ impl Analyzer {
         }
     }
 
-    // Stubbed helper methods
-    pub fn unwrap_alias(&self, a_type: &Type) -> Result<Type, String> {
+    pub fn unwrap_alias(&self, a_type: &Type<'bump>) -> Result<Type<'bump>, String> {
         if let Type::Alias(alias) = a_type {
-            if let Some(typ) = self.scope.get_typedef(alias) {
+            if let Some(typ) = self.scope.borrow().get_typedef(alias) {
                 self.unwrap_alias(&typ)
             } else {
                 Err(format!("Type alias `{}` not found.", alias))
@@ -668,66 +678,79 @@ impl Analyzer {
         }
     }
 
-    pub fn is_integer(a_type: &Type) -> bool {
-        matches!(
-            a_type,
-            Type::I8 | Type::I16 | Type::I32 | Type::I64 | Type::U8 | Type::U16 | Type::U32 | Type::U64
-        )
-    }
-
-    pub fn is_float(a_type: &Type) -> bool {
-        matches!(a_type, Type::F32 | Type::F64)
-    }
-
-    pub fn integer_order(a_type: &Type) -> u8 {
-        match a_type {
-            Type::I8 => 1,
-            Type::U8 => 2,
-            Type::I16 => 3,
-            Type::U16 => 4,
-            Type::I32 => 5,
-            Type::U32 => 6,
-            Type::I64 => 7,
-            Type::U64 => 8,
-            _ => 0,
-        }
-    }
-
-    pub fn float_order(a_type: &Type) -> u8 {
-        match a_type {
-            Type::F32 => 1,
-            Type::F64 => 2,
-            _ => 0,
-        }
-    }
-
-    pub fn is_unsigned_integer(a_type: &Type) -> bool {
-        matches!(
-            a_type,
-            Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::USIZE
-        )
-    }
-
-    pub fn unsigned_to_signed_integer(a_type: &Type) -> Type {
-        match a_type {
-            Type::U8 => Type::I8,
-            Type::U16 => Type::I16,
-            Type::U32 => Type::I32,
-            Type::U64 => Type::I64,
-            Type::USIZE => Type::I64,
-            _ => a_type.clone(),
-        }
-    }
-
-    pub fn verify_macrocall(&mut self, name: &str, arguments: &[Expressions], span: &(usize, usize)) -> Type {
+    pub fn verify_macrocall(
+        &self,
+        _name: &str,
+        _arguments: &[Expressions<'bump>],
+        _span: &(usize, usize),
+    ) -> Type<'bump> {
         todo!()
     }
 
-    pub fn expand_library_path(&self, path: &str, is_module: bool) -> Result<PathBuf, String> {
+    pub fn expand_library_path(
+        &self,
+        _path: &str,
+        _is_module: bool,
+    ) -> Result<PathBuf, String> {
         todo!()
     }
 
-    pub fn verify_cast(&self, from_type: &Type, target_type: &Type) -> Result<(), String> {
+    pub fn verify_cast(
+        &self,
+        _from_type: &Type,
+        _target_type: &Type,
+    ) -> Result<(), String> {
         todo!()
+    }
+}
+
+pub fn is_integer(a_type: &Type) -> bool {
+    matches!(
+        a_type,
+        Type::I8 | Type::I16 | Type::I32 | Type::I64 | Type::U8 | Type::U16 | Type::U32 | Type::U64
+    )
+}
+
+pub fn is_float(a_type: &Type) -> bool {
+    matches!(a_type, Type::F32 | Type::F64)
+}
+
+pub fn integer_order(a_type: &Type) -> u8 {
+    match a_type {
+        Type::I8 => 1,
+        Type::U8 => 2,
+        Type::I16 => 3,
+        Type::U16 => 4,
+        Type::I32 => 5,
+        Type::U32 => 6,
+        Type::I64 => 7,
+        Type::U64 => 8,
+        _ => 0,
+    }
+}
+
+pub fn float_order(a_type: &Type) -> u8 {
+    match a_type {
+        Type::F32 => 1,
+        Type::F64 => 2,
+        _ => 0,
+    }
+}
+
+pub fn is_unsigned_integer(a_type: &Type) -> bool {
+    matches!(
+        a_type,
+        Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::USIZE
+    )
+}
+
+pub fn unsigned_to_signed_integer<'c>(a_type: &Type<'c>) -> Type<'c> {
+    match a_type {
+        Type::U8 => Type::I8,
+        Type::U16 => Type::I16,
+        Type::U32 => Type::I32,
+        Type::U64 => Type::I64,
+        Type::USIZE => Type::I64,
+        _ => a_type.clone(),
     }
 }

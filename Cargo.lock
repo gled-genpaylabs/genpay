@@ -131,6 +131,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bumpalo"
+version = "3.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46c5e41b57b8bba42a04676d81cb89e9ee8e859a1a66f80a5a72e1cb76b34d43"
+
+[[package]]
 name = "cc"
 version = "1.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -255,6 +261,7 @@ version = "1.1.1"
 dependencies = [
  "anyhow",
  "assert_cmd",
+ "bumpalo",
  "clap",
  "colored",
  "genpay-codegen",
@@ -272,6 +279,7 @@ dependencies = [
 name = "genpay-codegen"
 version = "1.1.1"
 dependencies = [
+ "bumpalo",
  "genpay-parser",
  "genpay-semantic",
  "inkwell",
@@ -301,6 +309,7 @@ dependencies = [
 name = "genpay-parser"
 version = "1.1.1"
 dependencies = [
+ "bumpalo",
  "genpay-lexer",
  "miette",
  "thiserror 2.0.12",
@@ -310,6 +319,7 @@ dependencies = [
 name = "genpay-semantic"
 version = "1.1.1"
 dependencies = [
+ "bumpalo",
  "genpay-lexer",
  "genpay-parser",
  "miette",
