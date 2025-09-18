@@ -1,7 +1,6 @@
 use super::MacroObject;
 use crate::Analyzer;
 use genpay_parser::{expressions::Expressions, types::Type};
-use std::rc::Rc;
 
 /// **Prints formatted string to standard output with new line**
 /// `println!(LITERAL, ...)` -> `void`
@@ -10,7 +9,7 @@ pub struct PrintlnMacro;
 impl<'bump> MacroObject<'bump> for PrintlnMacro {
     fn verify_call(
         &self,
-        analyzer: &Rc<Analyzer<'bump>>,
+        analyzer: &mut Analyzer<'bump>,
         arguments: &[Expressions<'bump>],
         span: &(usize, usize),
     ) -> Type<'bump> {

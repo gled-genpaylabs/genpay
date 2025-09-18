@@ -1,12 +1,10 @@
 use super::MacroObject;
 use crate::{
-    Analyzer,
     error::{self, SemanticError},
     visitor::{is_float, is_integer},
+    Analyzer,
 };
 use genpay_parser::{expressions::Expressions, types::Type, value::Value};
-use std::rc::Rc;
-
 /// **Formats literal and args into single string**
 /// `format!(LITERAL, ...)` -> `*char`
 #[derive(Debug, Clone)]
@@ -14,7 +12,7 @@ pub struct FormatMacro;
 impl<'bump> MacroObject<'bump> for FormatMacro {
     fn verify_call(
         &self,
-        analyzer: &Rc<Analyzer<'bump>>,
+        analyzer: &mut Analyzer<'bump>,
         arguments: &[Expressions<'bump>],
         span: &(usize, usize),
     ) -> Type<'bump> {
@@ -118,7 +116,7 @@ impl<'bump> MacroObject<'bump> for FormatMacro {
                     }
                 }
                 Type::Alias(alias) => {
-                    if let Some(Type::Struct(_, functions)) = analyzer.scope.borrow().get_struct(&alias) {
+                    if let Some(Type::Struct(_, functions)) = analyzer.scope.get_struct(&alias) {
                         if let Some(Type::Function(_, return_type, _)) = functions.get("display") {
                             if let Type::Pointer(ptr) = **return_type
                                 && *ptr == Type::Char
@@ -144,7 +142,7 @@ impl<'bump> MacroObject<'bump> for FormatMacro {
                             }
                         );
                         }
-                    } else if analyzer.scope.borrow().get_enum(&alias).is_none() {
+                    } else if analyzer.scope.get_enum(&alias).is_none() {
                         analyzer.error(SemanticError::UnknownObject {
                             exception: format!("no displayable type `{expr_type}` found"),
                             help: None,
