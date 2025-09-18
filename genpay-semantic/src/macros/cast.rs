@@ -1,34 +1,36 @@
 use super::MacroObject;
 use crate::{
-    Analyzer,
     error::{self, SemanticError},
+    Analyzer,
 };
 use genpay_parser::{expressions::Expressions, types::Type};
+use std::rc::Rc;
 
 /// **Converts expression to provided type**
 /// `cast!(EXPRESSION, TYPE)` -> `usize`
 #[derive(Debug, Clone)]
 pub struct CastMacro;
-impl MacroObject for CastMacro {
+impl<'bump> MacroObject<'bump> for CastMacro {
     fn verify_call(
         &self,
-        analyzer: &mut Analyzer,
-        arguments: &[Expressions],
+        analyzer: &Rc<Analyzer<'bump>>,
+        arguments: &[Expressions<'bump>],
         span: &(usize, usize),
-    ) -> Type {
+    ) -> Type<'bump> {
         const MINIMUM_ARGUMENTS_LEN: usize = 2;
 
         if arguments.len() < MINIMUM_ARGUMENTS_LEN {
-            analyzer.error(SemanticError::ArgumentException {
+            let err = SemanticError::ArgumentException {
                 exception: format!(
                     "not enough arguments: expected {}, found {}",
                     MINIMUM_ARGUMENTS_LEN,
                     arguments.len()
                 ),
                 help: None,
-                src: analyzer.source.clone(),
+                src: (*analyzer.source).clone(),
                 span: error::position_to_span(*span),
-            });
+            };
+            analyzer.error(err);
         }
 
         if matches!(
@@ -46,28 +48,31 @@ impl MacroObject for CastMacro {
                 span: _
             })
         ) {
-            analyzer.error(SemanticError::ArgumentException {
+            let err = SemanticError::ArgumentException {
                 exception: "wrong arguments for casting found".to_string(),
                 help: Some("Consider using right syntax: cast!(EXPRESSION, TYPE)".to_string()),
-                src: analyzer.source.clone(),
+                src: (*analyzer.source).clone(),
                 span: error::position_to_span(*span),
-            });
+            };
+            analyzer.error(err);
         }
 
-        let (from_type, target_type) = (
-            analyzer.visit_expression(&arguments[0], None),
-            analyzer.visit_expression(&arguments[1], None),
-        );
-        analyzer
-            .verify_cast(&from_type, &target_type)
-            .unwrap_or_else(|err| {
-                analyzer.error(SemanticError::SemanticalError {
-                    exception: err,
-                    help: None,
-                    src: analyzer.source.clone(),
-                    span: error::position_to_span(*span),
-                });
+        let from_type = analyzer.visit_expression(&arguments[0], None);
+        let target_type = analyzer.visit_expression(&arguments[1], None);
+
+        let from_type_clone = from_type.clone();
+        let target_type_clone = target_type.clone();
+
+        if let Err(err) = analyzer.verify_cast(&from_type_clone, &target_type_clone) {
+            let source_clone = (*analyzer.source).clone();
+            let span_clone = *span;
+            analyzer.error(SemanticError::SemanticalError {
+                exception: err,
+                help: None,
+                src: source_clone,
+                span: error::position_to_span(span_clone),
             });
+        }
 
         target_type
     }
