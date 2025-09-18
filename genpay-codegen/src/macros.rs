@@ -1,4 +1,5 @@
 use genpay_parser::{expressions::Expressions, types::Type, value::Value};
+use genpay_semantic::visitor;
 use inkwell::{
     AddressSpace,
     module::Linkage,
@@ -12,16 +13,16 @@ pub trait StandartMacros<'ctx> {
     fn build_macro_call(
         &mut self,
         id: &str,
-        arguments: Vec<Expressions>,
-    ) -> (Type, BasicValueEnum<'ctx>);
+        arguments: Vec<Expressions<'ctx>>,
+    ) -> (Type<'ctx>, BasicValueEnum<'ctx>);
 }
 
 impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
     fn build_macro_call(
         &mut self,
         id: &str,
-        arguments: Vec<Expressions>,
-    ) -> (Type, BasicValueEnum<'ctx>) {
+        arguments: Vec<Expressions<'ctx>>,
+    ) -> (Type<'ctx>, BasicValueEnum<'ctx>) {
         match id {
             "print" | "println" => {
                 let mut literal =
@@ -30,16 +31,15 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     } else {
                         String::default()
                     };
-                let compiled_args = arguments
-                    .iter()
-                    .skip(1)
-                    .map(|expr| self.compile_expression(expr.clone(), None))
-                    .collect::<Vec<(Type, BasicValueEnum)>>();
+                let mut compiled_args = Vec::new();
+                for expr in arguments.iter().skip(1) {
+                    compiled_args.push(self.compile_expression(expr.clone(), None));
+                }
 
-                let format_specifiers = compiled_args
-                    .iter()
-                    .map(|(typ, _)| self.type_specifier(typ))
-                    .collect::<Vec<String>>();
+                let mut format_specifiers = Vec::new();
+                for (typ, _) in &compiled_args {
+                    format_specifiers.push(self.type_specifier(typ));
+                }
 
                 format_specifiers.into_iter().for_each(|spec| {
                     if let Some(position) = literal.find("{}") {
@@ -61,10 +61,9 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     )
                 });
 
-                let format_values = compiled_args
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, arg)| match arg.0.clone() {
+                let mut format_values = Vec::new();
+                for (index, arg) in compiled_args.into_iter().enumerate() {
+                    let value = match arg.0.clone() {
                         Type::Bool => {
                             let (_true, _false) = self.booleans_strings();
                             self.builder
@@ -102,7 +101,9 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                                         let mut recompiled = self
                                             .compile_expression(
                                                 self_expression,
-                                                Some(Type::Pointer(Box::new(Type::Undefined))),
+                                                Some(Type::Pointer(
+                                                    self.bump.alloc(Type::Undefined),
+                                                )),
                                             )
                                             .1;
 
@@ -137,8 +138,9 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                             }
                         }
                         _ => arg.1.into(),
-                    })
-                    .collect::<Vec<BasicMetadataValueEnum<'ctx>>>();
+                    };
+                    format_values.push(value);
+                }
 
                 let global_literal: BasicMetadataValueEnum<'ctx> = self
                     .builder
@@ -159,16 +161,15 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     } else {
                         String::default()
                     };
-                let compiled_args = arguments
-                    .iter()
-                    .skip(1)
-                    .map(|expr| self.compile_expression(expr.clone(), None))
-                    .collect::<Vec<(Type, BasicValueEnum)>>();
+                let mut compiled_args = Vec::new();
+                for expr in arguments.iter().skip(1) {
+                    compiled_args.push(self.compile_expression(expr.clone(), None));
+                }
 
-                let format_specifiers = compiled_args
-                    .iter()
-                    .map(|(typ, _)| self.type_specifier(typ))
-                    .collect::<Vec<String>>();
+                let mut format_specifiers = Vec::new();
+                for (typ, _) in &compiled_args {
+                    format_specifiers.push(self.type_specifier(typ));
+                }
 
                 format_specifiers.into_iter().for_each(|spec| {
                     if let Some(position) = literal.find("{}") {
@@ -191,10 +192,9 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     )
                 });
 
-                let format_values = compiled_args
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, arg)| match arg.0.clone() {
+                let mut format_values = Vec::new();
+                for (index, arg) in compiled_args.into_iter().enumerate() {
+                    let value = match arg.0.clone() {
                         Type::Bool => {
                             let (_true, _false) = self.booleans_strings();
                             self.builder
@@ -234,7 +234,9 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                                                     .nth(index)
                                                     .unwrap()
                                                     .clone(),
-                                                Some(Type::Pointer(Box::new(Type::Undefined))),
+                                                Some(Type::Pointer(
+                                                    self.bump.alloc(Type::Undefined),
+                                                )),
                                             )
                                             .1;
 
@@ -269,8 +271,9 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                             }
                         }
                         _ => arg.1.into(),
-                    })
-                    .collect::<Vec<BasicMetadataValueEnum<'ctx>>>();
+                    };
+                    format_values.push(value);
+                }
 
                 let global_literal: BasicMetadataValueEnum<'ctx> = self
                     .builder
@@ -337,7 +340,10 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                 let _ = self.builder.build_call(sprintf_fn, &call_arguments, "");
 
-                (Type::Pointer(Box::new(Type::Char)), buffer.into())
+                (
+                    Type::Pointer(self.bump.alloc(Type::Char)),
+                    buffer.into(),
+                )
             }
             "panic" => {
                 let (mut literal, call_line) =
@@ -347,16 +353,15 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                         (String::default(), 0)
                     };
 
-                let compiled_args = arguments
-                    .iter()
-                    .skip(1)
-                    .map(|expr| self.compile_expression(expr.clone(), None))
-                    .collect::<Vec<(Type, BasicValueEnum)>>();
+                let mut compiled_args = Vec::new();
+                for expr in arguments.iter().skip(1) {
+                    compiled_args.push(self.compile_expression(expr.clone(), None));
+                }
 
-                let format_specifiers = compiled_args
-                    .iter()
-                    .map(|(typ, _)| self.type_specifier(typ))
-                    .collect::<Vec<String>>();
+                let mut format_specifiers = Vec::new();
+                for (typ, _) in &compiled_args {
+                    format_specifiers.push(self.type_specifier(typ));
+                }
 
                 format_specifiers.into_iter().for_each(|spec| {
                     if let Some(position) = literal.find("{}") {
@@ -368,9 +373,9 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     literal.push('\n')
                 }
 
-                let format_values = compiled_args
-                    .into_iter()
-                    .map(|arg| match arg.0.clone() {
+                let mut format_values = Vec::new();
+                for arg in compiled_args.into_iter() {
+                    let value = match arg.0.clone() {
                         Type::Bool => {
                             let (_true, _false) = self.booleans_strings();
                             self.builder
@@ -408,8 +413,9 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                             }
                         }
                         _ => arg.1.into(),
-                    })
-                    .collect::<Vec<BasicMetadataValueEnum<'ctx>>>();
+                    };
+                    format_values.push(value);
+                }
 
                 self.build_panic(literal, format_values, call_line);
                 (Type::Void, self.context.bool_type().const_zero().into())
@@ -444,17 +450,17 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                     // integer types cast
                     (from, to)
-                        if genpay_semantic::Analyzer::is_integer(from)
-                            && genpay_semantic::Analyzer::is_integer(to)
+                        if visitor::is_integer(from)
+                            && visitor::is_integer(to)
                             || from == &Type::Char
                             || to == &Type::Char
                             || from == &Type::Bool
                             || to == &Type::Bool =>
                     {
-                        let unsigned = genpay_semantic::Analyzer::is_unsigned_integer(to);
+                        let unsigned = visitor::is_unsigned_integer(to);
 
-                        let from_order = genpay_semantic::Analyzer::integer_order(from);
-                        let to_order = genpay_semantic::Analyzer::integer_order(to);
+                        let from_order = visitor::integer_order(from);
+                        let to_order = visitor::integer_order(to);
 
                         let value = if from_order > to_order {
                             // truncating
@@ -499,11 +505,11 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                     // float types casts
                     (from, to)
-                        if genpay_semantic::Analyzer::is_float(from)
-                            && genpay_semantic::Analyzer::is_float(to) =>
+                        if visitor::is_float(from)
+                            && visitor::is_float(to) =>
                     {
-                        let from_order = genpay_semantic::Analyzer::float_order(from);
-                        let to_order = genpay_semantic::Analyzer::float_order(to);
+                        let from_order = visitor::float_order(from);
+                        let to_order = visitor::float_order(to);
 
                         let value = if from_order > to_order {
                             // truncating
@@ -532,10 +538,10 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                     // `float -> integer` cast
                     (from, to)
-                        if genpay_semantic::Analyzer::is_float(from)
-                            && genpay_semantic::Analyzer::is_integer(to) =>
+                        if visitor::is_float(from)
+                            && visitor::is_integer(to) =>
                     {
-                        let unsigned = genpay_semantic::Analyzer::is_unsigned_integer(to);
+                        let unsigned = visitor::is_unsigned_integer(to);
 
                         let value = if unsigned {
                             self.builder
@@ -562,10 +568,10 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                     // `integer -> float` cast
                     (from, to)
-                        if genpay_semantic::Analyzer::is_integer(from)
-                            && genpay_semantic::Analyzer::is_float(to) =>
+                        if visitor::is_integer(from)
+                            && visitor::is_float(to) =>
                     {
-                        let unsigned = genpay_semantic::Analyzer::is_unsigned_integer(from);
+                        let unsigned = visitor::is_unsigned_integer(from);
 
                         let value = if unsigned {
                             self.builder
@@ -593,7 +599,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
                     // `pointer -> integer` cast
                     (from, to)
                         if matches!(from, &Type::Pointer(_))
-                            && genpay_semantic::Analyzer::is_integer(to) =>
+                            && visitor::is_integer(to) =>
                     {
                         let value = self
                             .builder
@@ -609,7 +615,7 @@ impl<'ctx> StandartMacros<'ctx> for CodeGen<'ctx> {
 
                     // `integer -> pointer` cast
                     (from, to)
-                        if genpay_semantic::Analyzer::is_integer(from)
+                        if visitor::is_integer(from)
                             && matches!(to, &Type::Pointer(_)) =>
                     {
                         let value = self

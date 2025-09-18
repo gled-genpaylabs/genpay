@@ -1,3 +1,4 @@
+use bumpalo::Bump;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 
@@ -106,8 +107,10 @@ fn main() {
 
     cli::info("Parsing", "syntax tree");
 
+    let bump = Bump::new();
+
     // Syntax Analyzer initialization.
-    let mut parser = genpay_parser::Parser::new(&src, fname.to_string());
+    let mut parser = genpay_parser::Parser::new(&src, fname.to_string(), &bump);
     let ast = match parser.parse() {
         Ok(ast) => ast,
         Err(errors) => {
@@ -134,7 +137,7 @@ fn main() {
     // Imports aren't working currently | 20/06/2025 v0.0.4
     //
     // Analyzer takes only reference to AST (because we only provide checking)
-    let mut analyzer = genpay_semantic::Analyzer::new(&src, fname, args.path.clone(), true);
+    let analyzer = genpay_semantic::Analyzer::new(&src, fname, args.path.clone(), true, &bump);
     let (symtable, warns) = match analyzer.analyze(&ast) {
         Ok(res) => res,
         Err((errors, warns)) => {
@@ -198,10 +201,10 @@ fn main() {
     // Code Generator Initialization.
     // Creating custom context and a very big wrapper for builder.
     let ctx = genpay_codegen::CodeGen::create_context();
-    let mut codegen = genpay_codegen::CodeGen::new(&ctx, &module_name, &src, symtable);
+    let mut codegen = genpay_codegen::CodeGen::new(&ctx, &module_name, &src, symtable, &bump);
 
     // Compiling: AST -> LLVM IR Module Reference
-    let (module_ref, _) = codegen.compile(ast, None);
+    let (module_ref, _) = codegen.compile(ast.to_vec(), None);
 
     // --llvm argument allows user to export LLVM IR module into file
     if args.llvm {

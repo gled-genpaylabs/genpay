@@ -1,3 +1,4 @@
+use genpay_semantic::visitor;
 use crate::{
     enumeration::Enumeration,
     function::Function,
@@ -7,6 +8,7 @@ use crate::{
     variable::Variable,
 };
 use genpay_parser::{expressions::Expressions, statements::Statements, types::Type, value::Value};
+use bumpalo::collections::CollectIn;
 use inkwell::{
     AddressSpace,
     basic_block::BasicBlock,
@@ -27,19 +29,21 @@ mod scope;
 mod structure;
 mod variable;
 
+use bumpalo::Bump;
 pub struct CodeGen<'ctx> {
     source: String,
 
     context: &'ctx Context,
     builder: Builder<'ctx>,
     module: Module<'ctx>,
+    bump: &'ctx Bump,
 
     scope: Box<Scope<'ctx>>,
     function: Option<FunctionValue<'ctx>>,
     breaks: Vec<BasicBlock<'ctx>>,
     booleans_strings: Option<(PointerValue<'ctx>, PointerValue<'ctx>)>,
 
-    symtable: SymbolTable,
+    symtable: SymbolTable<'ctx>,
     imports: HashMap<String, ModuleContent<'ctx>>,
     includes: Vec<String>,
 }
@@ -61,7 +65,8 @@ impl<'ctx> CodeGen<'ctx> {
         context: &'ctx Context,
         module_name: &str,
         module_source: &str,
-        symtable: SymbolTable,
+        symtable: SymbolTable<'ctx>,
+        bump: &'ctx Bump,
     ) -> Self {
         let module = context.create_module(module_name);
         let builder = context.create_builder();
@@ -88,6 +93,7 @@ impl<'ctx> CodeGen<'ctx> {
             context,
             builder,
             module,
+            bump,
 
             scope: Box::new(Scope::new()),
             function: None,
@@ -102,7 +108,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     pub fn compile(
         &mut self,
-        statements: Vec<Statements>,
+        statements: Vec<Statements<'ctx>>,
         prefix: Option<String>,
     ) -> (&Module<'ctx>, ModuleContent<'ctx>) {
         statements
@@ -126,7 +132,7 @@ impl<'ctx> CodeGen<'ctx> {
 }
 
 impl<'ctx> CodeGen<'ctx> {
-    fn compile_statement(&mut self, statement: Statements, prefix: Option<String>) {
+    fn compile_statement(&mut self, statement: Statements<'ctx>, prefix: Option<String>) {
         match statement {
             Statements::AssignStatement {
                 object,
@@ -135,17 +141,19 @@ impl<'ctx> CodeGen<'ctx> {
             } => {
                 if let Expressions::Value(Value::Identifier(identifier), _) = object {
                     let var = self.scope.get_variable(&identifier).unwrap();
-                    let compiled_value = self.compile_expression(value, Some(var.datatype));
+                    let (_, compiled_value) = self.compile_expression(value, Some(var.datatype.clone()));
 
-                    self.builder.build_store(var.ptr, compiled_value.1).unwrap();
+                    self.builder.build_store(var.ptr, compiled_value).unwrap();
                 } else {
-                    let ptr = self
-                        .compile_expression(object, Some(Type::Pointer(Box::new(Type::Undefined))));
-                    let value = self.compile_expression(value, None);
+                    let (_, ptr_value) = self.compile_expression(
+                        object,
+                        Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
+                    );
+                    let (_, value) = self.compile_expression(value, None);
 
                     let _ = self
                         .builder
-                        .build_store(ptr.1.into_pointer_value(), value.1);
+                        .build_store(ptr_value.into_pointer_value(), value);
                 }
             }
             Statements::BinaryAssignStatement {
@@ -154,12 +162,15 @@ impl<'ctx> CodeGen<'ctx> {
                 value,
                 span,
             } => {
+                let lhs = self.bump.alloc(object.clone());
+                let rhs = self.bump.alloc(value);
+
                 let stmt = Statements::AssignStatement {
-                    object: object.clone(),
+                    object,
                     value: Expressions::Binary {
                         operand,
-                        lhs: Box::new(object),
-                        rhs: Box::new(value),
+                        lhs,
+                        rhs,
                         span: (0, 0),
                     },
                     span,
@@ -176,7 +187,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                 match instance_type {
                     Type::Pointer(ptr_type) => {
-                        let compiled_value = self.compile_expression(value, Some(*ptr_type));
+                        let compiled_value = self.compile_expression(value, Some(ptr_type.clone()));
 
                         self.builder
                             .build_store(instance_ptr.into_pointer_value(), compiled_value.1)
@@ -187,7 +198,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let instance_ptr = self
                             .compile_expression(
                                 object,
-                                Some(Type::Pointer(Box::new(Type::Undefined))),
+                                Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                             )
                             .1;
 
@@ -227,13 +238,14 @@ impl<'ctx> CodeGen<'ctx> {
                             let recompiled = self
                                 .compile_expression(
                                     object,
-                                    Some(Type::Pointer(Box::new(Type::Undefined))),
+                                    Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                                 )
                                 .1;
                             recompiled.into_pointer_value()
                         };
 
-                        let value = self.compile_expression(value, Some(*item_type.clone()));
+                        let value =
+                            self.compile_expression(value, Some((*item_type).clone()));
 
                         // checking for the right index
                         let checker_block = self
@@ -283,7 +295,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let ptr = unsafe {
                             self.builder
                                 .build_in_bounds_gep(
-                                    self.get_basic_type(*item_type),
+                                    self.get_basic_type(item_type.clone()),
                                     obj_ptr,
                                     &[idx.1.into_int_value()],
                                     "",
@@ -296,11 +308,12 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                     Type::Pointer(ptr_type) => {
                         // compiling value and ptr
-                        let value = self.compile_expression(value, Some(*ptr_type.clone()));
+                        let value =
+                            self.compile_expression(value, Some((*ptr_type).clone()));
                         let ptr = unsafe {
                             self.builder
                                 .build_in_bounds_gep(
-                                    self.get_basic_type(*ptr_type),
+                                    self.get_basic_type(ptr_type.clone()),
                                     obj.1.into_pointer_value(),
                                     &[idx.1.into_int_value()],
                                     "",
@@ -316,7 +329,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let instance_ptr = self
                             .compile_expression(
                                 object,
-                                Some(Type::Pointer(Box::new(Type::Undefined))),
+                                Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                             )
                             .1;
 
@@ -342,8 +355,10 @@ impl<'ctx> CodeGen<'ctx> {
                 value,
                 span: _,
             } => {
-                let compiled_object =
-                    self.compile_expression(object, Some(Type::Pointer(Box::new(Type::Undefined))));
+                let compiled_object = self.compile_expression(
+                    object,
+                    Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
+                );
                 let compiled_value = self.compile_expression(value, Some(compiled_object.0));
 
                 self.builder
@@ -603,7 +618,7 @@ impl<'ctx> CodeGen<'ctx> {
                 arguments,
                 span: _,
             } => {
-                self.build_macro_call(&name, arguments);
+                self.build_macro_call(&name, arguments.to_vec());
             }
 
             Statements::StructDefineStatement {
@@ -666,7 +681,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     if let Some(Type::SelfRef) = function_value.arguments.first() {
                         *function_value.arguments.first_mut().unwrap() =
-                            Type::Pointer(Box::new(Type::Alias(name.clone())));
+                            Type::Pointer(self.bump.alloc(Type::Alias(name.clone())));
                     }
                     self.scope
                         .set_function(function_id.clone(), function_value.clone());
@@ -690,7 +705,7 @@ impl<'ctx> CodeGen<'ctx> {
                 self.scope.set_enum(
                     name.clone(),
                     Enumeration {
-                        fields,
+                        fields: fields.to_vec(),
                         functions: HashMap::new(),
                         llvm_type: self.context.i8_type().into(),
                     },
@@ -848,13 +863,15 @@ impl<'ctx> CodeGen<'ctx> {
 
                 // binding initialization
 
-                let mut compiled_iterator = self
-                    .compile_expression(iterator, Some(Type::Pointer(Box::new(Type::Undefined))));
+                let mut compiled_iterator = self.compile_expression(
+                    iterator,
+                    Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
+                );
 
                 if let Type::Pointer(ptr_type) = compiled_iterator.0 {
-                    compiled_iterator.0 = *ptr_type.clone();
+                    compiled_iterator.0 = ptr_type.clone();
 
-                    if let Type::Array(_, _) = *ptr_type {
+                    if let Type::Array(_, _) = ptr_type {
                         compiled_iterator.1 = self
                             .builder
                             .build_load(
@@ -867,10 +884,10 @@ impl<'ctx> CodeGen<'ctx> {
                 }
 
                 let binding_type = match compiled_iterator.0.clone() {
-                    typ if genpay_semantic::Analyzer::is_integer(&typ) => typ,
+                    typ if visitor::is_integer(&typ) => typ,
 
-                    Type::Array(typ, _) => *typ,
-                    Type::DynamicArray(typ) => *typ,
+                    Type::Array(typ, _) => typ.clone(),
+                    Type::DynamicArray(typ) => typ.clone(),
                     Type::Alias(alias) => {
                         let iterator_fn = self
                             .scope
@@ -907,9 +924,9 @@ impl<'ctx> CodeGen<'ctx> {
                 self.breaks.push(after_block);
 
                 match compiled_iterator.0.clone() {
-                    typ if genpay_semantic::Analyzer::is_integer(&typ) => {
+                    typ if visitor::is_integer(&typ) => {
                         // runtime checker for negative number
-                        if !genpay_semantic::Analyzer::is_unsigned_integer(&typ)
+                        if !visitor::is_unsigned_integer(&typ)
                             && compiled_iterator
                                 .1
                                 .into_int_value()
@@ -1117,7 +1134,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                         // assigning first element
 
-                        let basic_type = self.get_basic_type(*arrtype);
+                        let basic_type = self.get_basic_type(arrtype.clone());
                         let ptr = unsafe {
                             self.builder
                                 .build_gep(
@@ -1179,7 +1196,7 @@ impl<'ctx> CodeGen<'ctx> {
                 // making iteration
 
                 match compiled_iterator.0 {
-                    typ if genpay_semantic::Analyzer::is_integer(&typ) => {
+                    typ if visitor::is_integer(&typ) => {
                         let current_value = self
                             .builder
                             .build_load(basic_binding_type, binding_ptr, "itertmp")
@@ -1292,7 +1309,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                         // storing value to the binding
 
-                        let basic_type = self.get_basic_type(*arrtype);
+                        let basic_type = self.get_basic_type(arrtype.clone());
                         let ptr = unsafe {
                             self.builder
                                 .build_gep(
@@ -1399,7 +1416,7 @@ impl<'ctx> CodeGen<'ctx> {
                     Function {
                         datatype: return_type,
                         value: fn_value,
-                        arguments,
+                        arguments: arguments.to_vec(),
                         called: false,
                     },
                 )
@@ -1427,15 +1444,16 @@ impl<'ctx> CodeGen<'ctx> {
                     .imports
                     .get(&module_name)
                     .cloned()
-                    .unwrap_or_default();
+                    .unwrap();
                 let mut codegen = Self::new(
                     self.context,
                     &module_name,
                     &import.source,
                     import.embedded_symtable.clone(),
+                    self.bump,
                 );
 
-                let (_module, mut module_content) = codegen.compile(import.ast.clone(), None);
+                let (_module, mut module_content) = codegen.compile(import.ast.to_vec(), None);
 
                 module_content.functions.iter_mut().for_each(|func| {
                     let args_fmt = func
@@ -1511,9 +1529,9 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn compile_expression(
         &mut self,
-        expression: Expressions,
-        expected: Option<Type>,
-    ) -> (Type, BasicValueEnum<'ctx>) {
+        expression: Expressions<'ctx>,
+        expected: Option<Type<'ctx>>,
+    ) -> (Type<'ctx>, BasicValueEnum<'ctx>) {
         match expression {
             Expressions::Value(val, _) => self.compile_value(val, expected),
             Expressions::FnCall {
@@ -1549,12 +1567,12 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 }
 
-                if genpay_semantic::Analyzer::is_integer(&return_type)
-                    && (genpay_semantic::Analyzer::is_integer(
+                if visitor::is_integer(&return_type)
+                    && (visitor::is_integer(
                         expected.as_ref().unwrap_or(&Type::Void),
                     ) || matches!(expected.as_ref().unwrap_or(&Type::Void), Type::Char))
-                    && genpay_semantic::Analyzer::integer_order(expected.as_ref().unwrap())
-                        <= genpay_semantic::Analyzer::integer_order(&return_type)
+                    && visitor::integer_order(expected.as_ref().unwrap())
+                        <= visitor::integer_order(&return_type)
                 {
                     return_type = expected.unwrap();
                 }
@@ -1574,65 +1592,58 @@ impl<'ctx> CodeGen<'ctx> {
                 name,
                 arguments,
                 span: _,
-            } => self.build_macro_call(&name, arguments),
+            } => self.build_macro_call(&name, arguments.to_vec()),
 
-            Expressions::Reference { object, span: _ } => match *object {
+            Expressions::Reference { object, span: _ } => match &*object {
                 Expressions::Value(Value::Identifier(id), _) => {
-                    let var = self.scope.get_variable(&id).unwrap();
+                    let var = self.scope.get_variable(id).unwrap();
 
                     (
-                        Type::Pointer(Box::new(var.datatype.clone())),
+                        Type::Pointer(self.bump.alloc(var.datatype.clone())),
                         var.ptr.into(),
                     )
                 }
-                Expressions::Slice {
-                    object: _,
-                    index: _,
-                    span: _,
-                } => {
-                    self.compile_expression(*object, Some(Type::Pointer(Box::new(Type::Undefined))))
-                }
-                Expressions::SubElement {
-                    head: _,
-                    subelements: _,
-                    span: _,
-                } => {
+                Expressions::Slice {..} => self.compile_expression(
+                    (*object).clone(),
+                    Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
+                ),
+                Expressions::SubElement {..} => {
                     let (result_type, ptr) = self.compile_expression(
-                        *object,
-                        Some(Type::Pointer(Box::new(Type::Undefined))),
+                        (*object).clone(),
+                        Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                     );
-                    (Type::Pointer(Box::new(result_type)), ptr)
+                    (Type::Pointer(self.bump.alloc(result_type)), ptr)
                 }
                 _ => {
                     let value = self.compile_expression(
-                        *object,
-                        Some(Type::Pointer(Box::new(Type::Undefined))),
+                        (*object).clone(),
+                        Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                     );
                     let alloca = self.builder.build_alloca(value.1.get_type(), "").unwrap();
                     let _ = self.builder.build_store(alloca, value.1);
 
-                    (Type::Pointer(Box::new(value.0)), alloca.into())
+                    (Type::Pointer(self.bump.alloc(value.0)), alloca.into())
                 }
             },
             Expressions::Dereference { object, span: _ } => {
-                let (datatype, ptr) = self.compile_expression(*object.clone(), None);
+                let (datatype, ptr) = self.compile_expression((*object).clone(), None);
 
                 match datatype {
                     Type::Pointer(ptr_type) => {
-                        let basic_type = self.get_basic_type(*ptr_type.clone());
+                        let basic_type = self.get_basic_type(ptr_type.clone());
                         let value = self
                             .builder
                             .build_load(basic_type, ptr.into_pointer_value(), "")
                             .unwrap();
 
-                        (*ptr_type, value)
+                        (ptr_type.clone(), value)
                     }
 
                     Type::Alias(alias) => {
                         let ptr = self
                             .compile_expression(
-                                *object,
-                                Some(Type::Pointer(Box::new(Type::Undefined))),
+                                (*object).clone(),
+                                Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                             )
                             .1;
 
@@ -1664,12 +1675,12 @@ impl<'ctx> CodeGen<'ctx> {
                 object,
                 span: _,
             } => {
-                let mut object_value = self.compile_expression(*object, expected);
+                let mut object_value = self.compile_expression((*object).clone(), expected);
 
                 if let Type::Pointer(ref ptr_type) = object_value.0
-                    && let Type::Alias(_) = *ptr_type.clone()
+                    && let Type::Alias(_) = (*ptr_type).clone()
                 {
-                    object_value.0 = *ptr_type.clone();
+                    object_value.0 = (*ptr_type).clone();
                 }
 
                 if let Type::Alias(alias) = &object_value.0 {
@@ -1722,7 +1733,7 @@ impl<'ctx> CodeGen<'ctx> {
                         | Type::U32
                         | Type::U64
                         | Type::USIZE => (
-                            genpay_semantic::Analyzer::unsigned_to_signed_integer(&object_value.0),
+                            visitor::unsigned_to_signed_integer(&object_value.0),
                             self.builder
                                 .build_int_neg(object_value.1.into_int_value(), "")
                                 .unwrap()
@@ -1765,22 +1776,22 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 });
 
-                let lhs_value = self.compile_expression(*lhs.clone(), expected.clone());
-                let rhs_value = self.compile_expression(*rhs.clone(), expected.clone());
+                let lhs_value = self.compile_expression((*lhs).clone(), expected.clone());
+                let rhs_value = self.compile_expression((*rhs).clone(), expected.clone());
 
                 let senior_type = match lhs_value.0.clone() {
-                    typ if genpay_semantic::Analyzer::is_integer(&typ) => {
-                        if genpay_semantic::Analyzer::integer_order(&lhs_value.0)
-                            > genpay_semantic::Analyzer::integer_order(&rhs_value.0)
+                    typ if visitor::is_integer(&typ) => {
+                        if visitor::integer_order(&lhs_value.0)
+                            > visitor::integer_order(&rhs_value.0)
                         {
                             lhs_value.0
                         } else {
                             rhs_value.0.clone()
                         }
                     }
-                    typ if genpay_semantic::Analyzer::is_float(&typ) => {
-                        if genpay_semantic::Analyzer::float_order(&lhs_value.0)
-                            > genpay_semantic::Analyzer::float_order(&rhs_value.0)
+                    typ if visitor::is_float(&typ) => {
+                        if visitor::float_order(&lhs_value.0)
+                            > visitor::float_order(&rhs_value.0)
                         {
                             lhs_value.0
                         } else {
@@ -1799,9 +1810,9 @@ impl<'ctx> CodeGen<'ctx> {
                 };
 
                 let output = match senior_type.clone() {
-                    typ if genpay_semantic::Analyzer::is_integer(&typ) => match operand.as_str() {
+                    typ if visitor::is_integer(&typ) => match operand.as_str() {
                         "+" => {
-                            if genpay_semantic::Analyzer::is_unsigned_integer(&typ) {
+                            if visitor::is_unsigned_integer(&typ) {
                                 self.builder
                                     .build_int_nsw_add(
                                         lhs_value.1.into_int_value(),
@@ -1822,7 +1833,7 @@ impl<'ctx> CodeGen<'ctx> {
                             }
                         }
                         "-" => {
-                            if genpay_semantic::Analyzer::is_unsigned_integer(&typ) {
+                            if visitor::is_unsigned_integer(&typ) {
                                 self.builder
                                     .build_int_nsw_sub(
                                         lhs_value.1.into_int_value(),
@@ -1843,7 +1854,7 @@ impl<'ctx> CodeGen<'ctx> {
                             }
                         }
                         "*" => {
-                            if genpay_semantic::Analyzer::is_unsigned_integer(&typ) {
+                            if visitor::is_unsigned_integer(&typ) {
                                 self.builder
                                     .build_int_nsw_mul(
                                         lhs_value.1.into_int_value(),
@@ -1864,7 +1875,7 @@ impl<'ctx> CodeGen<'ctx> {
                             }
                         }
                         "/" => {
-                            if genpay_semantic::Analyzer::is_unsigned_integer(&typ) {
+                            if visitor::is_unsigned_integer(&typ) {
                                 self.builder
                                     .build_int_unsigned_div(
                                         lhs_value.1.into_int_value(),
@@ -1885,7 +1896,7 @@ impl<'ctx> CodeGen<'ctx> {
                             }
                         }
                         "%" => {
-                            if genpay_semantic::Analyzer::is_unsigned_integer(&typ) {
+                            if visitor::is_unsigned_integer(&typ) {
                                 self.builder
                                     .build_int_unsigned_rem(
                                         lhs_value.1.into_int_value(),
@@ -1910,7 +1921,7 @@ impl<'ctx> CodeGen<'ctx> {
                             "Unsupported for codegen operator found! Please open issue on Github!"
                         ),
                     },
-                    typ if genpay_semantic::Analyzer::is_float(&typ) => match operand.as_str() {
+                    typ if visitor::is_float(&typ) => match operand.as_str() {
                         "+" => self
                             .builder
                             .build_float_add(
@@ -1994,7 +2005,7 @@ impl<'ctx> CodeGen<'ctx> {
                             unsafe {
                                 self.builder
                                     .build_in_bounds_gep(
-                                        self.get_basic_type(*ptr_type.clone()),
+                                        self.get_basic_type(ptr_type.clone()),
                                         lhs_value.1.into_pointer_value(),
                                         &[rhs_value.1.into_int_value()],
                                         "",
@@ -2015,14 +2026,14 @@ impl<'ctx> CodeGen<'ctx> {
 
                         let left_ptr = self
                             .compile_expression(
-                                *lhs.clone(),
-                                Some(Type::Pointer(Box::new(Type::Undefined))),
+                                (*lhs).clone(),
+                                Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                             )
                             .1;
                         let right_ptr = self
                             .compile_expression(
-                                *rhs.clone(),
-                                Some(Type::Pointer(Box::new(Type::Undefined))),
+                                (*rhs).clone(),
+                                Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                             )
                             .1;
 
@@ -2058,9 +2069,9 @@ impl<'ctx> CodeGen<'ctx> {
                 rhs,
                 span: _,
             } => {
-                let mut lhs_value = self.compile_expression(*lhs.clone(), expected.clone());
+                let mut lhs_value = self.compile_expression(lhs.clone(), expected.clone());
                 let mut rhs_value =
-                    self.compile_expression(*rhs.clone(), Some(lhs_value.0.clone()));
+                    self.compile_expression(rhs.clone(), Some(lhs_value.0.clone()));
 
                 if let Type::Alias(left) = &lhs_value.0
                     && let Type::Alias(right) = &rhs_value.0
@@ -2123,7 +2134,7 @@ impl<'ctx> CodeGen<'ctx> {
                         (Type::Bool, result_value)
                     }
 
-                    typ if genpay_semantic::Analyzer::is_integer(&typ) || typ == Type::Char => {
+                    typ if visitor::is_integer(&typ) || typ == Type::Char => {
                         let predicate = match operand.as_str() {
                             ">" => inkwell::IntPredicate::SGT,
                             "<" => inkwell::IntPredicate::SLT,
@@ -2148,7 +2159,7 @@ impl<'ctx> CodeGen<'ctx> {
                         )
                     }
 
-                    typ if genpay_semantic::Analyzer::is_float(&typ) => {
+                    typ if visitor::is_float(&typ) => {
                         let predicate = match operand.as_str() {
                             ">" => inkwell::FloatPredicate::OGT,
                             "<" => inkwell::FloatPredicate::OLT,
@@ -2224,14 +2235,14 @@ impl<'ctx> CodeGen<'ctx> {
 
                         let left_ptr = self
                             .compile_expression(
-                                *lhs.clone(),
-                                Some(Type::Pointer(Box::new(Type::Undefined))),
+                                (*lhs).clone(),
+                                Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                             )
                             .1;
                         let right_ptr = self
                             .compile_expression(
-                                *rhs.clone(),
-                                Some(Type::Pointer(Box::new(Type::Undefined))),
+                                (*rhs).clone(),
+                                Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                             )
                             .1;
 
@@ -2297,10 +2308,10 @@ impl<'ctx> CodeGen<'ctx> {
                 rhs,
                 span: _,
             } => {
-                let left = self.compile_expression(*lhs, expected.clone());
-                let right = self.compile_expression(*rhs, expected.clone());
+                let left = self.compile_expression((*lhs).clone(), expected.clone());
+                let right = self.compile_expression((*rhs).clone(), expected.clone());
 
-                let sign_extend = genpay_semantic::Analyzer::is_unsigned_integer(&left.0);
+                let sign_extend = visitor::is_unsigned_integer(&left.0);
                 let basic_value = match operand.as_str() {
                     "<<" => self
                         .builder
@@ -2344,8 +2355,10 @@ impl<'ctx> CodeGen<'ctx> {
                 subelements,
                 span: _,
             } => {
-                let compiled_head =
-                    self.compile_expression(*head, Some(Type::Pointer(Box::new(Type::Undefined))));
+                let compiled_head = self.compile_expression(
+                    head.clone(),
+                    Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
+                );
 
                 let mut prev_val = compiled_head.1;
                 let mut prev_type = compiled_head.0;
@@ -2354,8 +2367,8 @@ impl<'ctx> CodeGen<'ctx> {
                 // There's no way you can get double pointer to a struct in sub-element, so i just
                 // placed self pointers into this shit.
                 if let Type::Pointer(ptr_type) = prev_type.clone() {
-                    if let Type::Pointer(ptr_type) = *ptr_type.clone() {
-                        prev_type = *ptr_type;
+                    if let Type::Pointer(ptr_type) = *ptr_type {
+                        prev_type = (*ptr_type).clone();
                         prev_val = self
                             .builder
                             .build_load(
@@ -2370,7 +2383,7 @@ impl<'ctx> CodeGen<'ctx> {
                 subelements.iter().for_each(|sub| match sub {
                     Expressions::Value(Value::Identifier(field), _) => {
                         if let Type::Pointer(ptr_type) = prev_type.clone() {
-                            prev_type = *ptr_type;
+                            prev_type = ptr_type.clone();
                         }
 
                         if let Type::Alias(alias) = prev_type.clone() {
@@ -2468,7 +2481,7 @@ impl<'ctx> CodeGen<'ctx> {
                         span: _,
                     } => {
                         if let Type::Pointer(ptr_type) = prev_type.clone() {
-                            prev_type = *ptr_type;
+                            prev_type = ptr_type.clone();
                         }
 
                         match prev_type.clone() {
@@ -2497,7 +2510,7 @@ impl<'ctx> CodeGen<'ctx> {
                                             .iter()
                                             .zip(function.arguments.clone())
                                             .map(|(arg, exp)| {
-                                                self.compile_expression(arg.clone(), Some(exp))
+                                                self.compile_expression(arg.clone(), Some(exp.clone()))
                                                     .1
                                                     .into()
                                             })
@@ -2506,8 +2519,8 @@ impl<'ctx> CodeGen<'ctx> {
                                         if let Some(Type::Pointer(ptr_type)) =
                                             function.arguments.first()
                                         {
-                                            if let Type::Alias(arg_alias) = *ptr_type.clone() {
-                                                if arg_alias == alias {
+                                            if let Type::Alias(arg_alias) = *ptr_type {
+                                                if arg_alias == &alias {
                                                     arguments.reverse();
                                                     arguments.push(prev_val.into());
                                                     arguments.reverse();
@@ -2536,7 +2549,7 @@ impl<'ctx> CodeGen<'ctx> {
                                     .iter()
                                     .zip(function.arguments.clone())
                                     .map(|(arg, exp)| {
-                                        self.compile_expression(arg.clone(), Some(exp)).1.into()
+                                        self.compile_expression(arg.clone(), Some(exp.clone())).1.into()
                                     })
                                     .collect::<Vec<BasicMetadataValueEnum>>();
 
@@ -2650,7 +2663,7 @@ impl<'ctx> CodeGen<'ctx> {
                 span: _,
             } => {
                 let expected_items_type = match expected {
-                    Some(Type::Array(typ, _)) => Some(*typ),
+                    Some(Type::Array(typ, _)) => Some(typ.clone()),
                     _ => None,
                 };
 
@@ -2688,7 +2701,10 @@ impl<'ctx> CodeGen<'ctx> {
                         self.builder.build_store(ptr, basic_value).unwrap();
                     });
 
-                (Type::Array(Box::new(arr_type), len), arr_alloca.into())
+                (
+                    Type::Array(self.bump.alloc(arr_type), len),
+                    arr_alloca.into(),
+                )
             }
             Expressions::Tuple { values, span: _ } => {
                 let mut expected_types = values.iter().map(|_| None).collect::<Vec<Option<Type>>>();
@@ -2709,10 +2725,10 @@ impl<'ctx> CodeGen<'ctx> {
                     false,
                 );
 
-                let compiled_types = compiled_values
+                let compiled_types: bumpalo::collections::Vec<'ctx, Type<'ctx>> = compiled_values
                     .iter()
                     .map(|(typ, _)| typ.clone())
-                    .collect::<Vec<Type>>();
+                    .collect_in(self.bump);
                 let alloca = self
                     .builder
                     .build_alloca(
@@ -2752,8 +2768,8 @@ impl<'ctx> CodeGen<'ctx> {
                 index,
                 span,
             } => {
-                let obj = self.compile_expression(*object.clone(), None);
-                let idx = self.compile_expression(*index, Some(Type::USIZE));
+                let obj = self.compile_expression((*object).clone(), None);
+                let idx = self.compile_expression((*index).clone(), Some(Type::USIZE));
 
                 match obj.0 {
                     Type::Array(ret_type, len) => {
@@ -2762,8 +2778,8 @@ impl<'ctx> CodeGen<'ctx> {
                         } else {
                             let recompiled = self
                                 .compile_expression(
-                                    *object.clone(),
-                                    Some(Type::Pointer(Box::new(Type::Undefined))),
+                                    object.clone(),
+                                    Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                                 )
                                 .1;
                             recompiled.into_pointer_value()
@@ -2815,7 +2831,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                         // getting value
 
-                        let basic_ret_type = self.get_basic_type(*ret_type.clone());
+                        let basic_ret_type = self.get_basic_type(ret_type.clone());
                         let ptr = unsafe {
                             self.builder
                                 .build_in_bounds_gep(
@@ -2830,14 +2846,17 @@ impl<'ctx> CodeGen<'ctx> {
                         if let Some(Type::Pointer(expected_ptr)) = expected
                             && *expected_ptr == Type::Undefined
                         {
-                            return (Type::Pointer(Box::new(*ret_type)), ptr.into());
+                            return (
+                                Type::Pointer(self.bump.alloc((*ret_type).clone())),
+                                ptr.into(),
+                            );
                         }
 
                         let ret_value = self.builder.build_load(basic_ret_type, ptr, "").unwrap();
-                        (*ret_type, ret_value)
+                        (ret_type.clone(), ret_value)
                     }
                     Type::Pointer(ptr_type) => {
-                        let basic_ret_type = self.get_basic_type(*ptr_type.clone());
+                        let basic_ret_type = self.get_basic_type(ptr_type.clone());
                         let ptr = unsafe {
                             self.builder
                                 .build_in_bounds_gep(
@@ -2850,15 +2869,15 @@ impl<'ctx> CodeGen<'ctx> {
                         };
 
                         let ret_value = self.builder.build_load(basic_ret_type, ptr, "").unwrap();
-                        (*ptr_type, ret_value)
+                        (ptr_type.clone(), ret_value)
                     }
 
                     Type::Alias(alias) => {
                         // getting struct ptr and type
                         let ptr = self
                             .compile_expression(
-                                *object,
-                                Some(Type::Pointer(Box::new(Type::Undefined))),
+                                (*object).clone(),
+                                Some(Type::Pointer(self.bump.alloc(Type::Undefined))),
                             )
                             .1;
 
@@ -2897,7 +2916,7 @@ impl<'ctx> CodeGen<'ctx> {
                 for (field_name, field_expr) in fields {
                     let struct_field = structure.fields.get(&field_name).unwrap();
                     let field_value =
-                        self.compile_expression(field_expr, Some(struct_field.datatype.clone()));
+                        self.compile_expression(field_expr.clone(), Some(struct_field.datatype.clone()));
 
                     // let ordered_index = self
                     //     .context
@@ -2935,11 +2954,11 @@ impl<'ctx> CodeGen<'ctx> {
     fn compile_value(
         &mut self,
         value: Value,
-        expected: Option<Type>,
-    ) -> (Type, BasicValueEnum<'ctx>) {
+        expected: Option<Type<'ctx>>,
+    ) -> (Type<'ctx>, BasicValueEnum<'ctx>) {
         match value {
             Value::Integer(int) => {
-                if genpay_semantic::Analyzer::is_integer(&expected.clone().unwrap_or(Type::Void))
+                if visitor::is_integer(&expected.clone().unwrap_or(Type::Void))
                     || expected == Some(Type::Char)
                 {
                     let exp = if let Some(exp) = expected.clone() {
@@ -3009,7 +3028,7 @@ impl<'ctx> CodeGen<'ctx> {
                     .unwrap();
                 global_value.set_constant(false);
                 (
-                    Type::Pointer(Box::new(Type::Char)),
+                    Type::Pointer(self.bump.alloc(Type::Char)),
                     global_value.as_pointer_value().into(),
                 )
             }
@@ -3070,11 +3089,11 @@ impl<'ctx> CodeGen<'ctx> {
                 let datatype = match expected {
                     Some(Type::Pointer(ptr_type)) => {
                         if id == "self" {
-                            Type::Pointer(Box::new(Type::Pointer(Box::new(
-                                variable.datatype.clone(),
-                            ))))
+                            Type::Pointer(self.bump.alloc(Type::Pointer(
+                                self.bump.alloc(variable.datatype.clone()),
+                            )))
                         } else if *ptr_type == Type::Undefined {
-                            Type::Pointer(Box::new(variable.datatype.clone()))
+                            Type::Pointer(self.bump.alloc(variable.datatype.clone()))
                         } else {
                             variable.datatype.clone()
                         }
@@ -3194,7 +3213,7 @@ impl<'ctx> CodeGen<'ctx> {
 
 impl<'ctx> CodeGen<'ctx> {
     #[inline]
-    fn get_basic_type(&self, datatype: Type) -> BasicTypeEnum<'ctx> {
+    fn get_basic_type(&self, datatype: Type<'ctx>) -> BasicTypeEnum<'ctx> {
         match datatype {
             Type::I8 => self.context.i8_type().into(),
             Type::I16 => self.context.i16_type().into(),
@@ -3215,9 +3234,10 @@ impl<'ctx> CodeGen<'ctx> {
             Type::Bool => self.context.bool_type().into(),
 
             Type::Pointer(_) => self.context.ptr_type(AddressSpace::default()).into(),
-            Type::Array(datatype, len) => {
-                self.get_basic_type(*datatype).array_type(len as u32).into()
-            }
+            Type::Array(datatype, len) => self
+                .get_basic_type(datatype.clone())
+                .array_type(len as u32)
+                .into(),
             Type::DynamicArray(_) => todo!(),
 
             Type::Tuple(types) => {
@@ -3281,7 +3301,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn get_fn_type(
         &self,
-        datatype: Type,
+        datatype: Type<'ctx>,
         arguments: &[BasicMetadataTypeEnum<'ctx>],
         is_var_args: bool,
     ) -> FunctionType<'ctx> {
@@ -3293,7 +3313,7 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    fn get_alias_type(&self, alias_type: Type, import_name: Option<&str>) -> Option<&str> {
+    fn get_alias_type(&self, alias_type: Type<'ctx>, import_name: Option<&str>) -> Option<&str> {
         if let Type::Alias(alias) = alias_type {
             let struct_type = self.scope.get_struct(&alias);
             let enum_type = self.scope.get_enum(&alias);
@@ -3370,7 +3390,7 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    fn type_specifier(&self, datatype: &Type) -> String {
+    fn type_specifier(&self, datatype: &Type<'ctx>) -> String {
         match datatype {
             Type::I8 => "%hhd",
             Type::I16 => "%hd",
@@ -3437,11 +3457,13 @@ mod tests {
     #[test]
     fn panic_function_test() {
         let ctx = CodeGen::create_context();
+        let bump = Bump::new();
         let mut codegen = CodeGen::new(
             &ctx,
             "",
             "",
             genpay_semantic::symtable::SymbolTable::default(),
+            &bump,
         );
 
         let main_fn = codegen.module.add_function(
@@ -3463,11 +3485,13 @@ mod tests {
     #[test]
     fn boolean_strings_test() {
         let ctx = CodeGen::create_context();
+        let bump = Bump::new();
         let mut codegen = CodeGen::new(
             &ctx,
             "",
             "",
             genpay_semantic::symtable::SymbolTable::default(),
+            &bump,
         );
 
         let main_fn = codegen.module.add_function(

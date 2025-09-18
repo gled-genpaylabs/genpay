@@ -12,7 +12,7 @@ pub struct Scope<'ctx> {
     functions: HashMap<String, Function<'ctx>>,
     structures: HashMap<String, Structure<'ctx>>,
     enumerations: HashMap<String, Enumeration<'ctx>>,
-    typedefs: HashMap<String, Type>,
+    typedefs: HashMap<String, Type<'ctx>>,
 }
 
 impl<'ctx> Default for Scope<'ctx> {
@@ -134,11 +134,11 @@ impl<'ctx> Scope<'ctx> {
     }
 
     // typedefs
-    pub fn set_typedef(&mut self, id: impl std::convert::AsRef<str>, object: Type) {
+    pub fn set_typedef(&mut self, id: impl std::convert::AsRef<str>, object: Type<'ctx>) {
         self.typedefs.insert(id.as_ref().into(), object);
     }
 
-    pub fn get_typedef(&self, id: impl std::convert::AsRef<str>) -> Option<Type> {
+    pub fn get_typedef(&self, id: impl std::convert::AsRef<str>) -> Option<Type<'ctx>> {
         self.typedefs.get(id.as_ref()).cloned().or_else(|| {
             self.parent
                 .as_ref()
@@ -188,7 +188,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                         if let Some(destructor) = structure.functions.get("drop") {
                             let called = self.scope.get_function(format!("struct_{alias}__drop")).unwrap().called;
-                            if destructor.arguments == vec![Type::Pointer(Box::new(var.datatype))] && !called {
+                            if destructor.arguments == vec![Type::Pointer(self.bump.alloc(var.datatype))] && !called {
                                 let _ = self.builder.build_call(
                                     destructor.value,
                                     &[

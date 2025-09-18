@@ -2082,7 +2082,7 @@ mod tests {
         } = statement
         {
             assert_eq!(*identifier, "x");
-            assert_eq!(datatype, &Some(Type::Pointer(self.bump.alloc(Type::I32))));
+            assert_eq!(datatype, &Some(Type::Pointer(bump.alloc(Type::I32))));
             assert!(matches!(value, Some(Expressions::Reference { .. })));
         } else {
             panic!(
@@ -2150,8 +2150,8 @@ mod tests {
             ..
         } = statement
         {
-            assert_eq!(arguments[0].1, Type::Pointer(self.bump.alloc(Type::I32)));
-            assert_eq!(*datatype, Type::Pointer(self.bump.alloc(Type::I32)));
+            assert_eq!(arguments[0].1, Type::Pointer(bump.alloc(Type::I32)));
+            assert_eq!(*datatype, Type::Pointer(bump.alloc(Type::I32)));
         } else {
             panic!(
                 "Failed to parse function with pointer. Got: {:?}",
@@ -2169,7 +2169,7 @@ mod tests {
         if let Statements::AnnotationStatement { datatype, .. } = statement {
             assert_eq!(
                 datatype,
-                &Some(Type::Pointer(self.bump.alloc(Type::Pointer(self.bump.alloc(Type::I32)))))
+                &Some(Type::Pointer(bump.alloc(Type::Pointer(bump.alloc(Type::I32)))))
             );
         } else {
             panic!(
