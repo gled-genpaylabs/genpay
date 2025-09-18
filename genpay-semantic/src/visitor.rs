@@ -1,12 +1,12 @@
-use crate::{Analyzer, Scope, error::SemanticError};
+use crate::{error::SemanticError, Analyzer, Scope};
 use bumpalo::collections::CollectIn;
 use genpay_parser::{expressions::Expressions, statements::Statements, types::Type};
 use std::collections::BTreeMap;
+use std::mem;
 use std::path::PathBuf;
-use std::rc::Rc;
 
 impl<'bump> Analyzer<'bump> {
-    pub fn visit_statement(self: &Rc<Self>, statement: &Statements<'bump>) {
+    pub fn visit_statement(&mut self, statement: &Statements<'bump>) {
         match statement {
             Statements::AnnotationStatement {
                 identifier,
@@ -14,7 +14,7 @@ impl<'bump> Analyzer<'bump> {
                 value,
                 span,
             } => {
-                if self.scope.borrow().variables.contains_key(identifier) {
+                if self.scope.variables.contains_key(identifier) {
                     self.error(SemanticError::RedefinitionError {
                         exception: format!(
                             "Variable `{identifier}` is already defined in this scope."
@@ -56,7 +56,6 @@ impl<'bump> Analyzer<'bump> {
                 }
 
                 self.scope
-                    .borrow_mut()
                     .add_var(identifier.clone(), var_type, initialized, *span);
             }
             Statements::Expression(expression) => {
@@ -81,11 +80,7 @@ impl<'bump> Analyzer<'bump> {
                     *is_var_args,
                 );
 
-                if let Err(err) =
-                    self.scope
-                        .borrow_mut()
-                        .add_fn(name.clone(), func_type.clone(), *public)
-                {
+                if let Err(err) = self.scope.add_fn(name.clone(), func_type.clone(), *public) {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
@@ -96,27 +91,25 @@ impl<'bump> Analyzer<'bump> {
                 }
 
                 let mut func_scope = Scope::new();
-                func_scope.parent = Some(Box::new(self.scope.borrow().clone()));
+                func_scope.parent = Some(Box::new(self.scope.clone()));
                 func_scope.expected = datatype.clone();
 
                 for (arg_name, arg_type) in arguments {
                     func_scope.add_var(arg_name.clone(), arg_type.clone(), true, (0, 0));
                 }
 
-                let original_scope = self.scope.borrow().clone();
-                *self.scope.borrow_mut() = func_scope;
+                let original_scope = mem::replace(&mut self.scope, func_scope);
 
                 for stmt in block {
                     self.visit_statement(stmt);
                 }
 
-                *self.scope.borrow_mut() = original_scope;
+                mem::replace(&mut self.scope, original_scope);
             }
             Statements::ReturnStatement { value, span } => {
-                let ret_type =
-                    self.visit_expression(value, Some(self.scope.borrow().expected.clone()));
-                if ret_type != self.scope.borrow().expected {
-                    let expected = self.scope.borrow().expected.clone();
+                let ret_type = self.visit_expression(value, Some(self.scope.expected.clone()));
+                if ret_type != self.scope.expected {
+                    let expected = self.scope.expected.clone();
                     self.error(SemanticError::TypesMismatch {
                         exception: format!(
                             "Expected return type `{expected}`, but found type `{ret_type}`."
@@ -146,23 +139,21 @@ impl<'bump> Analyzer<'bump> {
                 }
 
                 let mut then_scope = Scope::new();
-                then_scope.parent = Some(Box::new(self.scope.borrow().clone()));
-                let original_scope = self.scope.borrow().clone();
-                *self.scope.borrow_mut() = then_scope;
+                then_scope.parent = Some(Box::new(self.scope.clone()));
+                let original_scope = mem::replace(&mut self.scope, then_scope);
                 for stmt in then_block {
                     self.visit_statement(stmt);
                 }
-                *self.scope.borrow_mut() = original_scope;
+                mem::replace(&mut self.scope, original_scope);
 
                 if let Some(else_block) = else_block {
                     let mut else_scope = Scope::new();
-                    else_scope.parent = Some(Box::new(self.scope.borrow().clone()));
-                    let original_scope = self.scope.borrow().clone();
-                    *self.scope.borrow_mut() = else_scope;
+                    else_scope.parent = Some(Box::new(self.scope.clone()));
+                    let original_scope = mem::replace(&mut self.scope, else_scope);
                     for stmt in else_block {
                         self.visit_statement(stmt);
                     }
-                    *self.scope.borrow_mut() = original_scope;
+                    mem::replace(&mut self.scope, original_scope);
                 }
             }
             Statements::WhileStatement {
@@ -183,14 +174,13 @@ impl<'bump> Analyzer<'bump> {
                 }
 
                 let mut while_scope = Scope::new();
-                while_scope.parent = Some(Box::new(self.scope.borrow().clone()));
+                while_scope.parent = Some(Box::new(self.scope.clone()));
                 while_scope.is_loop = true;
-                let original_scope = self.scope.borrow().clone();
-                *self.scope.borrow_mut() = while_scope;
+                let original_scope = mem::replace(&mut self.scope, while_scope);
                 for stmt in block {
                     self.visit_statement(stmt);
                 }
-                *self.scope.borrow_mut() = original_scope;
+                mem::replace(&mut self.scope, original_scope);
             }
             Statements::ForStatement { .. } => {
                 // TODO: Implement for loops
@@ -204,11 +194,7 @@ impl<'bump> Analyzer<'bump> {
             } => {
                 let struct_type = Type::Struct(fields.clone(), BTreeMap::new());
 
-                if let Err(err) =
-                    self.scope
-                        .borrow_mut()
-                        .add_struct(name.clone(), struct_type, *public)
-                {
+                if let Err(err) = self.scope.add_struct(name.clone(), struct_type, *public) {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
@@ -229,11 +215,7 @@ impl<'bump> Analyzer<'bump> {
                     BTreeMap::new(),
                 );
 
-                if let Err(err) = self
-                    .scope
-                    .borrow_mut()
-                    .add_enum(name.clone(), enum_type, *public)
-                {
+                if let Err(err) = self.scope.add_enum(name.clone(), enum_type, *public) {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
@@ -265,16 +247,15 @@ impl<'bump> Analyzer<'bump> {
             }
             Statements::ScopeStatement { block, .. } => {
                 let mut scope = Scope::new();
-                scope.parent = Some(Box::new(self.scope.borrow().clone()));
-                let original_scope = self.scope.borrow().clone();
-                *self.scope.borrow_mut() = scope;
+                scope.parent = Some(Box::new(self.scope.clone()));
+                let original_scope = mem::replace(&mut self.scope, scope);
                 for stmt in block {
                     self.visit_statement(stmt);
                 }
-                *self.scope.borrow_mut() = original_scope;
+                mem::replace(&mut self.scope, original_scope);
             }
             Statements::BreakStatements { span } => {
-                if !self.scope.borrow().is_loop() {
+                if !self.scope.is_loop() {
                     self.error(SemanticError::UnsupportedExpression {
                         exception: "Cannot use `break` outside of a loop.".to_string(),
                         help: None,
@@ -288,11 +269,7 @@ impl<'bump> Analyzer<'bump> {
                 datatype,
                 span,
             } => {
-                if let Err(err) = self
-                    .scope
-                    .borrow_mut()
-                    .add_typedef(alias.clone(), datatype.clone())
-                {
+                if let Err(err) = self.scope.add_typedef(alias.clone(), datatype.clone()) {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
@@ -306,7 +283,7 @@ impl<'bump> Analyzer<'bump> {
     }
 
     pub fn visit_expression(
-        &self,
+        &mut self,
         expression: &Expressions<'bump>,
         _expected_type: Option<Type<'bump>>,
     ) -> Type<'bump> {
@@ -318,7 +295,7 @@ impl<'bump> Analyzer<'bump> {
                 genpay_parser::value::Value::Char(_) => Type::Char,
                 genpay_parser::value::Value::Boolean(_) => Type::Bool,
                 genpay_parser::value::Value::Identifier(name) => {
-                    if let Some(var) = self.scope.borrow_mut().get_var(name) {
+                    if let Some(var) = self.scope.get_var(name) {
                         var.datatype
                     } else {
                         self.error(SemanticError::UnresolvedName {
@@ -447,7 +424,7 @@ impl<'bump> Analyzer<'bump> {
                 arguments,
                 span,
             } => {
-                if let Some(func_type) = self.scope.borrow().get_fn(name) {
+                if let Some(func_type) = self.scope.get_fn(name) {
                     if let Type::Function(args, ret_type, _) = func_type {
                         if arguments.len() != args.len() {
                             self.error(SemanticError::ArgumentException {
@@ -498,7 +475,7 @@ impl<'bump> Analyzer<'bump> {
                 }
             }
             Expressions::Struct { name, fields, span } => {
-                if let Some(struct_type) = self.scope.borrow().get_struct(name) {
+                if let Some(struct_type) = self.scope.get_struct(name) {
                     if let Type::Struct(defined_fields, _) = struct_type.clone() {
                         if fields.len() != defined_fields.len() {
                             self.error(SemanticError::MissingFields {
@@ -675,9 +652,9 @@ impl<'bump> Analyzer<'bump> {
         }
     }
 
-    pub fn unwrap_alias(&self, a_type: &Type<'bump>) -> Result<Type<'bump>, String> {
+    pub fn unwrap_alias(&mut self, a_type: &Type<'bump>) -> Result<Type<'bump>, String> {
         if let Type::Alias(alias) = a_type {
-            if let Some(typ) = self.scope.borrow().get_typedef(alias) {
+            if let Some(typ) = self.scope.get_typedef(alias) {
                 self.unwrap_alias(&typ)
             } else {
                 Err(format!("Type alias `{alias}` not found."))
@@ -688,7 +665,7 @@ impl<'bump> Analyzer<'bump> {
     }
 
     pub fn verify_macrocall(
-        &self,
+        &mut self,
         _name: &str,
         _arguments: &[Expressions<'bump>],
         _span: &(usize, usize),
