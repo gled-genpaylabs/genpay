@@ -104,7 +104,7 @@ impl<'bump> Analyzer<'bump> {
                     self.visit_statement(stmt);
                 }
 
-                mem::replace(&mut self.scope, original_scope);
+                let _ = mem::replace(&mut self.scope, original_scope);
             }
             Statements::ReturnStatement { value, span } => {
                 let ret_type = self.visit_expression(value, Some(self.scope.expected.clone()));
@@ -144,7 +144,7 @@ impl<'bump> Analyzer<'bump> {
                 for stmt in then_block {
                     self.visit_statement(stmt);
                 }
-                mem::replace(&mut self.scope, original_scope);
+                let _ = mem::replace(&mut self.scope, original_scope);
 
                 if let Some(else_block) = else_block {
                     let mut else_scope = Scope::new();
@@ -153,7 +153,7 @@ impl<'bump> Analyzer<'bump> {
                     for stmt in else_block {
                         self.visit_statement(stmt);
                     }
-                    mem::replace(&mut self.scope, original_scope);
+                    let _ = mem::replace(&mut self.scope, original_scope);
                 }
             }
             Statements::WhileStatement {
@@ -180,7 +180,7 @@ impl<'bump> Analyzer<'bump> {
                 for stmt in block {
                     self.visit_statement(stmt);
                 }
-                mem::replace(&mut self.scope, original_scope);
+                let _ = mem::replace(&mut self.scope, original_scope);
             }
             Statements::ForStatement { .. } => {
                 // TODO: Implement for loops
@@ -252,7 +252,7 @@ impl<'bump> Analyzer<'bump> {
                 for stmt in block {
                     self.visit_statement(stmt);
                 }
-                mem::replace(&mut self.scope, original_scope);
+                let _ = mem::replace(&mut self.scope, original_scope);
             }
             Statements::BreakStatements { span } => {
                 if !self.scope.is_loop() {
@@ -424,6 +424,14 @@ impl<'bump> Analyzer<'bump> {
                 arguments,
                 span,
             } => {
+                if name.ends_with('!') {
+                    return self.verify_macrocall(
+                        name.strip_suffix('!').unwrap(),
+                        arguments,
+                        span,
+                    );
+                }
+
                 if let Some(func_type) = self.scope.get_fn(name) {
                     if let Type::Function(args, ret_type, _) = func_type {
                         if arguments.len() != args.len() {
@@ -666,11 +674,21 @@ impl<'bump> Analyzer<'bump> {
 
     pub fn verify_macrocall(
         &mut self,
-        _name: &str,
-        _arguments: &[Expressions<'bump>],
-        _span: &(usize, usize),
+        name: &str,
+        arguments: &[Expressions<'bump>],
+        span: &(usize, usize),
     ) -> Type<'bump> {
-        todo!()
+        if let Some(macr) = self.compiler_macros.get(name).cloned() {
+            macr.verify_call(self, arguments, span)
+        } else {
+            self.error(SemanticError::UnresolvedName {
+                exception: format!("Macro `{name}` not found."),
+                help: None,
+                src: (*self.source).clone(),
+                span: (*span).into(),
+            });
+            Type::Void
+        }
     }
 
     pub fn expand_library_path(&self, _path: &str, _is_module: bool) -> Result<PathBuf, String> {

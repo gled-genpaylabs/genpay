@@ -1,6 +1,5 @@
 use crate::Analyzer;
 use genpay_parser::{expressions::Expressions, types::Type};
-use std::rc::Rc;
 
 pub use cast::CastMacro;
 pub use format::FormatMacro;
@@ -19,7 +18,7 @@ mod sizeof;
 pub trait MacroObject<'bump>: std::fmt::Debug {
     fn verify_call(
         &self,
-        analyzer: &Rc<Analyzer<'bump>>,
+        analyzer: &mut Analyzer<'bump>,
         arguments: &[Expressions<'bump>],
         span: &(usize, usize),
     ) -> Type<'bump>;
@@ -47,7 +46,7 @@ pub enum CompilerMacros {
 impl<'bump> MacroObject<'bump> for CompilerMacros {
     fn verify_call(
         &self,
-        analyzer: &Rc<Analyzer<'bump>>,
+        analyzer: &mut Analyzer<'bump>,
         arguments: &[Expressions<'bump>],
         span: &(usize, usize),
     ) -> Type<'bump> {

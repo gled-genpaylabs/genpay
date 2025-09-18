@@ -4,7 +4,6 @@ use crate::{
     error::{self, SemanticError},
 };
 use genpay_parser::{expressions::Expressions, types::Type};
-use std::rc::Rc;
 
 /// **Converts expression to provided type**
 /// `cast!(EXPRESSION, TYPE)` -> `usize`
@@ -13,7 +12,7 @@ pub struct CastMacro;
 impl<'bump> MacroObject<'bump> for CastMacro {
     fn verify_call(
         &self,
-        analyzer: &Rc<Analyzer<'bump>>,
+        analyzer: &mut Analyzer<'bump>,
         arguments: &[Expressions<'bump>],
         span: &(usize, usize),
     ) -> Type<'bump> {
