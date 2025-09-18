@@ -1,7 +1,4 @@
-use crate::{
-    error::SemanticError,
-    Analyzer, Scope,
-};
+use crate::{Analyzer, Scope, error::SemanticError};
 use bumpalo::collections::CollectIn;
 use genpay_parser::{expressions::Expressions, statements::Statements, types::Type};
 use std::collections::BTreeMap;
@@ -19,7 +16,9 @@ impl<'bump> Analyzer<'bump> {
             } => {
                 if self.scope.borrow().variables.contains_key(identifier) {
                     self.error(SemanticError::RedefinitionError {
-                        exception: format!("Variable `{}` is already defined in this scope.", identifier),
+                        exception: format!(
+                            "Variable `{identifier}` is already defined in this scope."
+                        ),
                         help: Some("Consider using a different name.".to_string()),
                         src: (*self.source).clone(),
                         span: (*span).into(),
@@ -32,7 +31,9 @@ impl<'bump> Analyzer<'bump> {
                     if let Some(dt) = datatype {
                         if *dt != expr_type {
                             self.error(SemanticError::TypesMismatch {
-                                exception: format!("Expected type `{}`, but found type `{}`.", dt, expr_type),
+                                exception: format!(
+                                    "Expected type `{dt}`, but found type `{expr_type}`."
+                                ),
                                 help: None,
                                 src: (*self.source).clone(),
                                 span: expr.get_span().into(),
@@ -47,7 +48,7 @@ impl<'bump> Analyzer<'bump> {
                 if var_type == Type::Void {
                     self.error(SemanticError::SemanticalError {
                         exception: "Variable declaration must have a type or an initial value.".to_string(),
-                        help: Some(format!("Consider adding a type annotation, like `let {}: <type>;` or an initial value `let {} = <value>;`", identifier, identifier)),
+                        help: Some(format!("Consider adding a type annotation, like `let {identifier}: <type>;` or an initial value `let {identifier} = <value>;`")),
                         src: (*self.source).clone(),
                         span: (*span).into(),
                     });
@@ -72,12 +73,19 @@ impl<'bump> Analyzer<'bump> {
                 header_span: _,
             } => {
                 let func_type = Type::Function(
-                    arguments.iter().map(|(_, t)| t.clone()).collect_in(self.bump),
+                    arguments
+                        .iter()
+                        .map(|(_, t)| t.clone())
+                        .collect_in(self.bump),
                     self.bump.alloc(datatype.clone()),
                     *is_var_args,
                 );
 
-                if let Err(err) = self.scope.borrow_mut().add_fn(name.clone(), func_type.clone(), *public) {
+                if let Err(err) =
+                    self.scope
+                        .borrow_mut()
+                        .add_fn(name.clone(), func_type.clone(), *public)
+                {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
@@ -105,12 +113,13 @@ impl<'bump> Analyzer<'bump> {
                 *self.scope.borrow_mut() = original_scope;
             }
             Statements::ReturnStatement { value, span } => {
-                let ret_type = self.visit_expression(value, Some(self.scope.borrow().expected.clone()));
+                let ret_type =
+                    self.visit_expression(value, Some(self.scope.borrow().expected.clone()));
                 if ret_type != self.scope.borrow().expected {
+                    let expected = self.scope.borrow().expected.clone();
                     self.error(SemanticError::TypesMismatch {
                         exception: format!(
-                            "Expected return type `{}`, but found type `{}`.",
-                            self.scope.borrow().expected, ret_type
+                            "Expected return type `{expected}`, but found type `{ret_type}`."
                         ),
                         help: None,
                         src: (*self.source).clone(),
@@ -128,8 +137,7 @@ impl<'bump> Analyzer<'bump> {
                 if cond_type != Type::Bool {
                     self.error(SemanticError::TypesMismatch {
                         exception: format!(
-                            "Expected a boolean condition, but found type `{}`.",
-                            cond_type
+                            "Expected a boolean condition, but found type `{cond_type}`."
                         ),
                         help: None,
                         src: (*self.source).clone(),
@@ -166,8 +174,7 @@ impl<'bump> Analyzer<'bump> {
                 if cond_type != Type::Bool {
                     self.error(SemanticError::TypesMismatch {
                         exception: format!(
-                            "Expected a boolean condition, but found type `{}`.",
-                            cond_type
+                            "Expected a boolean condition, but found type `{cond_type}`."
                         ),
                         help: None,
                         src: (*self.source).clone(),
@@ -197,7 +204,11 @@ impl<'bump> Analyzer<'bump> {
             } => {
                 let struct_type = Type::Struct(fields.clone(), BTreeMap::new());
 
-                if let Err(err) = self.scope.borrow_mut().add_struct(name.clone(), struct_type, *public) {
+                if let Err(err) =
+                    self.scope
+                        .borrow_mut()
+                        .add_struct(name.clone(), struct_type, *public)
+                {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
@@ -213,9 +224,16 @@ impl<'bump> Analyzer<'bump> {
                 public,
                 span,
             } => {
-                let enum_type = Type::Enum(fields.iter().map(|s| s.clone()).collect_in(self.bump), BTreeMap::new());
+                let enum_type = Type::Enum(
+                    fields.iter().cloned().collect_in(self.bump),
+                    BTreeMap::new(),
+                );
 
-                if let Err(err) = self.scope.borrow_mut().add_enum(name.clone(), enum_type, *public) {
+                if let Err(err) = self
+                    .scope
+                    .borrow_mut()
+                    .add_enum(name.clone(), enum_type, *public)
+                {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
@@ -235,8 +253,7 @@ impl<'bump> Analyzer<'bump> {
                 if left_type != right_type {
                     self.error(SemanticError::TypesMismatch {
                         exception: format!(
-                            "Expected type `{}`, but found type `{}`.",
-                            left_type, right_type
+                            "Expected type `{left_type}`, but found type `{right_type}`."
                         ),
                         help: None,
                         src: (*self.source).clone(),
@@ -271,7 +288,11 @@ impl<'bump> Analyzer<'bump> {
                 datatype,
                 span,
             } => {
-                if let Err(err) = self.scope.borrow_mut().add_typedef(alias.clone(), datatype.clone()) {
+                if let Err(err) = self
+                    .scope
+                    .borrow_mut()
+                    .add_typedef(alias.clone(), datatype.clone())
+                {
                     self.error(SemanticError::RedefinitionError {
                         exception: err,
                         help: None,
@@ -301,7 +322,7 @@ impl<'bump> Analyzer<'bump> {
                         var.datatype
                     } else {
                         self.error(SemanticError::UnresolvedName {
-                            exception: format!("Variable `{}` not found in this scope.", name),
+                            exception: format!("Variable `{name}` not found in this scope."),
                             help: None,
                             src: (*self.source).clone(),
                             span: (*span).into(),
@@ -324,10 +345,12 @@ impl<'bump> Analyzer<'bump> {
                         if !is_integer(&obj_type) && !is_float(&obj_type) {
                             self.error(SemanticError::TypesMismatch {
                                 exception: format!(
-                                    "Cannot apply unary operator `-` to type `{}`.",
-                                    obj_type
+                                    "Cannot apply unary operator `-` to type `{obj_type}`."
                                 ),
-                                help: Some("The `-` operator can only be applied to integers and floats.".to_string()),
+                                help: Some(
+                                    "The `-` operator can only be applied to integers and floats."
+                                        .to_string(),
+                                ),
                                 src: (*self.source).clone(),
                                 span: (*span).into(),
                             });
@@ -338,10 +361,11 @@ impl<'bump> Analyzer<'bump> {
                         if obj_type != Type::Bool {
                             self.error(SemanticError::TypesMismatch {
                                 exception: format!(
-                                    "Cannot apply unary operator `!` to type `{}`.",
-                                    obj_type
+                                    "Cannot apply unary operator `!` to type `{obj_type}`."
                                 ),
-                                help: Some("The `!` operator can only be applied to booleans.".to_string()),
+                                help: Some(
+                                    "The `!` operator can only be applied to booleans.".to_string(),
+                                ),
                                 src: (*self.source).clone(),
                                 span: (*span).into(),
                             });
@@ -350,7 +374,7 @@ impl<'bump> Analyzer<'bump> {
                     }
                     _ => {
                         self.error(SemanticError::UnsupportedExpression {
-                            exception: format!("Unsupported unary operator `{}`.", operand),
+                            exception: format!("Unsupported unary operator `{operand}`."),
                             help: None,
                             src: (*self.source).clone(),
                             span: (*span).into(),
@@ -385,8 +409,7 @@ impl<'bump> Analyzer<'bump> {
                         } else {
                             self.error(SemanticError::TypesMismatch {
                                 exception: format!(
-                                    "Cannot apply binary operator `{}` to types `{}` and `{}`.",
-                                    operand, left_type, right_type
+                                    "Cannot apply binary operator `{operand}` to types `{left_type}` and `{right_type}`."
                                 ),
                                 help: Some("This operator can only be applied to numbers of the same type.".to_string()),
                                 src: (*self.source).clone(),
@@ -399,8 +422,7 @@ impl<'bump> Analyzer<'bump> {
                         if left_type != right_type {
                             self.error(SemanticError::TypesMismatch {
                                 exception: format!(
-                                    "Cannot apply binary operator `{}` to types `{}` and `{}`.",
-                                    operand, left_type, right_type
+                                    "Cannot apply binary operator `{operand}` to types `{left_type}` and `{right_type}`."
                                 ),
                                 help: Some("Comparison operators can only be applied to values of the same type.".to_string()),
                                 src: (*self.source).clone(),
@@ -411,7 +433,7 @@ impl<'bump> Analyzer<'bump> {
                     }
                     _ => {
                         self.error(SemanticError::UnsupportedExpression {
-                            exception: format!("Unsupported binary operator `{}`.", operand),
+                            exception: format!("Unsupported binary operator `{operand}`."),
                             help: None,
                             src: (*self.source).clone(),
                             span: (*span).into(),
@@ -430,8 +452,7 @@ impl<'bump> Analyzer<'bump> {
                         if arguments.len() != args.len() {
                             self.error(SemanticError::ArgumentException {
                                 exception: format!(
-                                    "Function `{}` expects {} arguments, but {} were provided.",
-                                    name,
+                                    "Function `{name}` expects {} arguments, but {} were provided.",
                                     args.len(),
                                     arguments.len()
                                 ),
@@ -444,10 +465,10 @@ impl<'bump> Analyzer<'bump> {
                         for (i, arg_expr) in arguments.iter().enumerate() {
                             let arg_type = self.visit_expression(arg_expr, Some(args[i].clone()));
                             if arg_type != args[i] {
+                                let expected_arg = &args[i];
                                 self.error(SemanticError::TypesMismatch {
                                     exception: format!(
-                                        "Expected argument of type `{}`, but found type `{}`.",
-                                        args[i], arg_type
+                                        "Expected argument of type `{expected_arg}`, but found type `{arg_type}`."
                                     ),
                                     help: None,
                                     src: (*self.source).clone(),
@@ -459,7 +480,7 @@ impl<'bump> Analyzer<'bump> {
                         (*ret_type).clone()
                     } else {
                         self.error(SemanticError::SemanticalError {
-                            exception: format!("`{}` is not a function.", name),
+                            exception: format!("`{name}` is not a function."),
                             help: None,
                             src: (*self.source).clone(),
                             span: (*span).into(),
@@ -468,7 +489,7 @@ impl<'bump> Analyzer<'bump> {
                     }
                 } else {
                     self.error(SemanticError::UnresolvedName {
-                        exception: format!("Function `{}` not found.", name),
+                        exception: format!("Function `{name}` not found."),
                         help: None,
                         src: (*self.source).clone(),
                         span: (*span).into(),
@@ -476,19 +497,13 @@ impl<'bump> Analyzer<'bump> {
                     Type::Void
                 }
             }
-            Expressions::Struct {
-                name,
-                fields,
-                span,
-            } => {
+            Expressions::Struct { name, fields, span } => {
                 if let Some(struct_type) = self.scope.borrow().get_struct(name) {
-                    if let Type::Struct(defined_fields, _) = struct_type.clone()
-                    {
+                    if let Type::Struct(defined_fields, _) = struct_type.clone() {
                         if fields.len() != defined_fields.len() {
                             self.error(SemanticError::MissingFields {
                                 exception: format!(
-                                    "Struct `{}` expects {} fields, but {} were provided.",
-                                    name,
+                                    "Struct `{name}` expects {} fields, but {} were provided.",
                                     defined_fields.len(),
                                     fields.len()
                                 ),
@@ -500,15 +515,12 @@ impl<'bump> Analyzer<'bump> {
 
                         for (field_name, field_expr) in fields {
                             if let Some(defined_field_type) = defined_fields.get(field_name) {
-                                let field_type = self.visit_expression(
-                                    field_expr,
-                                    Some(defined_field_type.clone()),
-                                );
+                                let field_type = self
+                                    .visit_expression(field_expr, Some(defined_field_type.clone()));
                                 if field_type != *defined_field_type {
                                     self.error(SemanticError::TypesMismatch {
                                         exception: format!(
-                                            "Expected field `{}` to be of type `{}`, but found type `{}`.",
-                                            field_name, defined_field_type, field_type
+                                            "Expected field `{field_name}` to be of type `{defined_field_type}`, but found type `{field_type}`."
                                         ),
                                         help: None,
                                         src: (*self.source).clone(),
@@ -518,8 +530,7 @@ impl<'bump> Analyzer<'bump> {
                             } else {
                                 self.error(SemanticError::UnresolvedName {
                                     exception: format!(
-                                        "Field `{}` not found on struct `{}`.",
-                                        field_name, name
+                                        "Field `{field_name}` not found on struct `{name}`."
                                     ),
                                     help: None,
                                     src: (*self.source).clone(),
@@ -533,7 +544,7 @@ impl<'bump> Analyzer<'bump> {
                     }
                 } else {
                     self.error(SemanticError::UnresolvedName {
-                        exception: format!("Struct `{}` not found.", name),
+                        exception: format!("Struct `{name}` not found."),
                         help: None,
                         src: (*self.source).clone(),
                         span: (*span).into(),
@@ -548,15 +559,16 @@ impl<'bump> Analyzer<'bump> {
             } => {
                 let mut current_type = self.visit_expression(head, None);
                 for sub in subelements {
-                    if let Expressions::Value(genpay_parser::value::Value::Identifier(name), _) = sub {
+                    if let Expressions::Value(genpay_parser::value::Value::Identifier(name), _) =
+                        sub
+                    {
                         if let Type::Struct(fields, _) = current_type.clone() {
                             if let Some(field_type) = fields.get(name) {
                                 current_type = field_type.clone();
                             } else {
                                 self.error(SemanticError::UnresolvedName {
                                     exception: format!(
-                                        "Field `{}` not found on type `{}`.",
-                                        name, current_type
+                                        "Field `{name}` not found on type `{current_type}`."
                                     ),
                                     help: None,
                                     src: (*self.source).clone(),
@@ -567,8 +579,7 @@ impl<'bump> Analyzer<'bump> {
                         } else {
                             self.error(SemanticError::UnsupportedExpression {
                                 exception: format!(
-                                    "Cannot access field on non-struct type `{}`.",
-                                    current_type
+                                    "Cannot access field on non-struct type `{current_type}`."
                                 ),
                                 help: None,
                                 src: (*self.source).clone(),
@@ -593,8 +604,7 @@ impl<'bump> Analyzer<'bump> {
                     if current_type != first_type {
                         self.error(SemanticError::TypesMismatch {
                             exception: format!(
-                                "Array elements must have the same type. Expected `{}` but found `{}`.",
-                                first_type, current_type
+                                "Array elements must have the same type. Expected `{first_type}` but found `{current_type}`."
                             ),
                             help: None,
                             src: (*self.source).clone(),
@@ -623,8 +633,7 @@ impl<'bump> Analyzer<'bump> {
                 if !is_integer(&index_type) {
                     self.error(SemanticError::TypesMismatch {
                         exception: format!(
-                            "Array index must be an integer, but found `{}`.",
-                            index_type
+                            "Array index must be an integer, but found `{index_type}`."
                         ),
                         help: None,
                         src: (*self.source).clone(),
@@ -636,7 +645,7 @@ impl<'bump> Analyzer<'bump> {
                     (*elem_type).clone()
                 } else {
                     self.error(SemanticError::TypesMismatch {
-                        exception: format!("Cannot index non-array type `{}`.", obj_type),
+                        exception: format!("Cannot index non-array type `{obj_type}`."),
                         help: None,
                         src: (*self.source).clone(),
                         span: (*span).into(),
@@ -654,7 +663,7 @@ impl<'bump> Analyzer<'bump> {
                     (*elem_type).clone()
                 } else {
                     self.error(SemanticError::TypesMismatch {
-                        exception: format!("Cannot dereference non-pointer type `{}`.", obj_type),
+                        exception: format!("Cannot dereference non-pointer type `{obj_type}`."),
                         help: None,
                         src: (*self.source).clone(),
                         span: (*span).into(),
@@ -671,7 +680,7 @@ impl<'bump> Analyzer<'bump> {
             if let Some(typ) = self.scope.borrow().get_typedef(alias) {
                 self.unwrap_alias(&typ)
             } else {
-                Err(format!("Type alias `{}` not found.", alias))
+                Err(format!("Type alias `{alias}` not found."))
             }
         } else {
             Ok(a_type.clone())
@@ -687,19 +696,11 @@ impl<'bump> Analyzer<'bump> {
         todo!()
     }
 
-    pub fn expand_library_path(
-        &self,
-        _path: &str,
-        _is_module: bool,
-    ) -> Result<PathBuf, String> {
+    pub fn expand_library_path(&self, _path: &str, _is_module: bool) -> Result<PathBuf, String> {
         todo!()
     }
 
-    pub fn verify_cast(
-        &self,
-        _from_type: &Type,
-        _target_type: &Type,
-    ) -> Result<(), String> {
+    pub fn verify_cast(&self, _from_type: &Type, _target_type: &Type) -> Result<(), String> {
         todo!()
     }
 }
@@ -740,7 +741,7 @@ pub fn float_order(a_type: &Type) -> u8 {
 pub fn is_unsigned_integer(a_type: &Type) -> bool {
     matches!(
         a_type,
-        Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::USIZE
+        Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::Usize
     )
 }
 
@@ -750,7 +751,7 @@ pub fn unsigned_to_signed_integer<'c>(a_type: &Type<'c>) -> Type<'c> {
         Type::U16 => Type::I16,
         Type::U32 => Type::I32,
         Type::U64 => Type::I64,
-        Type::USIZE => Type::I64,
+        Type::Usize => Type::I64,
         _ => a_type.clone(),
     }
 }

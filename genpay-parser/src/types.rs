@@ -19,7 +19,7 @@ pub enum Type<'bump> {
     U16,
     U32,
     U64,
-    USIZE,
+    Usize,
 
     Bool,
     Void,
@@ -42,7 +42,7 @@ pub enum Type<'bump> {
     ImportObject(String),
 }
 
-impl<'a, 'bump> std::fmt::Display for Type<'bump> {
+impl<'bump> std::fmt::Display for Type<'bump> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Type::SelfRef => write!(f, "&self"),
@@ -61,7 +61,7 @@ impl<'a, 'bump> std::fmt::Display for Type<'bump> {
             Type::U16 => write!(f, "u16"),
             Type::U32 => write!(f, "u32"),
             Type::U64 => write!(f, "u64"),
-            Type::USIZE => write!(f, "usize"),
+            Type::Usize => write!(f, "usize"),
 
             Type::Char => write!(f, "char"),
             Type::String => write!(f, "string"),

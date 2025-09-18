@@ -9,7 +9,11 @@ pub struct Token<'a> {
 }
 
 impl<'a> Token<'a> {
-    pub fn new(value: impl Into<Cow<'a, str>>, token_type: TokenType, span: (usize, usize)) -> Self {
+    pub fn new(
+        value: impl Into<Cow<'a, str>>,
+        token_type: TokenType,
+        span: (usize, usize),
+    ) -> Self {
         Self {
             value: value.into(),
             token_type,

@@ -21,7 +21,9 @@ impl<'a> Lexer<'a> {
     }
 
     fn peek(&self) -> Option<char> {
-        self.source.get(self.cursor..).and_then(|s| s.chars().next())
+        self.source
+            .get(self.cursor..)
+            .and_then(|s| s.chars().next())
     }
 
     fn advance(&mut self) -> Option<char> {
@@ -136,7 +138,7 @@ impl<'a> Lexer<'a> {
                     .source
                     .chars()
                     .nth(self.cursor + 1)
-                    .map_or(false, |c| c.is_ascii_digit())
+                    .is_some_and(|c| c.is_ascii_digit())
             {
                 token_type = TokenType::FloatNumber;
                 self.advance();
@@ -219,10 +221,7 @@ impl<'a> Iterator for Lexer<'a> {
         }
 
         let start = self.cursor;
-        let char = match self.peek() {
-            Some(c) => c,
-            None => return None,
-        };
+        let char = self.peek()?;
 
         let result = match char {
             '(' => {
@@ -423,7 +422,7 @@ mod tests {
         let lexer = Lexer::new(&input);
         let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
 
-        let expected = vec![(TokenType::Boolean, "true"), (TokenType::Boolean, "false")];
+        let expected = [(TokenType::Boolean, "true"), (TokenType::Boolean, "false")];
 
         assert_eq!(tokens.len(), expected.len());
         for (token, (expected_type, expected_value)) in tokens.iter().zip(expected.iter()) {
@@ -438,7 +437,7 @@ mod tests {
         let lexer = Lexer::new(&input);
         let tokens: Vec<_> = lexer.collect::<Result<_, _>>().unwrap();
 
-        let expected = vec![
+        let expected = [
             (TokenType::Keyword, "let"),
             (TokenType::Keyword, "fn"),
             (TokenType::Keyword, "import"),
@@ -460,10 +459,7 @@ mod tests {
         let input = "123".to_string();
         let mut lexer = Lexer::new(&input);
         let token = lexer.next().unwrap().unwrap();
-        assert_eq!(
-            token,
-            Token::new("123", TokenType::Number, (0, 3))
-        );
+        assert_eq!(token, Token::new("123", TokenType::Number, (0, 3)));
     }
 
     #[test]
@@ -471,10 +467,7 @@ mod tests {
         let input = "1.23".to_string();
         let mut lexer = Lexer::new(&input);
         let token = lexer.next().unwrap().unwrap();
-        assert_eq!(
-            token,
-            Token::new("1.23", TokenType::FloatNumber, (0, 4))
-        );
+        assert_eq!(token, Token::new("1.23", TokenType::FloatNumber, (0, 4)));
     }
 
     #[test]

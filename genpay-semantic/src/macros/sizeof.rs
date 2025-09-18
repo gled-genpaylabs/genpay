@@ -1,7 +1,7 @@
 use super::MacroObject;
 use crate::{
-    error::{self, SemanticError},
     Analyzer,
+    error::{self, SemanticError},
 };
 use genpay_parser::{expressions::Expressions, types::Type};
 use std::rc::Rc;
@@ -18,7 +18,7 @@ impl<'bump> MacroObject<'bump> for SizeofMacro {
         span: &(usize, usize),
     ) -> Type<'bump> {
         const MINIMUM_ARGUMENTS_LEN: usize = 1;
-        const RETURN_TYPE: Type = Type::USIZE;
+        const RETURN_TYPE: Type = Type::Usize;
 
         if arguments.len() < MINIMUM_ARGUMENTS_LEN {
             let err = SemanticError::ArgumentException {

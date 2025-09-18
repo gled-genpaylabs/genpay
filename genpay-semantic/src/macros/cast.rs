@@ -1,7 +1,7 @@
 use super::MacroObject;
 use crate::{
-    error::{self, SemanticError},
     Analyzer,
+    error::{self, SemanticError},
 };
 use genpay_parser::{expressions::Expressions, types::Type};
 use std::rc::Rc;

@@ -1,8 +1,8 @@
 use super::MacroObject;
 use crate::{
+    Analyzer,
     error::{self, SemanticError},
     visitor::{is_float, is_integer},
-    Analyzer,
 };
 use genpay_parser::{expressions::Expressions, types::Type, value::Value};
 use std::rc::Rc;
