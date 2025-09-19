@@ -265,6 +265,8 @@ dependencies = [
  "clap",
  "colored",
  "genpay-codegen",
+ "genpay-hir",
+ "genpay-hir-lower",
  "genpay-lexer",
  "genpay-linker",
  "genpay-parser",
@@ -285,6 +287,21 @@ dependencies = [
  "genpay-semantic",
  "inkwell",
  "llvm-sys",
+ "miette",
+ "thiserror 2.0.12",
+]
+
+[[package]]
+name = "genpay-hir"
+version = "1.1.1"
+
+[[package]]
+name = "genpay-hir-lower"
+version = "1.1.1"
+dependencies = [
+ "bumpalo",
+ "genpay-hir",
+ "genpay-parser",
  "miette",
  "thiserror 2.0.12",
 ]

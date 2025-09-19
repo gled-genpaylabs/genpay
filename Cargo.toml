@@ -6,6 +6,8 @@ members = [
   "genpay-semantic",
   "genpay-codegen",
   "genpay-linker",
+  "genpay-hir",
+  "genpay-hir-lower",
 ]
 resolver = "2"
 

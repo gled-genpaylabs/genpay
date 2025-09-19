@@ -19,6 +19,8 @@ bumpalo = { version = "3.19.0", features = ["collections"] }
 
 genpay-lexer = { path = "../genpay-lexer" }
 genpay-parser = { path = "../genpay-parser" }
+genpay-hir = { path = "../genpay-hir" }
+genpay-hir-lower = { path = "../genpay-hir-lower" }
 genpay-semantic = { path = "../genpay-semantic" }
 genpay-codegen = { path = "../genpay-codegen" }
 genpay-linker = { path = "../genpay-linker" }

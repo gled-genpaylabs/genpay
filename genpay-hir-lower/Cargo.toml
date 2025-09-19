@@ -1,0 +1,15 @@
+[package]
+name = "genpay-hir-lower"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+genpay-parser = { path = "../genpay-parser" }
+genpay-hir = { path = "../genpay-hir" }
+miette = { version = "7.5.0", features = ["fancy"] }
+thiserror = "2.0.12"
+bumpalo = { version = "3.15.0", features = ["collections"] }
