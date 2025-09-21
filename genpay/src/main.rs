@@ -226,31 +226,40 @@ fn main() {
             &format!("compiled to LLVM IR: `{}.ll`", args.output.display()),
         )
     } else {
-        genpay_linker::compiler::ObjectCompiler::compile_module(module_ref, &module_name, args.bpf);
-        let compiler = genpay_linker::linker::ObjectLinker::link(
-            &module_name,
-            args.output.to_str().unwrap(),
-            external_linkages,
-        )
-        .unwrap_or_else(|err| {
-            let object_linker = genpay_linker::linker::ObjectLinker::detect_compiler()
-                .unwrap_or(String::from("none"));
-            cli::error(&format!(
-                "Linker catched an error! (object linker: `{object_linker}`)"
-            ));
-            println!("\n{err}\n");
+        let output_path_str = if args.bpf {
+            args.output.to_str().unwrap().to_string()
+        } else {
+            format!("{}.o", module_name)
+        };
+        let output_path = std::path::Path::new(&output_path_str);
 
-            cli::error(
-                "Please make sure you linked all the necessary libraries (check the '-i' argument)",
-            );
-            std::process::exit(1);
-        });
+        genpay_linker::compiler::ObjectCompiler::compile_module(module_ref, output_path, args.bpf);
+        if !args.bpf {
+            let compiler = genpay_linker::linker::ObjectLinker::link(
+                &module_name,
+                args.output.to_str().unwrap(),
+                external_linkages,
+            )
+            .unwrap_or_else(|err| {
+                let object_linker = genpay_linker::linker::ObjectLinker::detect_compiler()
+                    .unwrap_or(String::from("none"));
+                cli::error(&format!(
+                    "Linker catched an error! (object linker: `{object_linker}`)"
+                ));
+                println!("\n{err}\n");
 
-        let formatted_output = args.output.display().to_string();
+                cli::error(
+                    "Please make sure you linked all the necessary libraries (check the '-i' argument)",
+                );
+                std::process::exit(1);
+            });
 
-        cli::info(
-            "Successfully",
-            &format!("compiled to binary (with `{compiler}`): `{formatted_output}`"),
-        )
+            let formatted_output = args.output.display().to_string();
+
+            cli::info(
+                "Successfully",
+                &format!("compiled to binary (with `{compiler}`): `{formatted_output}`"),
+            )
+        }
     }
 }

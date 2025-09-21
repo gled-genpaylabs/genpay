@@ -26,3 +26,8 @@ genpay-linker = { path = "../genpay-linker" }
 [dev-dependencies]
 assert_cmd = "2.0.17"
 anyhow = "1.0.99"
+tempfile = "3.2"
+object = "0.32"
+
+[[test]]
+name = "bpf"

@@ -1,13 +1,14 @@
 use inkwell::{
-    OptimizationLevel,
     module::Module,
     targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple},
+    OptimizationLevel,
 };
+use std::path::Path;
 
 pub struct ObjectCompiler;
 
 impl ObjectCompiler {
-    pub fn compile_module(module: &Module, name: &str, is_bpf: bool) {
+    pub fn compile_module(module: &Module, output_path: &Path, is_bpf: bool) {
         const OPTIMIZATION_LEVEL: OptimizationLevel = OptimizationLevel::Default;
         const RELOC_MODE: RelocMode = RelocMode::PIC;
         const CODE_MODEL: CodeModel = CodeModel::Default;
@@ -32,8 +33,6 @@ impl ObjectCompiler {
             )
             .unwrap();
 
-        let output_name = format!("{name}.o");
-        let output_path = std::path::Path::new(&output_name);
         target_machine
             .write_to_file(module, FileType::Object, output_path)
             .unwrap();
