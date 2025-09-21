@@ -1,19 +1,25 @@
 use inkwell::{
     OptimizationLevel,
     module::Module,
-    targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine},
+    targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple},
 };
 
 pub struct ObjectCompiler;
 
 impl ObjectCompiler {
-    pub fn compile_module(module: &Module, name: &str) {
+    pub fn compile_module(module: &Module, name: &str, is_bpf: bool) {
         const OPTIMIZATION_LEVEL: OptimizationLevel = OptimizationLevel::Default;
         const RELOC_MODE: RelocMode = RelocMode::PIC;
         const CODE_MODEL: CodeModel = CodeModel::Default;
 
         Target::initialize_all(&InitializationConfig::default());
-        let target_triple = TargetMachine::get_default_triple();
+
+        let target_triple = if is_bpf {
+            TargetTriple::create("bpf-pc-linux")
+        } else {
+            TargetMachine::get_default_triple()
+        };
+
         let target = Target::from_triple(&target_triple).unwrap();
         let target_machine = target
             .create_target_machine(

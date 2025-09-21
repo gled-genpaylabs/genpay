@@ -206,7 +206,8 @@ fn main() {
     // Code Generator Initialization.
     // Creating custom context and a very big wrapper for builder.
     let ctx = genpay_codegen::CodeGen::create_context();
-    let mut codegen = genpay_codegen::CodeGen::new(&ctx, &module_name, &src, symtable, &bump);
+    let mut codegen =
+        genpay_codegen::CodeGen::new(&ctx, &module_name, &src, symtable, args.bpf, &bump);
 
     // Compiling: AST -> LLVM IR Module Reference
     let (module_ref, _) = codegen.compile(ast.to_vec(), None);
@@ -225,7 +226,7 @@ fn main() {
             &format!("compiled to LLVM IR: `{}.ll`", args.output.display()),
         )
     } else {
-        genpay_linker::compiler::ObjectCompiler::compile_module(module_ref, &module_name);
+        genpay_linker::compiler::ObjectCompiler::compile_module(module_ref, &module_name, args.bpf);
         let compiler = genpay_linker::linker::ObjectLinker::link(
             &module_name,
             args.output.to_str().unwrap(),

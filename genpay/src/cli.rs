@@ -25,6 +25,10 @@ pub struct Args {
     #[arg(short, long, action, help = "Enable compilation into LLVM IR")]
     pub llvm: bool,
 
+    /// `-b --bpf` flag to enable compilation into eBPF bytecode
+    #[arg(short, long, action, help = "Enable compilation into eBPF bytecode")]
+    pub bpf: bool,
+
     /// `-i --include` flag to link C library to linker
     #[arg(short, long, action, help = "Include C library to linker")]
     pub include: Vec<PathBuf>,

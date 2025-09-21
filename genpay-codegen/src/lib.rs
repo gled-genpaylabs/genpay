@@ -66,13 +66,20 @@ impl<'ctx> CodeGen<'ctx> {
         module_name: &str,
         module_source: &str,
         symtable: SymbolTable<'ctx>,
+        is_bpf: bool,
         bump: &'ctx Bump,
     ) -> Self {
         let module = context.create_module(module_name);
         let builder = context.create_builder();
 
+        let triple = if is_bpf {
+            inkwell::targets::TargetTriple::create("bpf-pc-linux")
+        } else {
+            inkwell::targets::TargetMachine::get_default_triple()
+        };
+
         module.set_source_file_name(&format!("{module_name}.dn"));
-        module.set_triple(&inkwell::targets::TargetMachine::get_default_triple());
+        module.set_triple(&triple);
 
         module
             .add_global_metadata(
@@ -1444,6 +1451,7 @@ impl<'ctx> CodeGen<'ctx> {
                     &module_name,
                     &import.source,
                     import.embedded_symtable.clone(),
+                    false,
                     self.bump,
                 );
 
@@ -3457,6 +3465,7 @@ mod tests {
             "",
             "",
             genpay_semantic::symtable::SymbolTable::default(),
+            false,
             &bump,
         );
 
@@ -3485,6 +3494,7 @@ mod tests {
             "",
             "",
             genpay_semantic::symtable::SymbolTable::default(),
+            false,
             &bump,
         );
 
