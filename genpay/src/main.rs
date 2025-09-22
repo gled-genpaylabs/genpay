@@ -227,7 +227,7 @@ fn main() {
         )
     } else {
         let output_path_str = if args.bpf {
-            args.output.to_str().unwrap().to_string()
+            "a.o".to_string()
         } else {
             format!("{}.o", module_name)
         };
@@ -236,7 +236,7 @@ fn main() {
         genpay_linker::compiler::ObjectCompiler::compile_module(module_ref, output_path, args.bpf);
         if !args.bpf {
             let compiler = genpay_linker::linker::ObjectLinker::link(
-                &module_name,
+                &output_path_str,
                 args.output.to_str().unwrap(),
                 external_linkages,
             )

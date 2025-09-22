@@ -5,7 +5,7 @@ members = [
   "genpay-parser",
   "genpay-semantic",
   "genpay-codegen",
-  "genpay-linker",
+  "genpay-linker", "bpf-tester",
 ]
 resolver = "2"
 

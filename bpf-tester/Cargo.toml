@@ -1,0 +1,11 @@
+[package]
+name = "bpf-tester"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0"
+solana-sbpf = { git = "https://github.com/anza-xyz/sbpf", rev = "58236a8ca3c3eeddae8b3c7f45a3246d8ee0fb8e" }
+object = "0.36.0"

@@ -12,9 +12,9 @@ fn test_bpf_compilation() {
     writeln!(file, "fn main() i64 {{ return 42; }}").unwrap();
 
     let mut cmd = Command::cargo_bin("genpay").unwrap();
-    let output_file = "test.o";
+    let output_file = "a.o";
     cmd.arg(file.path())
-        .arg(output_file)
+        .arg("test") // dummy output name
         .arg("--bpf")
         .assert()
         .success();
